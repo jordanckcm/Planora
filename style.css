@@ -8,6 +8,16 @@
     src: url(fonts/vhs-gothic.ttf);
 }
 
+@font-face {
+    font-family: "Stronger";
+    src: url(fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf);
+}
+
+@font-face {
+    font-family: "StarShield";
+    src: url(fonts/StarShieldV2-9M52K.ttf);
+}
+
 * {
     font-family: "VHS";
     margin: 0;
@@ -44,6 +54,94 @@ body {
     flex-direction: column;
 }
 
+.login-container {
+    width: 100%;
+    height: 100%;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 5;
+}
+
+.main-login-container {
+    width: 100%;
+
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.custom-input {
+    box-sizing: border-box;
+
+    padding: 15px;
+    width: 90%;
+    border-radius: 5px;
+    border: 1px solid black;
+    height: 4.5vh;
+}
+
+.custom-button {
+    width: 90%;
+    height: 4.5vh;
+    border-radius: 10px;
+
+    background: black;
+    cursor: pointer;
+}
+
+
+.login-button {
+    color: white;
+
+    margin-top: 5px;
+}
+
+.custom-button:hover {
+    scale: 1.01;
+    transition: 0.2s;
+}
+
+.planora {
+    width: 75px;
+    height: 75px;
+    background-image: url(icons/planora.png);
+    background-size: cover;
+    background-position: center;
+}
+
+.create-button {
+    background: blue;
+    color: white;
+}
+
+.custom-link {
+    font-size: 12px;
+    width: 90%;
+    color: gray;
+}
+
+.forgot-link {
+    margin-top: 15px;
+}
+
+.forgot-link:hover {
+    color: blue;
+    transition: 0.2s;
+}
+
+.custom-label {
+    width: 90%;
+    font-size: 12px;
+}
+
+.password-label {
+    margin-top: 15px;
+}
+
 .pages {
     width: 100%;
     height: calc(100dvh - 100px);
@@ -77,10 +175,11 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    font-size: 25px;
+    font-size: 35px;
+    font-family: "Gotham";
 
-    width: 15vh;
-    height: 20vh;
+    width: 12vh;
+    height: 18vh;
 
     border-radius: 10px;
     background: white;
@@ -112,7 +211,7 @@ body {
 }
 
 .c-two:hover {
-    transform: translate(-50%, calc(-50% - 25px));
+    transform: translate(-50%, calc(-50% - 22px));
 }
 
 .c-three:hover {
@@ -120,7 +219,7 @@ body {
 }
 
 .card:hover {
-    background: black;
+    background: linear-gradient(to top, black, rgb(46, 46, 46));
     color: white;
     transition: 0.2s;
 }
@@ -148,10 +247,19 @@ body {
 
 .description {
     width: 100%;
-    margin-top: 12px;
 
     text-align: center;
-    font-size: clamp(18px, 4vw, 24px);
+    font-size: clamp(9px, 4vw, 15px);
+}
+
+.bottom-description {
+    color: gray;
+    margin-top: 25px;
+    font-size: clamp(6px, 4vw, 12px);
+}
+
+.main-login-description {
+    margin-bottom: 90px;
 }
 
 .page {
@@ -250,4 +358,138 @@ body {
     to {
         left: 150%;
     }
+}
+
+.random-number {
+    font-size: 2550px;
+    left: 50%;
+    top: 20%;
+    transform: translateX(-50%) rotate(90deg);
+    font-family: "StarShield"; 
+    font-weight: bold;
+    
+    position: absolute;
+    opacity: 0.125;
+    z-index: -5;
+    user-select: none;
+    pointer-events: none;
+}
+
+@media (max-width: 600px) {
+    .random-number {
+        font-size: 750px;
+    }
+}
+
+.footer-cards {
+    position: absolute;
+
+    left: 50%;
+    bottom: -10%;
+
+    width: 100%;
+    height: 280px;
+
+    transform: translateX(-50%);
+
+    pointer-events: none;
+}
+
+.footer-card {
+    position: absolute;
+
+    width: 180px;
+    height: 250px;
+
+    left: 50%;
+    top: 50%;
+
+    border: 2px solid black;
+    border-radius: 20px;
+    background: white;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    transform-origin: center bottom;
+
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.15);
+    font-family: "Gotham";
+    font-size: 35px;
+}
+
+.card-center {
+    z-index: 3;
+
+    animation: centerFloat 4s ease-in-out infinite;
+}
+
+
+.card-left {
+    z-index: 2;
+
+    animation: leftFloat 4s ease-in-out infinite;
+}
+
+.card-right {
+    z-index: 2;
+
+    animation: rightFloat 4s ease-in-out infinite;
+}
+
+@keyframes centerFloat {
+
+    0%, 100% {
+        transform:
+            translate(-50%, -50%)
+            translateY(0)
+            rotate(0deg);
+    }
+
+    50% {
+        transform:
+            translate(-50%, -50%)
+            translateY(-8px)
+            rotate(0deg);
+    }
+
+}
+
+
+@keyframes leftFloat {
+
+    0%, 100% {
+        transform:
+            translate(calc(-50% - 100px), -50%)
+            translateY(0)
+            rotate(-12deg);
+    }
+
+    50% {
+        transform:
+            translate(calc(-50% - 100px), -50%)
+            translateY(-8px)
+            rotate(-14deg);
+    }
+
+}
+
+
+@keyframes rightFloat {
+
+    0%, 100% {
+        transform:
+            translate(calc(-50% + 100px), -50%)
+            translateY(0)
+            rotate(12deg);
+    }
+
+    50% {
+        transform:
+            translate(calc(-50% + 100px), -50%)
+            translateY(-8px)
+            rotate(14deg);
+    }
+
 }

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login/Signup</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="login.css">
+</head>
+
+<script>
+    window.addEventListener("load", () => {
+
+        document.body.classList.add("page-loaded");
+
+    });
+</script>
+
+<body>
+
+    <div class="random-number" id="randomNumberone">0000</div>
+
+    <div class="login-container">
+
+        <form class="main-login-container" action="homepage.html">
+            <div class="planora"></div>
+
+            <div class="title main-login-title">Planora</div>
+            <div class="description main-login-description">
+                Welcome back user.
+            </div>
+
+            <label class="custom-label username-label">Username</label>
+            <input class="custom-input username-input"
+                   type="text"
+                   placeholder="Enter username here.">
+
+            <label class="custom-label password-label">Password</label>
+            <input class="custom-input password-input"
+                   type="password"
+                   placeholder="Enter here.">
+
+            <a class="custom-link forgot-link" href="">
+                Forgot your password?
+            </a>
+
+            <button class="custom-button login-button">
+                Login.
+            </button>
+
+            <button class="custom-button create-button">
+                Create an account.
+            </button>
+        </form>
+
+        <pre class="description bottom-description">This web app is currently w.i.p. and currently
+being worked on please be patient and thank you
+for visiting!</pre>
+
+    </div>
+
+    <script src="numchange.js"></script>
+
+    <div class="footer-cards">
+        <div class="footer-card card-left">EVENTS</div>
+
+        <div class="footer-card card-center">CALENDAR</div>
+
+        <div class="footer-card card-right">HOST</div>
+    </div>
+
+    <script src="script.js"></script>
+
+    <script>
+        window.addEventListener("load", () => {
+            document.body.classList.add("page-loaded");
+        });
+    </script>
+
+</body>
+</html>

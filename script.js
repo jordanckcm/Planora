@@ -50,7 +50,15 @@ nextButton.addEventListener("click", () => {
 
     } else {
 
-        window.location.href = "login.html";
+        // Add the exit animation
+        document.body.classList.add("page-exit");
+
+        // Wait for the animation to finish
+        setTimeout(() => {
+
+            window.location.href = "login.html";
+
+        }, 500);
 
     }
 
