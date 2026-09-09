@@ -16,6 +16,7 @@ let currentUser = null;
 let currentYear = new Date().getFullYear();
 let mode = "local"; // "local" | "global"
 let openMonth = null;
+let shownOfflineToast = false;
 
 const monthButtons = document.querySelectorAll(".month-events-container");
 const yearDisplay = document.getElementById("year");
@@ -230,7 +231,12 @@ async function render() {
     try {
         events = await PlanoraData.getEvents(mode, currentYear);
         if (events.fromCache) {
-            toast("You're offline — showing your last saved local events.");
+            if (!shownOfflineToast) {
+                toast("You're offline — showing your last saved local events.");
+                shownOfflineToast = true;
+            }
+        } else {
+            shownOfflineToast = false;
         }
     } catch (err) {
         toast(err.message, "error");
