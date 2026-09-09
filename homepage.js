@@ -229,6 +229,9 @@ async function render() {
     let events;
     try {
         events = await PlanoraData.getEvents(mode, currentYear);
+        if (events.fromCache) {
+            toast("You're offline — showing your last saved local events.");
+        }
     } catch (err) {
         toast(err.message, "error");
         return;
