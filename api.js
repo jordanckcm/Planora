@@ -50,7 +50,9 @@ const Planora = (() => {
     }
 
     async function logout() {
-        return apiRequest("/api/logout", { method: "POST" });
+        const result = await apiRequest("/api/logout", { method: "POST" });
+        localStorage.removeItem("planora_started");
+        return result;
     }
 
     async function getCurrentUser() {
