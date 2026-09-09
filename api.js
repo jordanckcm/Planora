@@ -4,12 +4,29 @@
    Everyone's data now lives on the server, in plain lists.
 ========================================================= */
 
-async function apiRequest(url, options = {}) {
-    const response = await fetch(url, {
-        method: options.method || "GET",
-        headers: { "Content-Type": "application/json" },
-        body: options.body ? JSON.stringify(options.body) : undefined
+if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+        // best-effort — if this fails, the app just works exactly
+        // like it did before, with no offline support
+        navigator.serviceWorker.register("/sw.js").catch(() => {});
     });
+}
+
+async function apiRequest(url, options = {}) {
+    let response;
+    try {
+        response = await fetch(url, {
+            method: options.method || "GET",
+            headers: { "Content-Type": "application/json" },
+            body: options.body ? JSON.stringify(options.body) : undefined
+        });
+    } catch (networkErr) {
+        // fetch() itself only throws when the request never reached
+        // the server at all — i.e. you're offline
+        const offlineError = new Error("No connection right now.");
+        offlineError.isOffline = true;
+        throw offlineError;
+    }
 
     const data = await response.json();
 
@@ -52,13 +69,25 @@ const Planora = (() => {
     async function logout() {
         const result = await apiRequest("/api/logout", { method: "POST" });
         localStorage.removeItem("planora_started");
+        localStorage.removeItem("planora_cached_me");
         return result;
     }
 
     async function getCurrentUser() {
         try {
-            return await apiRequest("/api/me");
+            const user = await apiRequest("/api/me");
+            try { localStorage.setItem("planora_cached_me", JSON.stringify(user)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
+            return user;
         } catch (err) {
+            // Only fall back to the cached identity when we couldn't reach
+            // the server at all. A real 401 (actually logged out) should
+            // still send you to login, even if a stale cache exists.
+            if (err.isOffline) {
+                const cached = localStorage.getItem("planora_cached_me");
+                if (cached) {
+                    try { return JSON.parse(cached); } catch (e) { /* fall through */ }
+                }
+            }
             return null;
         }
     }
@@ -99,7 +128,29 @@ const Planora = (() => {
 const PlanoraData = (() => {
 
     async function getEvents(mode, year) {
-        return apiRequest(`/api/events?mode=${encodeURIComponent(mode)}&year=${encodeURIComponent(year)}`);
+        const cacheKey = `planora_cached_events_${mode}_${year}`;
+
+        try {
+            const events = await apiRequest(`/api/events?mode=${encodeURIComponent(mode)}&year=${encodeURIComponent(year)}`);
+            if (mode === "local") {
+                try { localStorage.setItem(cacheKey, JSON.stringify(events)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
+            }
+            return events;
+        } catch (err) {
+            // Global still needs the server — only Near/local falls back
+            // to whatever we last saw for this year.
+            if (err.isOffline && mode === "local") {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) {
+                    try {
+                        const events = JSON.parse(cached);
+                        events.fromCache = true; // lets the UI mention it's stale
+                        return events;
+                    } catch (e) { /* fall through to the throw below */ }
+                }
+            }
+            throw err;
+        }
     }
 
     async function addEvent(event) {
