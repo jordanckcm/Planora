@@ -428,10 +428,11 @@ body {
 .add-event-button {
     position: fixed;
 
-    left: 50%;
-    bottom: 25px;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
 
-    transform: translateX(-50%);
+    bottom: 25px;
 
     width: 55px;
     height: 55px;
@@ -455,19 +456,23 @@ body {
 
     transition:
         transform 0.2s ease,
+        opacity 0.25s ease,
         background 0.2s ease;
 }
 
 .add-event-button:hover {
-    transform:
-        translateX(-50%)
-        scale(1.08);
+    transform: scale(1.08);
 }
 
 .add-event-button:active {
-    transform:
-        translateX(-50%)
-        scale(0.95);
+    transform: scale(0.95);
+}
+
+/* Hidden while scrolling down, reappears on scroll up (see homepage.js) */
+.add-event-button.hide-on-scroll {
+    transform: translateY(120px);
+    opacity: 0;
+    pointer-events: none;
 }
 
 
@@ -726,6 +731,9 @@ body {
 
     pointer-events: none;
     user-select: none;
+
+    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 95%);
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 95%);
 }
 
 
