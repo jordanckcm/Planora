@@ -44,8 +44,8 @@ function toast(message, type = "") {
     document.querySelector(".profile").style.background =
         `linear-gradient(135deg, ${currentUser.avatarColor}, #111)`;
 
-    addLogoutButton();
-    addAdminLinkIfAdmin();
+    buildProfileMenu();
+    showRoleBadge();
     bindModeButtons();
     bindYearButtons();
     buildAddEventUI();
@@ -61,41 +61,68 @@ function toast(message, type = "") {
    permissions no matter what the UI shows or hides.
 ========================= */
 
-function addAdminLinkIfAdmin() {
-    if (currentUser.role !== "admin") return;
-
-    const button = document.createElement("button");
-    button.className = "custom-button admin-button";
-    button.textContent = "Admin";
-    button.addEventListener("click", () => {
-        window.location.href = "admin.html";
-    });
-    document.querySelector(".topbar").appendChild(button);
-}
-
 function roleLabel(role) {
     if (role === "admin") return "Admin";
     if (role === "community_plus") return "Community+";
     return "Community";
 }
 
+function showRoleBadge() {
+    const badge = document.getElementById("roleBadge");
+    if (badge) badge.textContent = roleLabel(currentUser.role);
+}
+
 
 /* =========================
-   TOP BAR EXTRAS
+   PROFILE MENU
+   Avatar opens a small dropdown (View profile / Admin panel /
+   Log out) instead of separate topbar buttons, which is what
+   used to break the layout on narrow screens.
 ========================= */
 
-function addLogoutButton() {
-    const button = document.createElement("button");
-    button.className = "custom-button logout-button";
-    button.textContent = "Log out";
-    button.addEventListener("click", async () => {
+function buildProfileMenu() {
+    const profileButton = document.getElementById("profileButton");
+    const dropdown = document.getElementById("profileDropdown");
+
+    if (currentUser.role === "admin") {
+        const adminItem = document.createElement("button");
+        adminItem.className = "profile-dropdown-item";
+        adminItem.id = "adminItem";
+        adminItem.textContent = "Admin panel";
+        adminItem.addEventListener("click", () => {
+            window.location.href = "admin.html";
+        });
+        dropdown.insertBefore(adminItem, dropdown.querySelector(".profile-dropdown-divider"));
+    }
+
+    function openDropdown() {
+        dropdown.classList.add("show");
+        profileButton.setAttribute("aria-expanded", "true");
+    }
+
+    function closeDropdown() {
+        dropdown.classList.remove("show");
+        profileButton.setAttribute("aria-expanded", "false");
+    }
+
+    profileButton.addEventListener("click", (e) => {
+        e.stopPropagation();
+        dropdown.classList.contains("show") ? closeDropdown() : openDropdown();
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!dropdown.contains(e.target) && e.target !== profileButton) {
+            closeDropdown();
+        }
+    });
+
+    document.getElementById("viewProfileItem").addEventListener("click", () => {
+        window.location.href = "profile.html";
+    });
+
+    document.getElementById("logoutItem").addEventListener("click", async () => {
         await Planora.logout();
         window.location.href = "login.html";
-    });
-    document.querySelector(".topbar").appendChild(button);
-
-    document.querySelector(".profile").addEventListener("click", () => {
-        window.location.href = "profile.html";
     });
 }
 
@@ -409,6 +436,40 @@ async function buildComments(event) {
 
 
 /* =========================
+   SCROLL-AWARE + BUTTON
+   Hides the add-event button while scrolling down, brings it
+   back as soon as the user scrolls up even a little.
+========================= */
+
+function bindScrollHide(button) {
+    let lastY = window.scrollY;
+    let ticking = false;
+
+    function onScroll() {
+        const currentY = window.scrollY;
+        const scrolledDown = currentY > lastY;
+        const pastTopBuffer = currentY > 80; // never hide it right near the top
+
+        if (scrolledDown && pastTopBuffer) {
+            button.classList.add("hide-on-scroll");
+        } else {
+            button.classList.remove("hide-on-scroll");
+        }
+
+        lastY = currentY;
+        ticking = false;
+    }
+
+    window.addEventListener("scroll", () => {
+        if (!ticking) {
+            requestAnimationFrame(onScroll);
+            ticking = true;
+        }
+    }, { passive: true });
+}
+
+
+/* =========================
    ADD EVENT
 ========================= */
 
@@ -418,6 +479,8 @@ function buildAddEventUI() {
     addButton.className = "add-event-button";
     addButton.textContent = "+";
     document.body.appendChild(addButton);
+
+    bindScrollHide(addButton);
 
     const eventForm = document.createElement("div");
     eventForm.className = "event-form";
