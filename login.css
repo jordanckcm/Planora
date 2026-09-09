@@ -32,6 +32,10 @@
     font-display: swap;
 }
 
+html {
+    overflow: hidden;
+}
+
 body {
     min-height: 100dvh;
     display: flex;
@@ -42,6 +46,20 @@ body {
     overflow: hidden;
     position: relative;
     background: rgb(252, 252, 252);
+}
+
+/* Dedicated viewport-locked layer for the giant number. Fixed +
+   its own overflow:hidden means the oversized rotated text can
+   never inflate the page's scrollable area, no matter how big
+   font-size gets — it's clipped right here, independent of body. */
+.random-number-clip {
+    position: fixed;
+    inset: 0;
+
+    overflow: hidden;
+
+    z-index: 1;
+    pointer-events: none;
 }
 
 .random-number {
@@ -55,7 +73,6 @@ body {
     position: absolute;
     color: black;
     opacity: 0.125;
-    z-index: 1;
     user-select: none;
     pointer-events: none;
 }
