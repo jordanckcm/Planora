@@ -24,6 +24,7 @@ ROLES
 import hashlib
 import secrets
 import time
+import os
 from functools import wraps
 
 from flask import Flask, request, jsonify, session
@@ -33,7 +34,7 @@ app = Flask(__name__, static_folder=".", static_url_path="")
 
 # this key is used to keep login sessions safe.
 # in a real project you would NOT hardcode this, you'd keep it secret!
-app.secret_key = "this-is-a-super-secret-key-change-me"
+app.secret_key = os.environ["SECRET_KEY"]
 
 
 # =========================================================
@@ -155,17 +156,17 @@ def now_in_ms():
 
 
 # =========================================================
-# SEED SOME DEMO DATA
-# So the Global tab isn't empty the first time you try it.
-# =========================================================
+    DATA
+# ==============-==========================================
 
 def add_demo_data():
     demo_salt = make_salt()
-    demo_password_hash = hash_password("jordie123", demo_salt)
+    planora_password = os.environ["PLANORA_ADMIN_PASSWORD"]
+    planora_password_hash = hash_password(planora_password, demo_salt)
 
-    # sable is a demo admin so you have someone to test the admin panel with.
     demo_users = [
         {"username": "Jordan", "role": "admin"},
+        {"username": "Manlangit", "role": "admin"},
     ]
 
     for demo in demo_users:
@@ -174,7 +175,7 @@ def add_demo_data():
             "username": name,
             "display_name": name.capitalize(),
             "salt": demo_salt,
-            "password_hash": demo_password_hash,
+            "password_hash": planora_password_hash,
             "bio": "",
             "avatar_color": pick_avatar_color(name),
             "created_at": now_in_ms(),
