@@ -16,7 +16,17 @@
     <!-- TOP BAR -->
     <div class="topbar">
 
-        <div class="profile"></div>
+        <div class="profile-menu">
+
+            <button class="profile" id="profileButton" aria-label="Profile menu" aria-haspopup="true" aria-expanded="false"></button>
+
+            <div class="profile-dropdown" id="profileDropdown">
+                <button class="profile-dropdown-item" id="viewProfileItem">View profile</button>
+                <div class="profile-dropdown-divider"></div>
+                <button class="profile-dropdown-item danger" id="logoutItem">Log out</button>
+            </div>
+
+        </div>
 
         <button class="custom-button calendar-button">
             Calendar
@@ -49,6 +59,8 @@
         </button>
 
     </div>
+
+    <div class="role-badge" id="roleBadge"></div>
 
 
     <!-- =========================
