@@ -151,13 +151,32 @@ function bindYearButtons() {
     document.getElementById("previousYear").addEventListener("click", () => {
         currentYear--;
         openMonth = null;
+        animateYearSwitch("prev");
         render();
     });
 
     document.getElementById("nextYear").addEventListener("click", () => {
         currentYear++;
         openMonth = null;
+        animateYearSwitch("next");
         render();
+    });
+}
+
+function animateYearSwitch(direction) {
+    const yearClass = direction === "next" ? "year-animate-next" : "year-animate-prev";
+
+    // remove + force reflow so the animation restarts even if you
+    // mash the arrows quickly
+    yearDisplay.classList.remove("year-animate-next", "year-animate-prev");
+    void yearDisplay.offsetWidth;
+    yearDisplay.classList.add(yearClass);
+
+    document.querySelectorAll(".month-wrapper").forEach((wrapper, i) => {
+        wrapper.classList.remove("month-animate");
+        void wrapper.offsetWidth;
+        wrapper.style.animationDelay = `${i * 35}ms`;
+        wrapper.classList.add("month-animate");
     });
 }
 
