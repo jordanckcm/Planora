@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Admin — Planora</title>
+
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="homepage.css">
+    <link rel="stylesheet" href="homepage-extra.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+
+<body>
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+        <div class="profile"></div>
+        <button class="custom-button" id="backButton">← Back</button>
+        <div class="admin-title">Admin panel</div>
+    </div>
+
+    <div class="admin-wrap">
+
+        <!-- USERS -->
+        <section class="admin-section">
+            <h2>Users</h2>
+            <div class="admin-table" id="usersTable">
+                <div class="admin-row admin-row-head">
+                    <span>Username</span>
+                    <span>Display name</span>
+                    <span>Role</span>
+                    <span></span>
+                </div>
+                <!-- rows injected by admin.js -->
+            </div>
+        </section>
+
+        <!-- GLOBAL EVENTS -->
+        <section class="admin-section">
+            <h2>All events</h2>
+            <div class="admin-table" id="eventsTable">
+                <div class="admin-row admin-row-head">
+                    <span>Title</span>
+                    <span>Owner</span>
+                    <span>Date</span>
+                    <span>Visibility</span>
+                    <span></span>
+                </div>
+                <!-- rows injected by admin.js -->
+            </div>
+        </section>
+
+    </div>
+
+    <div class="toast-stack" id="toastStack"></div>
+
+    <script src="api.js"></script>
+    <script src="admin.js"></script>
+
+</body>
+
+</html>

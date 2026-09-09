@@ -1,8 +1,309 @@
-body {
-    opacity: 0;
-    transition: opacity 0.5s ease;
+/* =========================================================
+   PLANORA — LOGIN
+========================================================= */
+
+@font-face {
+    font-family: "Gotham";
+    src: url(fonts/Gotham.ttf);
+    font-display: swap;
 }
 
-body.page-loaded {
-    opacity: 1;
+@font-face {
+    font-family: "VHS";
+    src: url(fonts/vhs-gothic.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Stronger";
+    src: url(fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "StarShield";
+    src: url(fonts/StarShieldV2-9M52K.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Gothikka";
+    src: url(fonts/Gothikka.ttf);
+    font-display: swap;
+}
+
+body {
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    overflow-x: hidden;
+    overflow: hidden;
+    position: relative;
+    background: rgb(252, 252, 252);
+}
+
+.random-number {
+    font-size: 2550px;
+    left: 50%;
+    top: 20%;
+    transform: translateX(-50%) rotate(90deg);
+    font-family: "StarShield"; 
+    font-weight: bold;
+    
+    position: absolute;
+    color: black;
+    opacity: 0.125;
+    z-index: 1;
+    user-select: none;
+    pointer-events: none;
+}
+
+@media (max-width: 600px) {
+    .random-number {
+        font-size: 750px;
+    }
+}
+
+.table-glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+}
+
+.auth-shell {
+    width: min(100%, 380px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+}
+
+
+/* =========================
+   BRAND
+========================= */
+
+.auth-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.brand-mark {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 4px;
+
+    background-image: url(icons/planora.png);
+    background-size: cover;
+    background-position: center;
+}
+
+.brand-name {
+    font-family: "Gotham";
+    font-size: 75px;
+    letter-spacing: 0.01em;
+    color: black;
+}
+
+.brand-tag {
+    font-family: "VHS";
+    font-size: 12px;
+    color: black;
+    opacity: 0.85;
+}
+
+
+/* =========================
+   CARD
+========================= */
+
+.auth-card {
+    width: 100%;
+
+    padding: 22px;
+
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+
+/* =========================
+   TABS
+========================= */
+
+.auth-tabs {
+    display: flex;
+    gap: 6px;
+
+    margin-bottom: 20px;
+
+    padding: 4px;
+
+    background: rgb(19, 19, 19);
+    border-radius: var(--radius-pill);
+}
+
+.auth-tab {
+    flex: 1;
+
+    height: 38px;
+
+    border: none;
+    border-radius: var(--radius-pill);
+
+    background: transparent;
+    color: var(--text-dim);
+
+    font-family: "Gotham";
+    font-size: 18px;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.auth-tab.active {
+    background: var(--text);
+    color: #0c0c0c;
+}
+
+
+/* =========================
+   FORM
+========================= */
+
+.auth-form {
+    display: none;
+    flex-direction: column;
+}
+
+.auth-form.active {
+    display: flex;
+}
+
+.field-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    margin-top: 14px;
+}
+
+.field-label:first-child {
+    margin-top: 0;
+}
+
+.field-input {
+    width: 100%;
+    height: 46px;
+
+    padding: 0 14px;
+
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+
+    background: rgb(19, 19, 19);
+    color: var(--text);
+
+    font-size: 14px;
+
+    outline: none;
+
+    transition: border-color 0.2s ease;
+}
+
+.field-input:focus {
+    border-color: var(--border-strong);
+}
+
+.field-input::placeholder {
+    color: var(--text-faint);
+}
+
+.password-wrap {
+    position: relative;
+}
+
+.reveal-toggle {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+
+    height: 34px;
+    padding: 0 12px;
+
+    border: none;
+    border-radius: var(--radius-sm);
+
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-dim);
+
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+.reveal-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.strength-hint {
+    margin-top: 8px;
+
+    font-size: 10.5px;
+    color: var(--text-faint);
+}
+
+.strength-hint.ok {
+    color: #9fd89f;
+}
+
+.remember-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    margin-top: 16px;
+
+    font-size: 11.5px;
+    color: var(--text-dim);
+
+    cursor: pointer;
+}
+
+.remember-row input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--gold);
+}
+
+.form-error {
+    min-height: 16px;
+    margin-top: 12px;
+
+    font-size: 11.5px;
+    color: #e08b86;
+}
+
+.auth-submit {
+    width: 100%;
+    height: 46px;
+    margin-top: 6px;
+
+    font-family: "Gotham";
+    font-size: 18px;
+}
+
+.auth-footnote {
+    margin-top: 18px;
+
+    text-align: center;
+
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--text-faint);
 }

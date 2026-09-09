@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planora — Profile</title>
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="profile.css">
+</head>
+<body>
+
+    <div class="topbar">
+        <button class="back-button" id="backButton">← Calendar</button>
+        <div class="topbar-spacer"></div>
+        <button class="custom-button logout-button" id="logoutButton">Log out</button>
+    </div>
+
+    <main class="profile-shell">
+
+        <div class="profile-header">
+            <button class="avatar-big" id="avatarBig"></button>
+            <div class="profile-name" id="displayNameView"></div>
+            <div class="profile-username" id="usernameView"></div>
+        </div>
+
+        <div class="stat-row">
+            <div class="stat">
+                <div class="stat-value" id="statEvents">0</div>
+                <div class="stat-label">Events</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statComments">0</div>
+                <div class="stat-label">Comments</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="statSince">—</div>
+                <div class="stat-label">Member since</div>
+            </div>
+        </div>
+
+        <div class="profile-card">
+
+            <div class="card-title">Avatar color</div>
+            <div class="color-row" id="colorRow"></div>
+
+            <label class="field-label" for="displayNameInput">Display name</label>
+            <input class="field-input" id="displayNameInput" maxlength="40">
+
+            <label class="field-label" for="bioInput">Bio</label>
+            <textarea class="field-input bio-input" id="bioInput" maxlength="200" placeholder="Say something about yourself..."></textarea>
+
+            <button class="btn btn-solid save-button" id="saveProfile">Save changes</button>
+            <div class="save-note" id="saveNote"></div>
+
+        </div>
+
+        <div class="profile-card">
+            <div class="card-title">Account</div>
+            <p class="account-note">
+                Your account lives on the Python server for now, kept in a plain list, not a real database —
+                restarting the server clears everyone's accounts.
+            </p>
+            <button class="btn btn-red" id="logoutButtonSecondary">Log out of Planora</button>
+        </div>
+
+    </main>
+
+    <div class="toast-stack" id="toastStack"></div>
+
+    <script src="api.js"></script>
+    <script src="profile.js"></script>
+
+</body>
+</html>

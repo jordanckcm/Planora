@@ -1,0 +1,301 @@
+/* =========================================================
+   PLANORA — HOMEPAGE EXTRAS
+   Loaded after homepage.css. Only adds things that file
+   doesn't already cover — never overrides its look.
+========================================================= */
+
+/* =========================
+   TOASTS
+========================= */
+
+.toast-stack {
+    position: fixed;
+    top: 76px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    z-index: 999;
+    pointer-events: none;
+
+    width: min(92%, 380px);
+}
+
+.toast {
+    padding: 12px 16px;
+
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+
+    background: rgb(24, 24, 24);
+    color: white;
+
+    font-family: "VHS";
+    font-size: 12px;
+    line-height: 1.4;
+
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+
+    animation: toastIn 0.25s ease;
+}
+
+.toast.error {
+    border-color: rgba(182, 69, 63, 0.5);
+    color: #f1b3af;
+}
+
+.toast.success {
+    border-color: rgba(72, 156, 72, 0.5);
+    color: #b7e3b7;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+
+.profile {
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.profile:hover {
+    transform: scale(1.08);
+}
+
+
+/* =========================
+   NEAR / GLOBAL AS A MODE SWITCH
+   "Near" = your own events, "Global" = everyone's.
+   Whichever is active gets the same green the Calendar
+   button already uses, so it reads as "the current view".
+========================= */
+
+.near-button,
+.global-button {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.near-button.mode-active,
+.global-button.mode-active {
+    background: rgb(72, 156, 72);
+    border-color: rgb(72, 156, 72);
+}
+
+.near-button.mode-active:hover,
+.global-button.mode-active:hover {
+    background: rgb(85, 175, 85);
+}
+
+.logout-button {
+    margin-left: auto;
+}
+
+
+/* =========================
+   EVENT CARD LAYOUT
+   homepage.css makes .event a row-flex container by default;
+   we stack a main row and a comments block underneath it.
+========================= */
+
+.event {
+    flex-direction: column;
+    align-items: stretch;
+}
+
+.event-main {
+    display: flex;
+    align-items: center;
+    width: 100%;
+}
+
+.event-actions {
+    display: flex;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-left: 10px;
+}
+
+.event-action-btn {
+    height: 30px;
+    padding: 0 12px;
+
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+
+    background: transparent;
+    color: rgba(255, 255, 255, 0.6);
+
+    font-family: "VHS";
+    font-size: 10px;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+    white-space: nowrap;
+}
+
+.event-action-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.event-action-btn.added {
+    color: #9fd89f;
+    border-color: rgba(72, 156, 72, 0.4);
+}
+
+.event-action-btn.danger:hover {
+    background: rgba(182, 69, 63, 0.15);
+    color: #e08b86;
+    border-color: #b6453f;
+}
+
+.event-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.event-author {
+    font-family: "VHS";
+    font-size: 9.5px;
+    padding: 2px 8px;
+
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+
+    color: rgba(255, 255, 255, 0.55);
+    white-space: nowrap;
+}
+
+
+/* =========================
+   COMMENTS
+========================= */
+
+.comments {
+    margin-top: 12px;
+    padding-top: 12px;
+
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.comment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    margin-bottom: 10px;
+}
+
+.comment {
+    font-family: "VHS";
+    font-size: 11px;
+    line-height: 1.4;
+    color: white;
+}
+
+.comment-author {
+    font-family: "Gotham";
+    font-size: 10px;
+    color: rgb(72, 156, 72);
+    margin-right: 6px;
+}
+
+.comment-empty {
+    font-family: "VHS";
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.comment-form {
+    display: flex;
+    gap: 8px;
+}
+
+.comment-input {
+    flex: 1;
+    height: 34px;
+
+    padding: 0 12px;
+
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+
+    background: rgb(19, 19, 19);
+    color: white;
+
+    font-family: "VHS";
+    font-size: 11px;
+
+    outline: none;
+}
+
+.comment-submit {
+    height: 34px;
+    padding: 0 14px;
+
+    border: none;
+    border-radius: 20px;
+
+    background: rgb(72, 156, 72);
+    color: white;
+
+    font-family: "VHS";
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+.comment-submit:hover {
+    background: rgb(85, 175, 85);
+}
+
+
+/* =========================
+   VISIBILITY TOGGLE IN THE CREATE-EVENT FORM
+========================= */
+
+.visibility-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+
+    margin-bottom: 14px;
+    padding: 12px 14px;
+
+    background: rgb(19, 19, 19);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+
+    font-family: "VHS";
+}
+
+.visibility-row input {
+    width: 16px;
+    height: 16px;
+    accent-color: rgb(72, 156, 72);
+}
+
+.visibility-row label {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+
+/* =========================
+   MOBILE
+========================= */
+
+@media (max-width: 600px) {
+
+    .event-actions {
+        flex-direction: column;
+    }
+
+}

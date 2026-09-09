@@ -1,0 +1,244 @@
+/* =========================================================
+   PLANORA — BASE
+   Shared tokens, fonts, resets, and primitive components.
+   Every page loads this first, then its own stylesheet.
+========================================================= */
+
+@font-face {
+    font-family: "Gotham";
+    src: url(fonts/Gotham.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "VHS";
+    src: url(fonts/vhs-gothic.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Stronger";
+    src: url(fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "StarShield";
+    src: url(fonts/StarShieldV2-9M52K.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Gothikka";
+    src: url(fonts/Gothikka.ttf);
+    font-display: swap;
+}
+
+:root {
+    --bg: #131313;
+    --panel: rgb(27, 27, 27);
+    --panel-soft: rgba(30, 30, 30, 0.8);
+    --panel-raised: rgb(38, 38, 38);
+    --border: rgba(255, 255, 255, 0.1);
+    --border-strong: rgba(255, 255, 255, 0.3);
+    --text: #ffffff;
+    --text-dim: rgba(255, 255, 255, 0.55);
+    --text-faint: rgba(255, 255, 255, 0.35);
+
+    --gold: #c9a227;
+    --gold-soft: rgba(201, 162, 39, 0.15);
+    --green: rgb(72, 156, 72);
+    --green-hover: rgb(85, 175, 85);
+    --red: #b6453f;
+    --red-hover: #c95751;
+
+    --radius-lg: 18px;
+    --radius-md: 12px;
+    --radius-sm: 8px;
+    --radius-pill: 999px;
+
+    --shadow-lift: 0 15px 50px rgba(0, 0, 0, 0.5);
+}
+
+* {
+    font-family: "VHS";
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+}
+
+html, body {
+    width: 100%;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+}
+
+::selection {
+    background: var(--gold-soft);
+    color: var(--text);
+}
+
+::-webkit-scrollbar {
+    width: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border-radius: var(--radius-pill);
+}
+
+a {
+    color: inherit;
+    text-decoration: none;
+}
+
+button {
+    font-family: "VHS";
+}
+
+:focus-visible {
+    outline: 2px solid var(--gold);
+    outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+}
+
+
+/* =========================
+   PRIMITIVE BUTTON
+========================= */
+
+.btn {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+
+    height: 44px;
+    padding: 0 20px;
+
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+
+    background: transparent;
+    color: var(--text);
+
+    font-size: 12px;
+    letter-spacing: 0.03em;
+
+    cursor: pointer;
+    transition: 0.2s ease;
+}
+
+.btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-strong);
+}
+
+.btn:active {
+    transform: scale(0.97);
+}
+
+.btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+
+.btn:disabled:hover {
+    background: transparent;
+    border-color: var(--border);
+}
+
+.btn-solid {
+    background: var(--text);
+    color: #0c0c0c;
+    border-color: var(--text);
+}
+
+.btn-solid:hover {
+    background: rgba(255, 255, 255, 0.85);
+}
+
+.btn-green {
+    background: var(--green);
+    border-color: var(--green);
+    color: white;
+}
+
+.btn-green:hover {
+    background: var(--green-hover);
+    border-color: var(--green-hover);
+}
+
+.btn-red {
+    background: transparent;
+    border-color: rgba(182, 69, 63, 0.5);
+    color: #e08b86;
+}
+
+.btn-red:hover {
+    background: rgba(182, 69, 63, 0.15);
+    border-color: var(--red);
+}
+
+
+/* =========================
+   TOAST
+========================= */
+
+.toast-stack {
+    position: fixed;
+    top: 76px;
+    left: 50%;
+    transform: translateX(-50%);
+
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    z-index: 999;
+
+    pointer-events: none;
+
+    width: min(92%, 380px);
+}
+
+.toast {
+    padding: 12px 16px;
+
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+
+    background: rgb(24, 24, 24);
+    color: var(--text);
+
+    font-size: 12px;
+    line-height: 1.4;
+
+    box-shadow: var(--shadow-lift);
+
+    animation: toastIn 0.25s ease;
+}
+
+.toast.error {
+    border-color: rgba(182, 69, 63, 0.5);
+    color: #f1b3af;
+}
+
+.toast.success {
+    border-color: rgba(72, 156, 72, 0.5);
+    color: #b7e3b7;
+}
+
+@keyframes toastIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+}

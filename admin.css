@@ -1,0 +1,87 @@
+.admin-title {
+    color: #eee;
+    font-weight: 600;
+    margin-left: 12px;
+    align-self: center;
+}
+
+.admin-wrap {
+    max-width: 900px;
+    margin: 32px auto;
+    padding: 0 16px;
+}
+
+.admin-section {
+    margin-bottom: 40px;
+}
+
+.admin-section h2 {
+    color: #eee;
+    font-size: 18px;
+    margin-bottom: 12px;
+}
+
+.admin-table {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #333;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.admin-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr auto;
+    gap: 12px;
+    padding: 10px 14px;
+    align-items: center;
+    border-bottom: 1px solid #2a2a2a;
+    color: #ddd;
+    font-size: 14px;
+}
+
+#eventsTable .admin-row {
+    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+}
+
+.admin-row:last-child {
+    border-bottom: none;
+}
+
+.admin-row-head {
+    background: #1a1a1a;
+    font-weight: 600;
+    color: #999;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.04em;
+}
+
+.role-select {
+    background: #111;
+    color: #eee;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 4px 8px;
+}
+
+.admin-danger-btn {
+    background: transparent;
+    border: 1px solid #b6453f;
+    color: #b6453f;
+    border-radius: 6px;
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.admin-danger-btn:hover {
+    background: #b6453f;
+    color: #fff;
+}
+
+.visibility-locked-hint {
+    color: #999;
+    font-size: 12px;
+    margin: -6px 0 8px;
+}

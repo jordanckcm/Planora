@@ -1,0 +1,357 @@
+/* =========================================================
+   PLANORA — ONBOARDING
+========================================================= */
+
+html, body {
+    height: 100%;
+}
+
+body {
+    overflow: hidden;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+}
+
+.backgroundignore {
+    width: 100%;
+    height: 100%;
+
+    background-image: url(images/inkling.jpg);
+    filter: blur(45px) brightness(0.35);
+    background-size: cover;
+    background-position: center;
+
+    position: absolute;
+    z-index: -1;
+}
+
+.onboarding {
+    width: 100%;
+    height: 100dvh;
+
+    display: flex;
+    flex-direction: column;
+}
+
+.pages {
+    width: 100%;
+    height: calc(100dvh - 110px);
+    display: flex;
+
+    transition: transform 0.5s cubic-bezier(.77, 0, .18, 1);
+}
+
+.page {
+    min-width: 100%;
+    height: 100%;
+    position: relative;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+
+/* =========================
+   PAGE 1 — HERO
+========================= */
+
+.title {
+    width: 100%;
+    height: auto;
+
+    font-family: "Gotham";
+    text-align: center;
+
+    font-size: clamp(64px, 16vw, 110px);
+    line-height: 0.95;
+
+    color: white;
+}
+
+.pageone-title {
+    margin-top: clamp(30px, 8vh, 100px);
+}
+
+.description {
+    width: 100%;
+    text-align: center;
+    font-size: clamp(9px, 4vw, 15px);
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.cards-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    position: absolute;
+
+    width: 100%;
+    height: 25vh;
+
+    top: 55%;
+    left: 50%;
+
+    transform: translate(-50%, -50%);
+}
+
+.card {
+    position: absolute;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 32px;
+    font-family: "Gotham";
+
+    width: 12vh;
+    height: 18vh;
+
+    border-radius: var(--radius-md);
+    background: white;
+    color: #0c0c0c;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+
+    top: 50%;
+    left: 50%;
+
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+
+.c-one {
+    transform: translate(calc(-50% - 12vh), -50%) rotate(-10deg);
+    z-index: 2;
+}
+
+.c-two {
+    z-index: 0;
+    transform: translate(-50%, -60%);
+}
+
+.c-three {
+    z-index: 2;
+    transform: translate(calc(-50% + 12vh), -50%) rotate(10deg);
+}
+
+.c-one:hover {
+    transform: translate(calc(-50% - 12vh), calc(-50% - 5px)) rotate(-10deg);
+}
+
+.c-two:hover {
+    transform: translate(-50%, calc(-50% - 22px));
+}
+
+.c-three:hover {
+    transform: translate(calc(-50% + 12vh), calc(-50% - 5px)) rotate(10deg);
+}
+
+.card:hover {
+    background: linear-gradient(to top, black, #8d8d8d);
+    color: white;
+}
+
+.ace {
+    width: 19vh;
+    height: 19vh;
+    margin-top: 32vh;
+
+    background-image: url(icons/spade.png);
+    background-position: center;
+    background-size: cover;
+
+    rotate: 180deg;
+}
+
+
+/* =========================
+   PAGE 2 & 3 — SHARED
+========================= */
+
+.page-title,
+.page-description {
+    margin-top: 0;
+}
+
+.page-explain,
+.page-cta {
+    justify-content: center;
+    gap: 14px;
+    padding: 0 8%;
+}
+
+.page-title {
+    font-size: clamp(30px, 8vw, 44px);
+    margin-bottom: 4px;
+}
+
+.page-description {
+    max-width: 320px;
+    margin: 0 auto 30px;
+}
+
+
+/* =========================
+   PAGE 2 — EXPLAIN CARDS
+========================= */
+
+.explain-cards {
+    display: flex;
+    gap: 14px;
+
+    width: 100%;
+    max-width: 420px;
+}
+
+.explain-card {
+    flex: 1;
+
+    padding: 20px 16px;
+
+    background: var(--panel-soft);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+
+    text-align: left;
+}
+
+.explain-tag {
+    display: inline-block;
+
+    padding: 3px 10px;
+    margin-bottom: 12px;
+
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border-strong);
+
+    font-family: "VHS";
+    font-size: 12px;
+    color: var(--gold);
+}
+
+.explain-tag-global {
+    color: var(--green-hover);
+    border-color: rgba(72, 156, 72, 0.5);
+}
+
+.explain-heading {
+    font-family: "VHS";
+    font-size: 17px;
+    color: white;
+    margin-bottom: 8px;
+}
+
+.explain-body {
+    font-size: 11px;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+
+/* =========================
+   PAGE 3 — CTA
+========================= */
+
+.cta-mark {
+    width: 70px;
+    height: 70px;
+    margin-top: 10px;
+
+    background-image: url(icons/planora.png);
+    background-size: cover;
+    background-position: center;
+}
+
+
+/* =========================
+   BOTTOM NAV
+========================= */
+
+.bottom {
+    width: 100%;
+    height: 110px;
+
+    display: flex;
+    flex-direction: column;
+
+    align-items: center;
+    justify-content: center;
+
+    gap: 20px;
+}
+
+.dots {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+
+    border-radius: 50%;
+
+    background: rgba(255, 255, 255, 0.25);
+
+    transition: width 0.3s ease, background 0.3s ease;
+}
+
+.dot.active {
+    width: 24px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.25);
+}
+
+#nextButton {
+    position: relative;
+    overflow: hidden;
+
+    border: none;
+    color: #0c0c0c;
+    background: white;
+    cursor: pointer;
+    width: 90%;
+    max-width: 360px;
+    height: 46px;
+    border-radius: var(--radius-pill);
+
+    font-family: "Gotham";
+    font-size: 13px;
+}
+
+#nextButton::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -100%;
+
+    width: 50%;
+    height: 100%;
+
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(0, 0, 0, 0.15),
+        transparent
+    );
+
+    transform: skewX(-20deg);
+}
+
+#nextButton:hover::before {
+    animation: shine 1s ease;
+}
+
+@keyframes shine {
+    from { left: -100%; }
+    to { left: 150%; }
+}
+
+.page-exit {
+    animation: pageExit 0.5s ease forwards;
+}
+
+@keyframes pageExit {
+    to { opacity: 0; }
+}

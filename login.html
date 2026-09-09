@@ -3,79 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login/Signup</title>
-    <link rel="stylesheet" href="style.css">
+    <title>Sign in</title>
+    <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="login.css">
 </head>
-
-<script>
-    window.addEventListener("load", () => {
-
-        document.body.classList.add("page-loaded");
-
-    });
-</script>
-
 <body>
-
     <div class="random-number" id="randomNumberone">0000</div>
+    <div class="table-glow"></div>
 
-    <div class="login-container">
+    <div class="auth-shell">
 
-        <form class="main-login-container" action="homepage.html">
-            <div class="planora"></div>
+        <div class="auth-brand">
+            <div class="brand-mark"></div>
+            <div class="brand-name">Planora</div>
+            <div class="brand-tag">Never miss a moment.</div>
+        </div>
 
-            <div class="title main-login-title">Planora</div>
-            <div class="description main-login-description">
-                Welcome back user.
+        <div class="auth-card">
+
+            <div class="auth-tabs">
+                <button class="auth-tab active" data-tab="login">Sign in</button>
+                <button class="auth-tab" data-tab="signup">Create account</button>
             </div>
 
-            <label class="custom-label username-label">Username</label>
-            <input class="custom-input username-input"
-                   type="text"
-                   placeholder="Enter username here.">
+            <!-- ================= LOGIN ================= -->
+            <form class="auth-form active" id="loginForm" autocomplete="off" novalidate>
 
-            <label class="custom-label password-label">Password</label>
-            <input class="custom-input password-input"
-                   type="password"
-                   placeholder="Enter here.">
+                <label class="field-label" for="loginUsername">Username</label>
+                <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
 
-            <a class="custom-link forgot-link" href="">
-                Forgot your password?
-            </a>
+                <label class="field-label" for="loginPassword">Password</label>
+                <div class="password-wrap">
+                    <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
+                    <button type="button" class="reveal-toggle" data-target="loginPassword">Show</button>
+                </div>
 
-            <button class="custom-button login-button">
-                Login.
-            </button>
+                <label class="remember-row">
+                    <input type="checkbox" id="rememberMe" checked>
+                    <span>Keep me signed in on this device</span>
+                </label>
 
-            <button class="custom-button create-button">
-                Create an account.
-            </button>
-        </form>
+                <div class="form-error" id="loginError"></div>
 
-        <pre class="description bottom-description">This web app is currently w.i.p. and currently
-being worked on please be patient and thank you
-for visiting!</pre>
+                <button type="submit" class="btn btn-solid auth-submit" id="loginSubmit">Sign in</button>
+
+            </form>
+
+            <!-- ================= SIGN UP ================= -->
+            <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
+
+                <label class="field-label" for="signupDisplayName">Display name</label>
+                <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
+
+                <label class="field-label" for="signupUsername">Username</label>
+                <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Letters, numbers, . and _" autocomplete="username" required>
+
+                <label class="field-label" for="signupPassword">Password</label>
+                <div class="password-wrap">
+                    <input class="field-input" id="signupPassword" name="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required>
+                    <button type="button" class="reveal-toggle" data-target="signupPassword">Show</button>
+                </div>
+                <div class="strength-hint" id="strengthHint">Mix letters and numbers, 8+ characters.</div>
+
+                <div class="form-error" id="signupError"></div>
+
+                <button type="submit" class="btn btn-solid auth-submit" id="signupSubmit">Create account</button>
+
+            </form>
+
+            <p class="auth-footnote">
+                Accounts and stuff are saved in a list, there's no actual database yet.
+            </p>
+
+        </div>
 
     </div>
 
+    <div class="toast-stack" id="toastStack"></div>
+
+    <script src="api.js"></script>
+    <script src="login.js"></script>
     <script src="numchange.js"></script>
-
-    <div class="footer-cards">
-        <div class="footer-card card-left">EVENTS</div>
-
-        <div class="footer-card card-center">CALENDAR</div>
-
-        <div class="footer-card card-right">HOST</div>
-    </div>
-
-    <script src="script.js"></script>
-
-    <script>
-        window.addEventListener("load", () => {
-            document.body.classList.add("page-loaded");
-        });
-    </script>
 
 </body>
 </html>

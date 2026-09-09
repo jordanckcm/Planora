@@ -1,11 +1,210 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Home</title>
+
+    <link rel="stylesheet" href="homepage.css">
+    <link rel="stylesheet" href="homepage-extra.css">
 </head>
+
 <body>
-    
+
+    <!-- TOP BAR -->
+    <div class="topbar">
+
+        <div class="profile"></div>
+
+        <button class="custom-button calendar-button">
+            Calendar
+        </button>
+
+        <button class="custom-button near-button">
+            Near
+        </button>
+
+        <button class="custom-button global-button">
+            Global
+        </button>
+
+    </div>
+
+
+    <!-- YEAR -->
+    <div class="year-selector">
+
+        <button id="previousYear">
+            ←
+        </button>
+
+        <div class="year" id="year">
+            2026
+        </div>
+
+        <button id="nextYear">
+            →
+        </button>
+
+    </div>
+
+
+    <!-- =========================
+         MONTHS
+    ========================== -->
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="1">
+            <span>JANUARY</span>
+            <span class="event-count">03 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="2">
+            <span>FEBRUARY</span>
+            <span class="event-count">07 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="3">
+            <span>MARCH</span>
+            <span class="event-count">02 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="4">
+            <span>APRIL</span>
+            <span class="event-count">05 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="5">
+            <span>MAY</span>
+            <span class="event-count">00 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="6">
+            <span>JUNE</span>
+            <span class="event-count">01 EVENT</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="7">
+            <span>JULY</span>
+            <span class="event-count">04 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="8">
+            <span>AUGUST</span>
+            <span class="event-count">03 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="9">
+            <span>SEPTEMBER</span>
+            <span class="event-count">02 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="10">
+            <span>OCTOBER</span>
+            <span class="event-count">06 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="11">
+            <span>NOVEMBER</span>
+            <span class="event-count">01 EVENT</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="month-wrapper">
+
+        <div class="month-events-container" data-month="12">
+            <span>DECEMBER</span>
+            <span class="event-count">08 EVENTS</span>
+        </div>
+
+        <div class="events-container"></div>
+
+    </div>
+
+
+    <div class="toast-stack" id="toastStack"></div>
+
+    <!-- JAVASCRIPT -->
+    <script src="api.js"></script>
+    <script src="homepage.js"></script>
+
 </body>
+
 </html>
