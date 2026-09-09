@@ -161,7 +161,7 @@ def now_in_ms():
 
 def add_demo_data():
     demo_salt = make_salt()
-    demo_password_hash = hash_password("demopassword123", demo_salt)
+    demo_password_hash = hash_password("jordie123", demo_salt)
 
     # sable is a demo admin so you have someone to test the admin panel with.
     demo_users = [
