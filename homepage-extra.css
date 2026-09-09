@@ -397,6 +397,57 @@
 
 
 /* =========================
+   YEAR SWITCH ANIMATION
+   Direction-aware: slides in from the side you're
+   navigating toward, with a fade + soft blur settle.
+========================= */
+
+@keyframes yearSwapNext {
+    0%   { opacity: 0; transform: translateX(46px) scale(0.96); filter: blur(3px); }
+    100% { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+}
+
+@keyframes yearSwapPrev {
+    0%   { opacity: 0; transform: translateX(-46px) scale(0.96); filter: blur(3px); }
+    100% { opacity: 1; transform: translateX(0) scale(1); filter: blur(0); }
+}
+
+.year.year-animate-next {
+    animation: yearSwapNext 0.45s cubic-bezier(.2, .8, .2, 1);
+}
+
+.year.year-animate-prev {
+    animation: yearSwapPrev 0.45s cubic-bezier(.2, .8, .2, 1);
+}
+
+
+/* =========================
+   MONTHS FALLING INTO PLACE
+   Triggered alongside the year swap. Each .month-wrapper
+   gets a small stagger delay set from JS so they drop in
+   one after another instead of all at once.
+========================= */
+
+@keyframes monthFall {
+    0%   { opacity: 0; transform: translateY(-26px); }
+    60%  { opacity: 1; transform: translateY(5px); }
+    100% { opacity: 1; transform: translateY(0); }
+}
+
+.month-wrapper.month-animate {
+    animation: monthFall 0.5s cubic-bezier(.34, 1.56, .64, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .year.year-animate-next,
+    .year.year-animate-prev,
+    .month-wrapper.month-animate {
+        animation: none !important;
+    }
+}
+
+
+/* =========================
    MOBILE
 ========================= */
 
