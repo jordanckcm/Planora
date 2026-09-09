@@ -448,6 +448,53 @@
 
 
 /* =========================
+   MONTH HEADER — OPEN STATE
+   The count + chevron live in .month-meta so the header keeps
+   its original left/right layout. .month-open highlights the
+   active row; .month-press gives touch devices a tap bounce
+   since :hover barely fires on mobile.
+========================= */
+
+.month-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.month-chevron {
+    display: inline-block;
+
+    font-size: 13px;
+    line-height: 1;
+
+    opacity: 0.4;
+    transform: rotate(0deg);
+
+    transition: transform 0.3s cubic-bezier(.4, 0, .2, 1), opacity 0.2s ease;
+}
+
+.month-events-container.month-open .month-chevron {
+    transform: rotate(180deg);
+    opacity: 0.9;
+}
+
+.month-events-container.month-open {
+    background: rgba(38, 46, 38, 0.85);
+    border-color: rgba(72, 156, 72, 0.45);
+}
+
+@keyframes monthPress {
+    0%   { transform: scale(1); }
+    40%  { transform: scale(0.975); }
+    100% { transform: scale(1); }
+}
+
+.month-events-container.month-press {
+    animation: monthPress 0.28s ease;
+}
+
+
+/* =========================
    MOBILE
 ========================= */
 
