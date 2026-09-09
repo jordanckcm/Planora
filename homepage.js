@@ -46,6 +46,7 @@ function toast(message, type = "") {
 
     buildProfileMenu();
     showRoleBadge();
+    enhanceMonthHeaders();
     bindModeButtons();
     bindYearButtons();
     buildAddEventUI();
@@ -70,6 +71,25 @@ function roleLabel(role) {
 function showRoleBadge() {
     const badge = document.getElementById("roleBadge");
     if (badge) badge.textContent = roleLabel(currentUser.role);
+}
+
+/* Groups .event-count with a little chevron that rotates when a
+   month is open, without disturbing the header's left/right layout. */
+function enhanceMonthHeaders() {
+    monthButtons.forEach(monthEl => {
+        const countEl = monthEl.querySelector(".event-count");
+
+        const meta = document.createElement("div");
+        meta.className = "month-meta";
+        monthEl.insertBefore(meta, countEl);
+        meta.appendChild(countEl);
+
+        const chevron = document.createElement("span");
+        chevron.className = "month-chevron";
+        chevron.textContent = "⌄";
+        chevron.setAttribute("aria-hidden", "true");
+        meta.appendChild(chevron);
+    });
 }
 
 
@@ -187,6 +207,11 @@ function animateYearSwitch(direction) {
 
 monthButtons.forEach(monthEl => {
     monthEl.addEventListener("click", () => {
+        // quick tactile press bounce — restart it even on rapid taps
+        monthEl.classList.remove("month-press");
+        void monthEl.offsetWidth;
+        monthEl.classList.add("month-press");
+
         const monthNumber = Number(monthEl.dataset.month);
         openMonth = openMonth === monthNumber ? null : monthNumber;
         render();
@@ -213,6 +238,7 @@ async function render() {
         const monthNumber = Number(monthEl.dataset.month);
         const countEl = monthEl.querySelector(".event-count");
         const container = monthEl.parentElement.querySelector(".events-container");
+        const isOpen = openMonth === monthNumber;
 
         const monthEvents = events
             .filter(e => new Date(e.date).getMonth() + 1 === monthNumber)
@@ -224,8 +250,12 @@ async function render() {
                 ? "01 EVENT"
                 : String(monthEvents.length).padStart(2, "0") + " EVENTS";
 
-        if (openMonth !== monthNumber) {
-            container.innerHTML = "";
+        monthEl.classList.toggle("month-open", isOpen);
+        container.classList.toggle("open", isOpen);
+
+        if (!isOpen) {
+            // leave old content in place — it's fully clipped by the
+            // collapsed grid row, and gets rebuilt fresh next time it opens
             continue;
         }
 
@@ -234,7 +264,13 @@ async function render() {
 }
 
 async function renderMonthEvents(container, monthEvents) {
-    container.innerHTML = "";
+    let inner = container.querySelector(".events-inner");
+    if (!inner) {
+        inner = document.createElement("div");
+        inner.className = "events-inner";
+        container.appendChild(inner);
+    }
+    inner.innerHTML = "";
 
     if (monthEvents.length === 0) {
         const empty = document.createElement("div");
@@ -242,12 +278,12 @@ async function renderMonthEvents(container, monthEvents) {
         empty.textContent = mode === "local"
             ? "Nothing here yet — tap + to add something."
             : "No one's posted to the table this month yet.";
-        container.appendChild(empty);
+        inner.appendChild(empty);
         return;
     }
 
     for (const event of monthEvents) {
-        container.appendChild(await buildEventCard(event));
+        inner.appendChild(await buildEventCard(event));
     }
 }
 
