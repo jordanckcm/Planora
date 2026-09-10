@@ -28,7 +28,24 @@ async function apiRequest(url, options = {}) {
         throw offlineError;
     }
 
-    const data = await response.json();
+    // Read the body as text first instead of calling response.json()
+    // directly. Most responses are valid JSON, but if the server ever
+    // sends back something that isn't — an unhandled error slipping
+    // past app.py's error handlers, a dev-server hiccup, a proxy
+    // stepping in — response.json() throws a raw "Unexpected token
+    // ... in JSON" straight from the browser's parser. That's cryptic
+    // and, worse, surfaces even when the request itself (like a
+    // delete) already succeeded server-side. Parsing it ourselves lets
+    // us turn that into a message that actually explains what happened.
+    const raw = await response.text();
+    let data = {};
+    if (raw) {
+        try {
+            data = JSON.parse(raw);
+        } catch (parseErr) {
+            throw new Error(`The server sent back something unexpected (status ${response.status}). Try again.`);
+        }
+    }
 
     if (!response.ok) {
         throw new Error(data.error || "Something went wrong.");
@@ -165,6 +182,13 @@ const PlanoraData = (() => {
         return apiRequest(`/api/events/${eventId}`, { method: "DELETE" });
     }
 
+    // Admin-only: remove an event you don't own (e.g. moderating Global).
+    // Goes through apiRequest like everything else here, so it gets the
+    // same offline handling and safe JSON parsing.
+    async function adminDeleteEvent(eventId) {
+        return apiRequest(`/api/admin/events/${eventId}`, { method: "DELETE" });
+    }
+
     async function getComments(eventId) {
         return apiRequest(`/api/events/${eventId}/comments`);
     }
@@ -190,6 +214,7 @@ const PlanoraData = (() => {
         addEvent,
         addToMyCalendar,
         deleteEvent,
+        adminDeleteEvent,
         getComments,
         addComment,
         deleteComment,
