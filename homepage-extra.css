@@ -693,10 +693,19 @@ body.mode-global {
 }
 
 .comment-author {
-    font-family: "Gotham";
-    font-size: 10px;
+    font-family: "VHS";
+    font-size: 9px;
     color: rgb(72, 156, 72);
     margin-right: 6px;
+}
+
+.comment-time {
+    font-family: "VHS";
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.35);
+    margin-right: 6px;
+    white-space: nowrap;
+    cursor: default;
 }
 
 .comment-empty {
