@@ -54,6 +54,11 @@ login_attempts = {}   # {"username": {"count": 2, "locked_until": 1234567.0}}
 
 AVATAR_COLORS = ["#c9a227", "#489c48", "#b6453f", "#4a7fc9", "#9a56c9", "#c96f2e"]
 
+# same palette reused for event color-tags, so the picker UI feels consistent
+EVENT_COLORS = AVATAR_COLORS
+
+EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "🌙", "🔥", "🎬"]
+
 VALID_ROLES = ("community", "community_plus", "admin")
 
 # how many ACTIVE (not deleted) events each role is allowed to have at once
@@ -392,7 +397,21 @@ def get_events():
     result = []
     for event in matching_events:
         event_copy = dict(event)
+        event_copy.setdefault("color", EVENT_COLORS[0])
+        event_copy.setdefault("icon", EVENT_ICONS[0])
         event_copy["isMine"] = event["owner"].lower() == username.lower()
+
+        if mode == "global":
+            # everyone who's added this to their own calendar — shown as
+            # a little "who's going" avatar row on the card
+            adders = []
+            for e in events:
+                if e.get("cloned_from") == event["id"]:
+                    adder = find_user(e["owner"])
+                    if adder:
+                        adders.append({"username": adder["username"], "avatarColor": adder["avatar_color"]})
+            event_copy["addedBy"] = adders
+
         result.append(event_copy)
 
     return jsonify(result)
@@ -411,6 +430,14 @@ def add_event():
     description = data.get("description", "").strip()
     date = data.get("date", "")
     visibility = "global" if data.get("visibility") == "global" else "local"
+
+    color = data.get("color")
+    if color not in EVENT_COLORS:
+        color = EVENT_COLORS[0]
+
+    icon = data.get("icon")
+    if icon not in EVENT_ICONS:
+        icon = EVENT_ICONS[0]
 
     if not title or not date:
         return jsonify({"error": "Add a name and date first."}), 400
@@ -444,6 +471,8 @@ def add_event():
         "description": description,
         "date": date,
         "visibility": visibility,
+        "color": color,
+        "icon": icon,
         "cloned_from": None,
         "created_at": now_in_ms(),
     }
@@ -494,6 +523,8 @@ def add_to_my_calendar(event_id):
         "description": source_event["description"],
         "date": source_event["date"],
         "visibility": "local",
+        "color": source_event.get("color", EVENT_COLORS[0]),
+        "icon": source_event.get("icon", EVENT_ICONS[0]),
         "cloned_from": event_id,
         "created_at": now_in_ms(),
     }
