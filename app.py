@@ -32,22 +32,8 @@ from flask import Flask, request, jsonify, session
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
-# this key is used to keep login sessions safe.
-# in a real project you would NOT hardcode this, you'd keep it secret!
 app.secret_key = os.environ["SECRET_KEY"]
 
-
-# =========================================================
-# JSON ERROR HANDLERS
-# Every response the frontend gets back needs to be JSON,
-# because api.js always calls response.json() on it. Without
-# these, an unmatched route (typo'd URL, etc.) or a bug that
-# raises an exception falls through to Flask's default error
-# page — which is HTML, not JSON. Trying to JSON-parse that
-# HTML is exactly what throws the cryptic "Unexpected token
-# ... in JSON" error in the browser, even though nothing about
-# the actual request (like a delete) failed.
-# =========================================================
 
 @app.errorhandler(404)
 def handle_not_found(e):
@@ -59,43 +45,27 @@ def handle_server_error(e):
     return jsonify({"error": "Something went wrong on the server. Try again."}), 500
 
 
-# =========================================================
-# OUR "DATABASE" (just lists in memory, nothing fancy)
-# =========================================================
+users = []
+events = []
+comments = []
 
-users = []          # each item looks like: {"username": ..., "password_hash": ..., "role": ..., ...}
-events = []         # each item looks like: {"id": 1, "owner": ..., "title": ..., ...}
-comments = []       # each item looks like: {"id": 1, "event_id": 1, "author": ..., "text": ...}
-
-# simple counters so every event/comment gets its own id number
 next_event_id = 1
 next_comment_id = 1
 
-# keeps track of failed logins so people can't just guess passwords forever
-login_attempts = {}   # {"username": {"count": 2, "locked_until": 1234567.0}}
+login_attempts = {}
 
 AVATAR_COLORS = ["#c9a227", "#489c48", "#b6453f", "#4a7fc9", "#9a56c9", "#c96f2e"]
-
-# same palette reused for event color-tags, so the picker UI feels consistent
 EVENT_COLORS = AVATAR_COLORS
-
 EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "🌙", "🔥", "🎬"]
 
 VALID_ROLES = ("community", "community_plus", "admin")
 
-# how many ACTIVE (not deleted) events each role is allowed to have at once
 COMMUNITY_LOCAL_LIMIT = 10
 COMMUNITY_PLUS_LOCAL_LIMIT = 25
 COMMUNITY_PLUS_GLOBAL_LIMIT = 1
-# admin has no limits
 
-
-# =========================================================
-# LITTLE HELPER FUNCTIONS
-# =========================================================
 
 def find_user(username):
-    """Look through the users list and find one with this username."""
     for user in users:
         if user["username"].lower() == username.lower():
             return user
@@ -103,18 +73,15 @@ def find_user(username):
 
 
 def make_salt():
-    """Makes a random bit of text to mix into the password before hashing."""
     return secrets.token_hex(8)
 
 
 def hash_password(password, salt):
-    """Turns a password into a scrambled hash so we never store the real password."""
     combined = salt + password
     return hashlib.sha256(combined.encode()).hexdigest()
 
 
 def pick_avatar_color(username):
-    """Just picks a color from our list based on the username, so it's always the same."""
     total = 0
     for letter in username:
         total = total + ord(letter)
@@ -122,7 +89,6 @@ def pick_avatar_color(username):
 
 
 def user_public_info(user):
-    """Sends back the safe parts of a user (never the password/salt!)."""
     return {
         "username": user["username"],
         "displayName": user["display_name"],
@@ -134,12 +100,10 @@ def user_public_info(user):
 
 
 def get_logged_in_username():
-    """Checks the session cookie to see who (if anyone) is logged in."""
     return session.get("username")
 
 
 def get_logged_in_user():
-    """Same as above but returns the full user record instead of just the name."""
     username = get_logged_in_username()
     if not username:
         return None
@@ -147,11 +111,6 @@ def get_logged_in_user():
 
 
 def require_role(*allowed_roles):
-    """
-    Route decorator. Blocks the request unless the logged-in user's role
-    is one of allowed_roles. Passes the user record into the route as the
-    first argument so you don't have to look it up again.
-    """
     def decorator(fn):
         @wraps(fn)
         def wrapper(*args, **kwargs):
@@ -166,42 +125,26 @@ def require_role(*allowed_roles):
 
 
 def register_failed_login(key):
-    """Counts failed logins and locks the account for a bit after too many."""
     attempt = login_attempts.get(key, {"count": 0, "locked_until": 0})
     attempt["count"] += 1
-
     if attempt["count"] >= 5:
-        attempt["locked_until"] = time.time() + 60  # locked for 60 seconds
+        attempt["locked_until"] = time.time() + 60
         attempt["count"] = 0
-
     login_attempts[key] = attempt
 
 
 def now_in_ms():
-    """JavaScript likes timestamps in milliseconds, so we convert here."""
     return int(time.time() * 1000)
 
 
 def cascade_delete_event(deleted_event):
-    """
-    Cleans up everything tied to a deleted event: its own comments, and —
-    if it was a Global event — every personal ("local") copy other people
-    made of it via "Add to my calendar", plus THEIR comments too. Local
-    events aren't cloned by anyone, so deleting one never cascades.
-    """
     removed_ids = {deleted_event["id"]}
-
     if deleted_event["visibility"] == "global":
         clone_ids = {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
         removed_ids |= clone_ids
         events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
-
     comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
 
-
-# =========================================================
-# DEMO DATA
-# =========================================================
 
 def add_demo_data():
     demo_salt = make_salt()
@@ -259,18 +202,10 @@ def add_demo_data():
 add_demo_data()
 
 
-# =========================================================
-# PAGE ROUTES (just sends the html files)
-# =========================================================
-
 @app.route("/")
 def serve_home_page():
     return app.send_static_file("index.html")
 
-
-# =========================================================
-# ACCOUNT ROUTES
-# =========================================================
 
 @app.route("/api/signup", methods=["POST"])
 def signup():
@@ -306,7 +241,7 @@ def signup():
         "bio": "",
         "avatar_color": pick_avatar_color(username),
         "created_at": now_in_ms(),
-        "role": "community",   # everyone starts as Community
+        "role": "community",
     }
     users.append(new_user)
 
@@ -394,10 +329,6 @@ def update_me():
     return jsonify(user_public_info(user))
 
 
-# =========================================================
-# EVENT ROUTES
-# =========================================================
-
 @app.route("/api/events", methods=["GET"])
 def get_events():
     username = get_logged_in_username()
@@ -415,7 +346,6 @@ def get_events():
     if year:
         matching_events = [e for e in matching_events if e["date"].startswith(year)]
 
-    # add a little flag so the frontend knows which ones belong to you
     result = []
     for event in matching_events:
         event_copy = dict(event)
@@ -427,14 +357,16 @@ def get_events():
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
         if mode == "global":
-            # everyone who's added this to their own calendar — shown as
-            # a little "who's going" avatar row on the card
             adders = []
             for e in events:
                 if e.get("cloned_from") == event["id"]:
                     adder = find_user(e["owner"])
                     if adder:
-                        adders.append({"username": adder["username"], "avatarColor": adder["avatar_color"]})
+                        adders.append({
+                            "username": adder["username"],
+                            "avatarColor": adder["avatar_color"],
+                            "addedAt": e.get("created_at"),
+                        })
             event_copy["addedBy"] = adders
 
         result.append(event_copy)
@@ -467,9 +399,6 @@ def add_event():
     if not title or not date:
         return jsonify({"error": "Add a name and date first."}), 400
 
-    # Optional: what time it starts/ends, and — for something that runs
-    # more than one day — when it ends. Leaving these blank just means
-    # "no specific time, single day", same as before.
     start_time = data.get("startTime", "").strip()
     end_time = data.get("endTime", "").strip()
     end_date = data.get("endDate", "").strip() or date
@@ -599,10 +528,6 @@ def delete_event(event_id):
     return jsonify({"error": "Event not found."}), 404
 
 
-# =========================================================
-# COMMENT ROUTES
-# =========================================================
-
 @app.route("/api/events/<int:event_id>/comments", methods=["GET"])
 def get_comments(event_id):
     username = get_logged_in_username()
@@ -696,10 +621,6 @@ def delete_comment(event_id, comment_id):
     return jsonify({"ok": True})
 
 
-# =========================================================
-# PROFILE STATS
-# =========================================================
-
 @app.route("/api/stats", methods=["GET"])
 def get_stats():
     username = get_logged_in_username()
@@ -718,13 +639,6 @@ def get_stats():
 
     return jsonify({"events": event_count, "comments": comment_count})
 
-
-# =========================================================
-# ADMIN ROUTES
-# All of these require role == "admin". Nobody else can reach them,
-# even if they guess the URL, because @require_role checks the
-# session on every request.
-# =========================================================
 
 @app.route("/api/admin/users", methods=["GET"])
 @require_role("admin")
@@ -768,8 +682,6 @@ def admin_delete_user(current_user, username):
 
     users.remove(target)
 
-    # clean up their events + comments too, otherwise the app is left
-    # pointing at events "owned" by nobody
     events[:] = [e for e in events if e["owner"].lower() != username.lower()]
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
 
