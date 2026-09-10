@@ -1,6 +1,6 @@
 /* =========================================================
    PLANORA — HOMEPAGE
-   Works with the original homepage.html/css. "Near" and
+   Works with the original homepage.html/css. "Local" and
    "Global" double as the local/global switch, and the add
    button + form + comments are all built here in JS, same
    as the original file did for the add button and form.
@@ -20,7 +20,7 @@ let shownOfflineToast = false;
 
 const monthButtons = document.querySelectorAll(".month-events-container");
 const yearDisplay = document.getElementById("year");
-const nearButton = document.querySelector(".near-button");
+const localButton = document.querySelector(".local-button");
 const globalButton = document.querySelector(".global-button");
 
 
@@ -148,7 +148,7 @@ function buildProfileMenu() {
 }
 
 function bindModeButtons() {
-    nearButton.addEventListener("click", () => {
+    localButton.addEventListener("click", () => {
         mode = "local";
         setActiveModeButton();
         openMonth = null;
@@ -164,7 +164,7 @@ function bindModeButtons() {
 }
 
 function setActiveModeButton() {
-    nearButton.classList.toggle("mode-active", mode === "local");
+    localButton.classList.toggle("mode-active", mode === "local");
     globalButton.classList.toggle("mode-active", mode === "global");
 }
 
@@ -285,7 +285,7 @@ async function renderMonthEvents(container, monthEvents) {
         const empty = document.createElement("div");
         empty.className = "no-events";
         empty.textContent = mode === "local"
-            ? "Nothing here yet | tap + to add something."
+            ? "Nothing here yet — tap + to add something."
             : "No one's posted to the table this month yet.";
         inner.appendChild(empty);
         return;
@@ -443,6 +443,9 @@ async function buildComments(event) {
         empty.textContent = "No comments yet — say something.";
         list.appendChild(empty);
     } else {
+        const canModerate = currentUser.role === "admin"
+            || currentUser.username.toLowerCase() === event.owner.toLowerCase();
+
         comments.forEach(comment => {
             const c = document.createElement("div");
             c.className = "comment";
@@ -454,8 +457,30 @@ async function buildComments(event) {
             const text = document.createElement("span");
             text.textContent = comment.text;
 
-            c.appendChild(author);
-            c.appendChild(text);
+            const body = document.createElement("span");
+            body.className = "comment-body";
+            body.appendChild(author);
+            body.appendChild(text);
+
+            c.appendChild(body);
+
+            if (canModerate) {
+                const remove = document.createElement("button");
+                remove.className = "comment-delete";
+                remove.textContent = "Remove";
+                remove.setAttribute("aria-label", "Delete comment");
+                remove.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    try {
+                        await PlanoraData.deleteComment(event.id, comment.id);
+                        render();
+                    } catch (err) {
+                        toast(err.message, "error");
+                    }
+                });
+                c.appendChild(remove);
+            }
+
             list.appendChild(c);
         });
     }
