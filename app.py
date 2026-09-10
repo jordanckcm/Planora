@@ -155,6 +155,23 @@ def now_in_ms():
     return int(time.time() * 1000)
 
 
+def cascade_delete_event(deleted_event):
+    """
+    Cleans up everything tied to a deleted event: its own comments, and —
+    if it was a Global event — every personal ("local") copy other people
+    made of it via "Add to my calendar", plus THEIR comments too. Local
+    events aren't cloned by anyone, so deleting one never cascades.
+    """
+    removed_ids = {deleted_event["id"]}
+
+    if deleted_event["visibility"] == "global":
+        clone_ids = {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
+        removed_ids |= clone_ids
+        events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
+
+    comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
+
+
 # =========================================================
     DATA
 # ==============-==========================================
@@ -493,6 +510,9 @@ def delete_event(event_id):
     (Community, Community+, Admin) can always delete their own events.
     Deleting events you DON'T own is handled separately, by admins only,
     at /api/admin/events/<id>.
+
+    If it was a Global event, this also removes everyone's local copies
+    of it (and comments on those copies) — see cascade_delete_event.
     """
     username = get_logged_in_username()
     if not username:
@@ -501,6 +521,7 @@ def delete_event(event_id):
     for event in events:
         if event["id"] == event_id and event["owner"].lower() == username.lower():
             events.remove(event)
+            cascade_delete_event(event)
             return jsonify({"ok": True})
 
     return jsonify({"error": "Event not found."}), 404
@@ -545,6 +566,35 @@ def add_comment(event_id):
 
     comments.append(new_comment)
     return jsonify(new_comment)
+
+
+@app.route("/api/events/<int:event_id>/comments/<int:comment_id>", methods=["DELETE"])
+def delete_comment(event_id, comment_id):
+    """
+    Only the event's poster or an admin can remove a comment — not just
+    the comment's own author. Matches how event moderation already works:
+    the person who owns the space gets to moderate it.
+    """
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    event = next((e for e in events if e["id"] == event_id), None)
+    if not event:
+        return jsonify({"error": "Event not found."}), 404
+
+    comment = next((c for c in comments if c["id"] == comment_id and c["event_id"] == event_id), None)
+    if not comment:
+        return jsonify({"error": "Comment not found."}), 404
+
+    is_admin = user["role"] == "admin"
+    is_event_owner = event["owner"].lower() == user["username"].lower()
+
+    if not (is_admin or is_event_owner):
+        return jsonify({"error": "Only the event's poster or an admin can delete comments."}), 403
+
+    comments.remove(comment)
+    return jsonify({"ok": True})
 
 
 # =========================================================
@@ -638,11 +688,13 @@ def admin_list_events(current_user):
 def admin_delete_event(current_user, event_id):
     """
     Lets an admin remove ANY event, not just their own — e.g. to take
-    down something inappropriate someone posted to Global.
+    down something inappropriate someone posted to Global. Also cascades:
+    see cascade_delete_event.
     """
     for event in events:
         if event["id"] == event_id:
             events.remove(event)
+            cascade_delete_event(event)
             return jsonify({"ok": True})
 
     return jsonify({"error": "Event not found."}), 404
