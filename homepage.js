@@ -1190,6 +1190,15 @@ function buildAddEventUI() {
         eventForm.classList.remove("show");
     });
 
+    // Enter submits from any single-line field (title, date, time) —
+    // skips the description textarea so Enter still just makes a new line there.
+    eventForm.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
+            e.preventDefault();
+            document.getElementById("saveEvent").click();
+        }
+    });
+
     document.getElementById("saveEvent").addEventListener("click", async () => {
         const title = document.getElementById("eventTitle").value.trim();
         const description = document.getElementById("eventDescription").value.trim();
