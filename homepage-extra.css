@@ -601,6 +601,14 @@ body.mode-global {
     pointer-events: auto;
 }
 
+/* Applied only while the menu is open and living as a direct child
+   of <body> (see openCommentDropdown in homepage.js) — needs to beat
+   every other top-level element's z-index, not just its old
+   siblings inside one month card. */
+.comment-dropdown.comment-dropdown-portal {
+    z-index: 850;
+}
+
 .comment-dropdown-item {
     height: 30px;
     padding: 0 10px;
