@@ -13,69 +13,140 @@
     </div>
     <div class="table-glow"></div>
 
-    <div class="auth-shell">
+    <div class="auth-page">
 
-        <div class="auth-brand">
-            <div class="brand-mark"></div>
-            <div class="brand-name">Planora</div>
-            <div class="brand-tag">Never miss a moment.</div>
+        <!-- ================= PINTEREST-STYLE BOARD (wide screens only) ================= -->
+        <div class="pin-board">
+            <div class="pin-columns">
+
+                <div class="pin-card dark h-md">
+                    <div class="pin-caption pin-caption-solo">
+                        <div class="pin-title">Plan it once.<br>Show up for everyone.</div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-lg">
+                    <div class="pin-photo pin-photo-1"></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Rooftop movie night</div>
+                        <div class="pin-meta">Fri · 8:00 PM</div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-sm">
+                    <div class="pin-photo pin-photo-2"></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Morning run club</div>
+                        <div class="pin-meta">Daily · 6:30 AM</div>
+                    </div>
+                </div>
+
+                <div class="pin-card dark h-lg">
+                    <div class="pin-photo pin-photo-3"></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Open mic night</div>
+                        <div class="pin-meta">Thu · The Landing</div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-md">
+                    <div class="pin-photo pin-photo-4"></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Farmers market walk</div>
+                        <div class="pin-meta">Sat · 9:00 AM</div>
+                    </div>
+                </div>
+
+                <div class="pin-card dark h-sm">
+                    <div class="pin-caption pin-caption-solo">
+                        <div class="pin-title">Never double-book again.</div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-lg">
+                    <div class="pin-photo pin-photo-5"></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Game night @ Jordan's</div>
+                        <div class="pin-meta">Sat · 7:00 PM</div>
+                    </div>
+                </div>
+
+                <div class="pin-card dark h-md">
+                    <div class="pin-photo pin-photo-6"></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Study group — Rm 204</div>
+                        <div class="pin-meta">Tue · 4:00 PM</div>
+                    </div>
+                </div>
+
+            </div>
         </div>
 
-        <div class="auth-card">
+        <div class="auth-shell">
 
-            <div class="auth-tabs">
-                <button class="auth-tab active" data-tab="login">Sign in</button>
-                <button class="auth-tab" data-tab="signup">Create account</button>
+            <div class="auth-brand">
+                <div class="brand-mark"></div>
+                <div class="brand-name">Planora</div>
+                <div class="brand-tag">Never miss a moment.</div>
             </div>
 
-            <!-- ================= LOGIN ================= -->
-            <form class="auth-form active" id="loginForm" autocomplete="off" novalidate>
+            <div class="auth-card">
 
-                <label class="field-label" for="loginUsername">Username</label>
-                <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
-
-                <label class="field-label" for="loginPassword">Password</label>
-                <div class="password-wrap">
-                    <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
-                    <button type="button" class="reveal-toggle" data-target="loginPassword">Show</button>
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-tab="login">Sign in</button>
+                    <button class="auth-tab" data-tab="signup">Create account</button>
                 </div>
 
-                <label class="remember-row">
-                    <input type="checkbox" id="rememberMe" checked>
-                    <span>Keep me signed in on this device</span>
-                </label>
+                <!-- ================= LOGIN ================= -->
+                <form class="auth-form active" id="loginForm" autocomplete="off" novalidate>
 
-                <div class="form-error" id="loginError"></div>
+                    <label class="field-label" for="loginUsername">Username</label>
+                    <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
 
-                <button type="submit" class="btn btn-solid auth-submit" id="loginSubmit">Sign in</button>
+                    <label class="field-label" for="loginPassword">Password</label>
+                    <div class="password-wrap">
+                        <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <button type="button" class="reveal-toggle" data-target="loginPassword">Show</button>
+                    </div>
 
-            </form>
+                    <label class="remember-row">
+                        <input type="checkbox" id="rememberMe" checked>
+                        <span>Keep me signed in on this device</span>
+                    </label>
 
-            <!-- ================= SIGN UP ================= -->
-            <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
+                    <div class="form-error" id="loginError"></div>
 
-                <label class="field-label" for="signupDisplayName">Display name</label>
-                <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
+                    <button type="submit" class="btn btn-solid auth-submit" id="loginSubmit">Sign in</button>
 
-                <label class="field-label" for="signupUsername">Username</label>
-                <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Letters, numbers, . and _" autocomplete="username" required>
+                </form>
 
-                <label class="field-label" for="signupPassword">Password</label>
-                <div class="password-wrap">
-                    <input class="field-input" id="signupPassword" name="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required>
-                    <button type="button" class="reveal-toggle" data-target="signupPassword">Show</button>
-                </div>
-                <div class="strength-hint" id="strengthHint">Mix letters and numbers, 8+ characters.</div>
+                <!-- ================= SIGN UP ================= -->
+                <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
 
-                <div class="form-error" id="signupError"></div>
+                    <label class="field-label" for="signupDisplayName">Display name</label>
+                    <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
 
-                <button type="submit" class="btn btn-solid auth-submit" id="signupSubmit">Create account</button>
+                    <label class="field-label" for="signupUsername">Username</label>
+                    <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Letters, numbers, . and _" autocomplete="username" required>
 
-            </form>
+                    <label class="field-label" for="signupPassword">Password</label>
+                    <div class="password-wrap">
+                        <input class="field-input" id="signupPassword" name="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required>
+                        <button type="button" class="reveal-toggle" data-target="signupPassword">Show</button>
+                    </div>
+                    <div class="strength-hint" id="strengthHint">Mix letters and numbers, 8+ characters.</div>
 
-            <p class="auth-footnote">
-                Accounts and stuff are saved in a list, there's no actual database yet.
-            </p>
+                    <div class="form-error" id="signupError"></div>
+
+                    <button type="submit" class="btn btn-solid auth-submit" id="signupSubmit">Create account</button>
+
+                </form>
+
+                <p class="auth-footnote">
+                    Accounts and stuff are saved in a list, there's no actual database yet.
+                </p>
+
+            </div>
 
         </div>
 
