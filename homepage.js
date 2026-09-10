@@ -85,6 +85,70 @@ function formatFullTimestamp(ms) {
     });
 }
 
+
+/* =========================
+   COMMENT DROPDOWN PORTAL
+   Edit/Delete menus used to be position:absolute inside the
+   month card, which has its own stacking context AND clips
+   overflow — so a menu near the bottom of a long comment list
+   could get visually buried under the NEXT month card, or cut
+   off entirely. Moving the open menu to a fixed-position child
+   of <body> sidesteps both problems: it always paints above
+   everything else and is never clipped by an ancestor.
+========================= */
+
+function openCommentDropdown(dropdown, trigger) {
+    closeAllCommentDropdowns();
+
+    document.body.appendChild(dropdown);
+    dropdown.classList.add("show", "comment-dropdown-portal");
+
+    const rect = trigger.getBoundingClientRect();
+    dropdown.style.position = "fixed";
+    dropdown.style.top = `${rect.bottom + 6}px`;
+    dropdown.style.left = `${rect.left}px`;
+
+    // now that it's actually in the DOM we can measure it, and pull
+    // it back onto the screen if it would spill off the right edge
+    const menuWidth = dropdown.offsetWidth;
+    const overflowRight = rect.left + menuWidth - (window.innerWidth - 8);
+    if (overflowRight > 0) {
+        dropdown.style.left = `${Math.max(8, rect.left - overflowRight)}px`;
+    }
+}
+
+function closeCommentDropdown(dropdown) {
+    dropdown.classList.remove("show", "comment-dropdown-portal");
+    dropdown.style.position = "";
+    dropdown.style.top = "";
+    dropdown.style.left = "";
+}
+
+function closeAllCommentDropdowns() {
+    document.querySelectorAll(".comment-dropdown.show").forEach(closeCommentDropdown);
+}
+
+/* Bound once at startup — a fresh listener isn't added per comment,
+   so this stays cheap no matter how many times render() rebuilds
+   the comment lists. */
+function bindCommentDropdownDismissal() {
+    document.addEventListener("click", (e) => {
+        document.querySelectorAll(".comment-dropdown.show").forEach(dropdown => {
+            if (!dropdown.contains(e.target) && dropdown._trigger !== e.target) {
+                closeCommentDropdown(dropdown);
+            }
+        });
+    });
+
+    // scrolling would leave a fixed-position menu pointing at empty
+    // space, so just close it rather than trying to track it
+    window.addEventListener("scroll", closeAllCommentDropdowns, true);
+
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeAllCommentDropdowns();
+    });
+}
+
 /* "7:30 PM" from a 24h "19:30" input value. */
 function formatTime(hhmm) {
     const [h, m] = hhmm.split(":").map(Number);
@@ -140,6 +204,7 @@ function formatEventWhen(event) {
     bindTodayButton();
     bindSearch();
     buildAddEventUI();
+    bindCommentDropdownDismissal();
 
     // A "Copy link" URL (?event=123&mode=global&year=2026) can set the
     // mode/year before the first render, then we open + scroll to the
@@ -470,6 +535,7 @@ monthButtons.forEach(monthEl => {
 
 async function render() {
     yearDisplay.textContent = currentYear;
+    closeAllCommentDropdowns();
 
     let events;
     try {
@@ -844,23 +910,37 @@ async function buildComments(event) {
                 editInput.focus();
                 editInput.setSelectionRange(editInput.value.length, editInput.value.length);
 
+                function exitEditMode() {
+                    document.removeEventListener("click", cancelOnOutsideClick);
+                    render();
+                }
+
                 async function save() {
                     if (!editInput.value.trim()) return;
                     try {
                         await PlanoraData.editComment(event.id, comment.id, editInput.value);
-                        render();
+                        toast("Comment updated.");
+                        exitEditMode();
                     } catch (err) {
                         toast(err.message, "error");
                     }
                 }
 
                 saveBtn.addEventListener("click", (e) => { e.stopPropagation(); save(); });
-                cancelBtn.addEventListener("click", (e) => { e.stopPropagation(); render(); });
+                cancelBtn.addEventListener("click", (e) => { e.stopPropagation(); exitEditMode(); });
                 editInput.addEventListener("click", (e) => e.stopPropagation());
                 editInput.addEventListener("keydown", (e) => {
                     if (e.key === "Enter") save();
-                    if (e.key === "Escape") render();
+                    if (e.key === "Escape") exitEditMode();
                 });
+
+                // clicking anywhere else on the page cancels the edit,
+                // same principle as the dropdown menus dismissing on
+                // outside click
+                function cancelOnOutsideClick(e) {
+                    if (!editRow.contains(e.target)) exitEditMode();
+                }
+                setTimeout(() => document.addEventListener("click", cancelOnOutsideClick), 0);
             }
 
             if (canEdit || canDelete) {
@@ -875,6 +955,7 @@ async function buildComments(event) {
 
                 const dropdown = document.createElement("div");
                 dropdown.className = "comment-dropdown";
+                dropdown._trigger = menuButton;
 
                 if (canEdit) {
                     const editItem = document.createElement("button");
@@ -882,7 +963,7 @@ async function buildComments(event) {
                     editItem.textContent = "Edit";
                     editItem.addEventListener("click", (e) => {
                         e.stopPropagation();
-                        dropdown.classList.remove("show");
+                        closeCommentDropdown(dropdown);
                         enterEditMode();
                     });
                     dropdown.appendChild(editItem);
@@ -896,6 +977,7 @@ async function buildComments(event) {
                         e.stopPropagation();
                         try {
                             await PlanoraData.deleteComment(event.id, comment.id);
+                            toast("Comment deleted.");
                             render();
                         } catch (err) {
                             toast(err.message, "error");
@@ -906,7 +988,11 @@ async function buildComments(event) {
 
                 menuButton.addEventListener("click", (e) => {
                     e.stopPropagation();
-                    dropdown.classList.toggle("show");
+                    if (dropdown.classList.contains("show")) {
+                        closeCommentDropdown(dropdown);
+                    } else {
+                        openCommentDropdown(dropdown, menuButton);
+                    }
                 });
 
                 menuWrap.appendChild(menuButton);
@@ -936,6 +1022,7 @@ async function buildComments(event) {
         try {
             await PlanoraData.addComment(event.id, input.value);
             input.value = "";
+            toast("Comment posted.", "success");
             render();
         } catch (err) {
             toast(err.message, "error");
