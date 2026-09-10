@@ -352,7 +352,7 @@ async function renderMonthEvents(container, monthEvents) {
         const empty = document.createElement("div");
         empty.className = "no-events";
         empty.textContent = mode === "local"
-            ? "Nothing here yet — tap + to add something."
+            ? "No schedules made, tap + to add something."
             : "No one's posted to the table this month yet.";
         inner.appendChild(empty);
         return;
