@@ -353,7 +353,7 @@ async function renderMonthEvents(container, monthEvents) {
         empty.className = "no-events";
         empty.textContent = mode === "local"
             ? "No schedules made, tap + to add something."
-            : "No one's posted to the table this month yet.";
+            : "No one's posted a global event this month yet.";
         inner.appendChild(empty);
         return;
     }
