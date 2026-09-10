@@ -89,12 +89,149 @@ body {
     z-index: -1;
 }
 
+/* =========================
+   PAGE LAYOUT
+   (auth-shell + the pin board sit side by side on wide
+   screens; on narrow screens it's just the auth-shell,
+   centered, same as before)
+========================= */
+
+.auth-page {
+    position: relative;
+    z-index: 2;
+
+    width: 100%;
+    max-width: 1120px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+}
+
 .auth-shell {
     width: min(100%, 380px);
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 28px;
+}
+
+
+/* =========================
+   PINTEREST-STYLE BOARD
+   Pure black/white "pins" — no photos to pull from, so each
+   image is a small grayscale gradient standing in for one.
+   Hidden below 1000px; the auth-shell alone carries mobile.
+========================= */
+
+.pin-board {
+    display: none;
+}
+
+@media (min-width: 1000px) {
+
+    .pin-board {
+        display: block;
+
+        width: 400px;
+        height: min(700px, 90dvh);
+
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
+        mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
+
+        animation: pin-board-in 0.5s ease-out;
+    }
+
+    .pin-columns {
+        column-count: 2;
+        column-gap: 12px;
+    }
+
+    .pin-card {
+        break-inside: avoid;
+        margin-bottom: 12px;
+
+        border-radius: 14px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+    }
+
+    .pin-card.light {
+        background: rgb(252, 252, 252);
+        color: #0c0c0c;
+        border-color: rgba(0, 0, 0, 0.12);
+    }
+
+    .pin-card.dark {
+        background: rgb(19, 19, 19);
+        color: #f2f2f2;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .pin-photo {
+        width: 100%;
+    }
+
+    .pin-card.h-sm .pin-photo { height: 90px; }
+    .pin-card.h-md .pin-photo { height: 140px; }
+    .pin-card.h-lg .pin-photo { height: 200px; }
+
+    .pin-photo-1 { background: linear-gradient(150deg, #050505, #3a3a3a 55%, #0c0c0c); }
+    .pin-photo-2 { background: linear-gradient(160deg, #dcdcdc, #f7f7f7 60%, #cfcfcf); }
+    .pin-photo-3 { background: linear-gradient(140deg, #101010, #454545 45%, #050505 100%); }
+    .pin-photo-4 { background: linear-gradient(155deg, #e6e6e6, #ffffff 50%, #d2d2d2); }
+    .pin-photo-5 { background: linear-gradient(145deg, #0a0a0a, #363636 40%, #121212); }
+    .pin-photo-6 { background: repeating-linear-gradient(45deg, #f2f2f2, #f2f2f2 8px, #dcdcdc 8px, #dcdcdc 16px); }
+
+    .pin-caption {
+        padding: 10px 12px 12px;
+        font-family: "Gotham";
+    }
+
+    .pin-caption-solo {
+        padding: 18px 16px;
+        display: flex;
+        align-items: center;
+        min-height: 100%;
+    }
+
+    .pin-card.h-sm .pin-caption-solo { min-height: 90px; }
+    .pin-card.h-md .pin-caption-solo { min-height: 140px; }
+
+    .pin-title {
+        font-size: 13.5px;
+        font-weight: 600;
+        line-height: 1.3;
+    }
+
+    .pin-caption-solo .pin-title {
+        font-size: 15px;
+    }
+
+    .pin-meta {
+        margin-top: 4px;
+        font-size: 10.5px;
+        opacity: 0.55;
+    }
+
+    @keyframes pin-board-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .pin-board {
+            animation: none;
+        }
+    }
 }
 
 
@@ -239,6 +376,7 @@ body {
 
 .field-input::placeholder {
     color: var(--text-faint);
+    font-size: 12.5px;
 }
 
 .password-wrap {
