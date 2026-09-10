@@ -560,6 +560,7 @@ def add_comment(event_id):
         "event_id": event_id,
         "author": username,
         "text": text,
+        "edited": False,
         "created_at": now_in_ms(),
     }
     next_comment_id += 1
@@ -568,12 +569,37 @@ def add_comment(event_id):
     return jsonify(new_comment)
 
 
+@app.route("/api/events/<int:event_id>/comments/<int:comment_id>", methods=["PUT"])
+def edit_comment(event_id, comment_id):
+    """Only the comment's own author can edit it — not the event's poster or an admin."""
+    username = get_logged_in_username()
+    if not username:
+        return jsonify({"error": "Not signed in."}), 401
+
+    comment = next((c for c in comments if c["id"] == comment_id and c["event_id"] == event_id), None)
+    if not comment:
+        return jsonify({"error": "Comment not found."}), 404
+
+    if comment["author"].lower() != username.lower():
+        return jsonify({"error": "You can only edit your own comments."}), 403
+
+    data = request.get_json()
+    text = data.get("text", "").strip()
+    if not text:
+        return jsonify({"error": "Comment can't be empty."}), 400
+
+    comment["text"] = text
+    comment["edited"] = True
+
+    return jsonify(comment)
+
+
 @app.route("/api/events/<int:event_id>/comments/<int:comment_id>", methods=["DELETE"])
 def delete_comment(event_id, comment_id):
     """
-    Only the event's poster or an admin can remove a comment — not just
-    the comment's own author. Matches how event moderation already works:
-    the person who owns the space gets to moderate it.
+    The comment's own author can always delete it. The event's poster or
+    an admin can also delete ANY comment on that event, same as event
+    moderation elsewhere.
     """
     user = get_logged_in_user()
     if not user:
@@ -589,9 +615,10 @@ def delete_comment(event_id, comment_id):
 
     is_admin = user["role"] == "admin"
     is_event_owner = event["owner"].lower() == user["username"].lower()
+    is_comment_author = comment["author"].lower() == user["username"].lower()
 
-    if not (is_admin or is_event_owner):
-        return jsonify({"error": "Only the event's poster or an admin can delete comments."}), 403
+    if not (is_admin or is_event_owner or is_comment_author):
+        return jsonify({"error": "You don't have permission to delete that comment."}), 403
 
     comments.remove(comment)
     return jsonify({"ok": True})
