@@ -69,24 +69,24 @@
 
 
 /* =========================
-   NEAR / GLOBAL AS A MODE SWITCH
-   "Near" = your own events, "Global" = everyone's.
+   LOCAL / GLOBAL AS A MODE SWITCH
+   "Local" = your own events, "Global" = everyone's.
    Whichever is active gets the same green the Calendar
    button already uses, so it reads as "the current view".
 ========================= */
 
-.near-button,
+.local-button,
 .global-button {
     border-color: rgba(255, 255, 255, 0.15);
 }
 
-.near-button.mode-active,
+.local-button.mode-active,
 .global-button.mode-active {
     background: rgb(72, 156, 72);
     border-color: rgb(72, 156, 72);
 }
 
-.near-button.mode-active:hover,
+.local-button.mode-active:hover,
 .global-button.mode-active:hover {
     background: rgb(85, 175, 85);
 }
@@ -302,10 +302,50 @@
 }
 
 .comment {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+
     font-family: "VHS";
     font-size: 11px;
     line-height: 1.4;
     color: white;
+}
+
+.comment-body {
+    flex: 1;
+    min-width: 0;
+    word-break: break-word;
+}
+
+.comment-delete {
+    flex-shrink: 0;
+
+    height: 20px;
+    padding: 0 8px;
+    margin-top: 1px;
+
+    border: 1px solid rgba(182, 69, 63, 0.35);
+    border-radius: 20px;
+
+    background: transparent;
+    color: rgba(224, 139, 134, 0.75);
+
+    font-family: "VHS";
+    font-size: 9px;
+
+    cursor: pointer;
+
+    opacity: 0.7;
+    transition: 0.15s ease;
+}
+
+.comment-delete:hover {
+    opacity: 1;
+    background: rgba(182, 69, 63, 0.15);
+    border-color: #b6453f;
+    color: #e08b86;
 }
 
 .comment-author {
