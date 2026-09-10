@@ -63,6 +63,28 @@ function isRecentlyPosted(event) {
     return Date.now() - event.created_at < 24 * 60 * 60 * 1000;
 }
 
+/* Compact relative time for comment/post stamps — "just now", "5m",
+   "3h", "2d" — falling back to a short date further out. The full
+   date/time always goes in the caller's title attribute so hovering
+   gives the exact moment. */
+function formatRelativeShort(ms) {
+    const diffSeconds = Math.round((Date.now() - ms) / 1000);
+
+    if (diffSeconds < 60) return "just now";
+    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m`;
+    if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h`;
+    if (diffSeconds < 7 * 86400) return `${Math.floor(diffSeconds / 86400)}d`;
+
+    return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatFullTimestamp(ms) {
+    return new Date(ms).toLocaleString(undefined, {
+        month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit"
+    });
+}
+
 /* "7:30 PM" from a 24h "19:30" input value. */
 function formatTime(hhmm) {
     const [h, m] = hhmm.split(":").map(Number);
@@ -340,6 +362,22 @@ function bindSearch() {
         input.focus();
         render();
     });
+
+    // "/" jumps into search from anywhere on the page (unless you're
+    // already typing somewhere), Escape backs out of it.
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "/" && document.activeElement !== input
+            && !["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) {
+            e.preventDefault();
+            input.focus();
+        } else if (e.key === "Escape" && document.activeElement === input) {
+            input.value = "";
+            searchQuery = "";
+            clearBtn.style.display = "none";
+            input.blur();
+            render();
+        }
+    });
 }
 
 function clearSearchIfActive() {
@@ -562,6 +600,7 @@ async function buildEventCard(event) {
         const authorEl = document.createElement("div");
         authorEl.className = "event-author";
         authorEl.textContent = event.isMine ? "you" : "@" + event.owner;
+        authorEl.title = `Posted ${formatFullTimestamp(event.created_at)}`;
         titleRow.appendChild(authorEl);
     }
 
@@ -589,7 +628,9 @@ async function buildEventCard(event) {
             const dot = document.createElement("div");
             dot.className = "event-going-avatar";
             dot.style.background = person.avatarColor;
-            dot.title = "@" + person.username;
+            dot.title = person.addedAt
+                ? `@${person.username} · added ${formatFullTimestamp(person.addedAt)}`
+                : "@" + person.username;
             stack.appendChild(dot);
         });
         goingRow.appendChild(stack);
@@ -757,6 +798,11 @@ async function buildComments(event) {
             author.className = "comment-author";
             author.textContent = "@" + comment.author;
 
+            const time = document.createElement("span");
+            time.className = "comment-time";
+            time.textContent = formatRelativeShort(comment.created_at);
+            time.title = formatFullTimestamp(comment.created_at);
+
             const text = document.createElement("span");
             text.className = "comment-text";
             text.textContent = comment.text;
@@ -764,6 +810,7 @@ async function buildComments(event) {
             const body = document.createElement("span");
             body.className = "comment-body";
             body.appendChild(author);
+            body.appendChild(time);
             body.appendChild(text);
 
             if (comment.edited) {
