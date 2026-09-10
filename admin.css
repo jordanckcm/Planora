@@ -1,5 +1,23 @@
+:root {
+    --admin-panel: #151515;
+    --admin-panel-head: #1a1a1a;
+    --admin-border: #2a2a2a;
+    --admin-border-strong: #333;
+    --admin-text: #eee;
+    --admin-text-dim: #ddd;
+    --admin-text-muted: #999;
+    --admin-danger: #b6453f;
+
+    --role-admin: #c9a227;
+    --role-community-plus: #4a7fc9;
+    --role-community: #7a8290;
+
+    --vis-global: #9a56c9;
+    --vis-local: #489c48;
+}
+
 .admin-title {
-    color: #eee;
+    color: var(--admin-text);
     font-weight: 600;
     margin-left: 12px;
     align-self: center;
@@ -11,32 +29,95 @@
     padding: 0 16px;
 }
 
+/* ============ STAT STRIP ============ */
+
+.admin-stats {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 32px;
+}
+
+.stat-card {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border);
+    border-radius: 8px;
+}
+
+.stat-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--admin-text);
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 12px;
+    color: var(--admin-text-muted);
+}
+
+/* ============ SECTION HEAD + SEARCH ============ */
+
 .admin-section {
     margin-bottom: 40px;
 }
 
-.admin-section h2 {
-    color: #eee;
-    font-size: 18px;
+.admin-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 12px;
 }
+
+.admin-section-head h2 {
+    color: var(--admin-text);
+    font-size: 18px;
+    margin: 0;
+}
+
+.admin-search {
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border-strong);
+    color: var(--admin-text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    font-size: 13px;
+    width: 180px;
+    max-width: 45vw;
+}
+
+.admin-search::placeholder {
+    color: var(--admin-text-muted);
+}
+
+.admin-search:focus {
+    outline: 1px solid var(--admin-text-muted);
+    outline-offset: 0;
+}
+
+/* ============ TABLE (DESKTOP) ============ */
 
 .admin-table {
     display: flex;
     flex-direction: column;
-    border: 1px solid #333;
+    border: 1px solid var(--admin-border-strong);
     border-radius: 8px;
     overflow: hidden;
 }
 
 .admin-row {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr auto;
+    grid-template-columns: 1.3fr 1.3fr 1fr 1fr auto;
     gap: 12px;
     padding: 10px 14px;
     align-items: center;
-    border-bottom: 1px solid #2a2a2a;
-    color: #ddd;
+    border-bottom: 1px solid var(--admin-border);
+    color: var(--admin-text-dim);
     font-size: 14px;
 }
 
@@ -49,26 +130,112 @@
 }
 
 .admin-row-head {
-    background: #1a1a1a;
+    background: var(--admin-panel-head);
     font-weight: 600;
-    color: #999;
+    color: var(--admin-text-muted);
     text-transform: uppercase;
     font-size: 11px;
     letter-spacing: 0.04em;
 }
 
+.admin-row:not(.admin-row-head):hover {
+    background: #191919;
+}
+
+.admin-empty-row,
+.admin-loading-row {
+    padding: 20px 14px;
+    color: var(--admin-text-muted);
+    font-size: 13px;
+    text-align: center;
+}
+
+/* generic wrapper for multi-part cell content (icon/dot + text), so it
+   behaves as one value next to its label when stacked on mobile */
+.cell-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* username with avatar dot */
+
+.avatar-dot {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    flex: none;
+}
+
+.user-id-cell span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* event title with icon + color mark */
+
+.event-color-mark {
+    width: 4px;
+    align-self: stretch;
+    border-radius: 2px;
+    flex: none;
+}
+
+.event-title-cell .event-title-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* role select + dot */
+
+.role-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex: none;
+}
+
 .role-select {
     background: #111;
-    color: #eee;
-    border: 1px solid #333;
+    color: var(--admin-text);
+    border: 1px solid var(--admin-border-strong);
     border-radius: 6px;
     padding: 4px 8px;
 }
 
+/* visibility badge */
+
+.badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    border: 1px solid transparent;
+    width: fit-content;
+}
+
+.badge-global {
+    color: var(--vis-global);
+    border-color: var(--vis-global);
+    background: rgba(154, 86, 201, 0.12);
+}
+
+.badge-local {
+    color: var(--vis-local);
+    border-color: var(--vis-local);
+    background: rgba(72, 156, 72, 0.12);
+}
+
+/* ============ BUTTONS ============ */
+
 .admin-danger-btn {
     background: transparent;
-    border: 1px solid #b6453f;
-    color: #b6453f;
+    border: 1px solid var(--admin-danger);
+    color: var(--admin-danger);
     border-radius: 6px;
     padding: 4px 10px;
     cursor: pointer;
@@ -76,12 +243,132 @@
 }
 
 .admin-danger-btn:hover {
-    background: #b6453f;
+    background: var(--admin-danger);
     color: #fff;
 }
 
+.admin-danger-btn-solid {
+    background: var(--admin-danger);
+    color: #fff;
+}
+
+.admin-danger-btn-solid:hover {
+    background: #9c3a35;
+}
+
 .visibility-locked-hint {
-    color: #999;
+    color: var(--admin-text-muted);
     font-size: 12px;
     margin: -6px 0 8px;
+}
+
+/* ============ CONFIRM MODAL ============ */
+
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 100;
+}
+
+.confirm-overlay.open {
+    display: flex;
+    animation: confirm-fade 0.12s ease-out;
+}
+
+@keyframes confirm-fade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.confirm-box {
+    background: var(--admin-panel);
+    border: 1px solid var(--admin-border-strong);
+    border-radius: 10px;
+    padding: 20px;
+    max-width: 340px;
+    width: 100%;
+}
+
+.confirm-box p {
+    color: var(--admin-text);
+    font-size: 14px;
+    margin: 0 0 16px;
+    line-height: 1.4;
+}
+
+.confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+/* ============ MOBILE ============ */
+
+@media (max-width: 680px) {
+    .admin-stats {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .admin-section-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .admin-search {
+        width: 100%;
+        max-width: none;
+    }
+
+    .admin-row-head {
+        display: none;
+    }
+
+    .admin-table {
+        border: none;
+        gap: 10px;
+    }
+
+    .admin-row,
+    #eventsTable .admin-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+        border: 1px solid var(--admin-border-strong);
+        border-radius: 8px;
+        padding: 12px 14px;
+    }
+
+    .admin-row:not(:last-child) {
+        margin-bottom: 10px;
+    }
+
+    .admin-row > span[data-label] {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+    }
+
+    .admin-row > span[data-label]::before {
+        content: attr(data-label);
+        color: var(--admin-text-muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        flex: none;
+    }
+
+    .admin-row > span:last-child:not([data-label]) {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 4px;
+    }
+
+    .role-select {
+        max-width: 60%;
+    }
 }
