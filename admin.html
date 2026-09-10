@@ -24,14 +24,38 @@
 
     <div class="admin-wrap">
 
+        <!-- STATS -->
+        <div class="admin-stats" id="adminStats">
+            <div class="stat-card">
+                <span class="stat-value" id="statTotalUsers">—</span>
+                <span class="stat-label">Users</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="statAdmins">—</span>
+                <span class="stat-label">Admins</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="statTotalEvents">—</span>
+                <span class="stat-label">Events</span>
+            </div>
+            <div class="stat-card">
+                <span class="stat-value" id="statGlobalEvents">—</span>
+                <span class="stat-label">Global</span>
+            </div>
+        </div>
+
         <!-- USERS -->
         <section class="admin-section">
-            <h2>Users</h2>
+            <div class="admin-section-head">
+                <h2>Users</h2>
+                <input type="search" class="admin-search" id="usersSearch" placeholder="Search users…" aria-label="Search users">
+            </div>
             <div class="admin-table" id="usersTable">
                 <div class="admin-row admin-row-head">
-                    <span>Username</span>
+                    <span>User</span>
                     <span>Display name</span>
                     <span>Role</span>
+                    <span>Joined</span>
                     <span></span>
                 </div>
                 <!-- rows injected by admin.js -->
@@ -40,7 +64,10 @@
 
         <!-- GLOBAL EVENTS -->
         <section class="admin-section">
-            <h2>All events</h2>
+            <div class="admin-section-head">
+                <h2>All events</h2>
+                <input type="search" class="admin-search" id="eventsSearch" placeholder="Search events…" aria-label="Search events">
+            </div>
             <div class="admin-table" id="eventsTable">
                 <div class="admin-row admin-row-head">
                     <span>Title</span>
@@ -53,6 +80,17 @@
             </div>
         </section>
 
+    </div>
+
+    <!-- CONFIRM MODAL -->
+    <div class="confirm-overlay" id="confirmOverlay">
+        <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmMessage">
+            <p id="confirmMessage">Are you sure?</p>
+            <div class="confirm-actions">
+                <button class="custom-button" id="confirmNoBtn">Cancel</button>
+                <button class="admin-danger-btn admin-danger-btn-solid" id="confirmYesBtn">Delete</button>
+            </div>
+        </div>
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
