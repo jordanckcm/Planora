@@ -62,6 +62,41 @@ function isRecentlyPosted(event) {
     return Date.now() - event.created_at < 24 * 60 * 60 * 1000;
 }
 
+/* "7:30 PM" from a 24h "19:30" input value. */
+function formatTime(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const period = h >= 12 ? "PM" : "AM";
+    const hour12 = h % 12 === 0 ? 12 : h % 12;
+    return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
+/* Combines the date/date-range with the start/end time, whichever of
+   those the event actually has. All of it is optional, so this reads
+   fine whether an event has a full range or just a single plain date. */
+function formatEventWhen(event) {
+    let dateLabel;
+
+    if (event.end_date && event.end_date !== event.date) {
+        const start = new Date(event.date + "T00:00:00");
+        const end = new Date(event.end_date + "T00:00:00");
+        const days = Math.round((end - start) / 86400000) + 1;
+        const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        const endLabel = end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+        dateLabel = `${startLabel} – ${endLabel} · ${days} days`;
+    } else {
+        dateLabel = formatEventDate(event.date);
+    }
+
+    if (event.start_time) {
+        const timeLabel = event.end_time
+            ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
+            : formatTime(event.start_time);
+        return `${dateLabel} · ${timeLabel}`;
+    }
+
+    return dateLabel;
+}
+
 
 /* =========================
    STARTUP
@@ -385,7 +420,7 @@ async function buildEventCard(event) {
 
     const dateEl = document.createElement("div");
     dateEl.className = "event-date";
-    dateEl.textContent = formatEventDate(event.date);
+    dateEl.textContent = formatEventWhen(event);
     info.appendChild(dateEl);
 
     if (mode === "global" && event.addedBy && event.addedBy.length > 0) {
@@ -443,13 +478,7 @@ async function buildEventCard(event) {
         adminRemoveBtn.addEventListener("click", async (e) => {
             e.stopPropagation();
             try {
-                // Direct fetch since this hits a new admin-only endpoint
-                // that isn't in api.js yet — add a PlanoraData.adminDeleteEvent
-                // helper there if you'd rather keep this consistent with
-                // the rest of your data calls.
-                const res = await fetch(`/api/admin/events/${event.id}`, { method: "DELETE" });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "Couldn't remove that event.");
+                await PlanoraData.adminDeleteEvent(event.id);
                 toast("Removed by admin.");
                 render();
             } catch (err) {
@@ -737,7 +766,18 @@ function buildAddEventUI() {
 
             <input type="text" id="eventTitle" placeholder="Event name" maxlength="80">
             <textarea id="eventDescription" placeholder="Description" maxlength="400"></textarea>
+
+            <div class="field-label">Starts</div>
             <input type="date" id="eventDate">
+
+            <div class="field-label">Ends (optional — leave blank for a single day)</div>
+            <input type="date" id="eventEndDate">
+
+            <div class="field-label">Time (optional)</div>
+            <div class="time-grid">
+                <input type="time" id="eventStartTime">
+                <input type="time" id="eventEndTime">
+            </div>
 
             <div class="field-label">Icon</div>
             <div class="event-icon-row" id="eventIconRow"></div>
@@ -801,6 +841,9 @@ function buildAddEventUI() {
         document.getElementById("eventTitle").value = "";
         document.getElementById("eventDescription").value = "";
         document.getElementById("eventDate").value = "";
+        document.getElementById("eventEndDate").value = "";
+        document.getElementById("eventStartTime").value = "";
+        document.getElementById("eventEndTime").value = "";
         document.getElementById("eventVisibility").checked = false;
 
         selectedEventIcon = EVENT_ICONS[0];
@@ -817,6 +860,9 @@ function buildAddEventUI() {
         const title = document.getElementById("eventTitle").value.trim();
         const description = document.getElementById("eventDescription").value.trim();
         const date = document.getElementById("eventDate").value;
+        const endDate = document.getElementById("eventEndDate").value;
+        const startTime = document.getElementById("eventStartTime").value;
+        const endTime = document.getElementById("eventEndTime").value;
         const isPublic = currentUser.role !== "community"
             && document.getElementById("eventVisibility").checked;
 
@@ -825,11 +871,19 @@ function buildAddEventUI() {
             return;
         }
 
+        if (endDate && endDate < date) {
+            toast("End date can't be before the start date.", "error");
+            return;
+        }
+
         try {
             await PlanoraData.addEvent({
                 title,
                 description,
                 date,
+                endDate,
+                startTime,
+                endTime,
                 visibility: isPublic ? "global" : "local",
                 icon: selectedEventIcon,
                 color: selectedEventColor
