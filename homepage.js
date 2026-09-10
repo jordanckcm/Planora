@@ -17,6 +17,7 @@ let currentYear = new Date().getFullYear();
 let mode = "local"; // "local" | "global"
 let openMonth = null;
 let shownOfflineToast = false;
+let searchQuery = "";
 
 const monthButtons = document.querySelectorAll(".month-events-container");
 const yearDisplay = document.getElementById("year");
@@ -114,10 +115,21 @@ function formatEventWhen(event) {
     enhanceMonthHeaders();
     bindModeButtons();
     bindYearButtons();
+    bindTodayButton();
+    bindSearch();
     buildAddEventUI();
+
+    // A "Copy link" URL (?event=123&mode=global&year=2026) can set the
+    // mode/year before the first render, then we open + scroll to the
+    // specific card once everything's on the page.
+    const deepLinkEventId = applyDeepLinkFromURL();
 
     setActiveModeButton();
     await render();
+
+    if (deepLinkEventId !== null) {
+        await focusEvent(deepLinkEventId);
+    }
 })();
 
 
@@ -270,11 +282,138 @@ function animateYearSwitch(direction) {
 
 
 /* =========================
+   TODAY BUTTON
+========================= */
+
+function bindTodayButton() {
+    document.getElementById("todayButton").addEventListener("click", async () => {
+        const now = new Date();
+        const targetYear = now.getFullYear();
+        const targetMonth = now.getMonth() + 1;
+
+        // a stale search could hide the very month we're jumping to
+        clearSearchIfActive();
+
+        if (targetYear !== currentYear) {
+            const direction = targetYear > currentYear ? "next" : "prev";
+            currentYear = targetYear;
+            animateYearSwitch(direction);
+        }
+
+        openMonth = targetMonth;
+        await render();
+        scrollToMonth(targetMonth);
+    });
+}
+
+function scrollToMonth(monthNumber) {
+    const monthEl = [...monthButtons].find(el => Number(el.dataset.month) === monthNumber);
+    const wrapper = monthEl && monthEl.closest(".month-wrapper");
+    if (wrapper) {
+        wrapper.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+}
+
+
+/* =========================
+   SEARCH
+   Filters events by title/description across every month at
+   once. Matching months auto-expand; months with nothing
+   matching collapse out of the way instead of making you
+   click through all twelve to find something.
+========================= */
+
+function bindSearch() {
+    const input = document.getElementById("eventSearch");
+    const clearBtn = document.getElementById("clearSearch");
+
+    input.addEventListener("input", () => {
+        searchQuery = input.value;
+        clearBtn.style.display = searchQuery ? "flex" : "none";
+        render();
+    });
+
+    clearBtn.addEventListener("click", () => {
+        input.value = "";
+        searchQuery = "";
+        clearBtn.style.display = "none";
+        input.focus();
+        render();
+    });
+}
+
+function clearSearchIfActive() {
+    if (!searchQuery) return;
+    searchQuery = "";
+    const input = document.getElementById("eventSearch");
+    const clearBtn = document.getElementById("clearSearch");
+    if (input) input.value = "";
+    if (clearBtn) clearBtn.style.display = "none";
+}
+
+
+/* =========================
+   SHARED EVENT LINKS
+   "Copy link" on a global event produces a URL like
+   ?event=123&mode=global&year=2026. On load we read that,
+   switch into the right mode/year, then scroll to and briefly
+   highlight the matching card once it's rendered.
+========================= */
+
+function applyDeepLinkFromURL() {
+    const params = new URLSearchParams(location.search);
+    const eventIdParam = params.get("event");
+    if (!eventIdParam || Number.isNaN(Number(eventIdParam))) return null;
+
+    mode = params.get("mode") === "local" ? "local" : "global";
+
+    const yearParam = Number(params.get("year"));
+    if (yearParam) currentYear = yearParam;
+
+    // clean the URL so refreshing or hitting Today later doesn't
+    // keep re-triggering the same jump
+    history.replaceState(null, "", location.pathname);
+
+    return Number(eventIdParam);
+}
+
+async function focusEvent(eventId) {
+    let events;
+    try {
+        events = await PlanoraData.getEvents(mode, currentYear);
+    } catch (err) {
+        toast(err.message, "error");
+        return;
+    }
+
+    const target = events.find(e => e.id === eventId);
+    if (!target) {
+        toast("Couldn't find that event — it may be from a different year.", "error");
+        return;
+    }
+
+    openMonth = new Date(target.date).getMonth() + 1;
+    await render();
+
+    const card = document.querySelector(`.event[data-event-id="${eventId}"]`);
+    if (card) {
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        card.classList.add("event-highlight");
+        setTimeout(() => card.classList.remove("event-highlight"), 1800);
+    } else {
+        scrollToMonth(openMonth);
+    }
+}
+
+
+/* =========================
    MONTH CLICK
 ========================= */
 
 monthButtons.forEach(monthEl => {
     monthEl.addEventListener("click", () => {
+        if (searchQuery.trim()) return; // search already controls which months are open
+
         // quick tactile press bounce — restart it even on rapid taps
         monthEl.classList.remove("month-press");
         void monthEl.offsetWidth;
@@ -310,21 +449,37 @@ async function render() {
         return;
     }
 
+    const query = searchQuery.trim().toLowerCase();
+    const isSearching = query.length > 0;
+
     for (const monthEl of monthButtons) {
         const monthNumber = Number(monthEl.dataset.month);
         const countEl = monthEl.querySelector(".event-count");
+        const wrapper = monthEl.closest(".month-wrapper");
         const container = monthEl.parentElement.querySelector(".events-container");
-        const isOpen = openMonth === monthNumber;
 
-        const monthEvents = events
+        let monthEvents = events
             .filter(e => new Date(e.date).getMonth() + 1 === monthNumber)
             .sort((a, b) => new Date(a.date) - new Date(b.date));
 
+        if (isSearching) {
+            monthEvents = monthEvents.filter(e =>
+                e.title.toLowerCase().includes(query) ||
+                (e.description && e.description.toLowerCase().includes(query))
+            );
+        }
+
         countEl.textContent = monthEvents.length === 0
-            ? "NO EVENTS"
+            ? (isSearching ? "NO MATCHES" : "NO EVENTS")
             : monthEvents.length === 1
-                ? "01 EVENT"
-                : String(monthEvents.length).padStart(2, "0") + " EVENTS";
+                ? (isSearching ? "01 MATCH" : "01 EVENT")
+                : String(monthEvents.length).padStart(2, "0") + (isSearching ? " MATCHES" : " EVENTS");
+
+        // while searching, months with hits auto-open and months
+        // without just disappear — otherwise it's the normal accordion
+        const isOpen = isSearching ? monthEvents.length > 0 : openMonth === monthNumber;
+
+        wrapper.classList.toggle("search-hidden", isSearching && monthEvents.length === 0);
 
         monthEl.classList.toggle("month-open", isOpen);
         container.classList.toggle("open", isOpen);
@@ -368,6 +523,7 @@ async function buildEventCard(event) {
 
     const card = document.createElement("div");
     card.className = "event";
+    card.dataset.eventId = event.id;
     if (isRecentlyPosted(event)) card.classList.add("event-new");
 
     const cover = document.createElement("div");
@@ -468,6 +624,33 @@ async function buildEventCard(event) {
             }
         });
         actions.appendChild(removeBtn);
+
+        // Quick one-click copy of your own event onto another date —
+        // lands in Local so it never fights the Global post cap.
+        const duplicateBtn = document.createElement("button");
+        duplicateBtn.className = "event-action-btn";
+        duplicateBtn.textContent = "Duplicate";
+        duplicateBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            try {
+                await PlanoraData.addEvent({
+                    title: `${event.title} (copy)`,
+                    description: event.description || "",
+                    date: event.date,
+                    endDate: event.end_date || event.date,
+                    startTime: event.start_time || "",
+                    endTime: event.end_time || "",
+                    visibility: "local",
+                    icon: event.icon || EVENT_ICONS[0],
+                    color: event.color || EVENT_COLORS[0]
+                });
+                toast(`Duplicated "${event.title}" to your calendar.`, "success");
+                render();
+            } catch (err) {
+                toast(err.message, "error");
+            }
+        });
+        actions.appendChild(duplicateBtn);
     }
 
     // Admins can also remove events posted by other people in Global.
@@ -505,6 +688,23 @@ async function buildEventCard(event) {
             }
         });
         actions.appendChild(addBtn);
+    }
+
+    if (mode === "global") {
+        const copyLinkBtn = document.createElement("button");
+        copyLinkBtn.className = "event-action-btn";
+        copyLinkBtn.textContent = "Copy link";
+        copyLinkBtn.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            const url = `${location.origin}${location.pathname}?event=${event.id}&mode=global&year=${currentYear}`;
+            try {
+                await navigator.clipboard.writeText(url);
+                toast("Link copied.", "success");
+            } catch (err) {
+                toast("Couldn't copy the link.", "error");
+            }
+        });
+        actions.appendChild(copyLinkBtn);
     }
 
     main.appendChild(actions);
