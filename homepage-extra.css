@@ -403,6 +403,16 @@ body.mode-global {
     margin-bottom: 6px;
 }
 
+.time-grid {
+    display: flex;
+    gap: 10px;
+}
+
+.time-grid input {
+    flex: 1;
+    min-width: 0;
+}
+
 .event-icon-row {
     display: flex;
     flex-wrap: wrap;
