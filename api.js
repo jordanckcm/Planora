@@ -173,6 +173,10 @@ const PlanoraData = (() => {
         return apiRequest(`/api/events/${eventId}/comments`, { method: "POST", body: { text } });
     }
 
+    async function deleteComment(eventId, commentId) {
+        return apiRequest(`/api/events/${eventId}/comments/${commentId}`, { method: "DELETE" });
+    }
+
     async function getStats() {
         return apiRequest("/api/stats");
     }
@@ -184,6 +188,7 @@ const PlanoraData = (() => {
         deleteEvent,
         getComments,
         addComment,
+        deleteComment,
         getStats
     };
 
