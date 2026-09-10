@@ -403,6 +403,14 @@ body.mode-global {
     margin-bottom: 6px;
 }
 
+/* Event name input uses the readable heading font instead of the
+   decorative VHS font every other input gets, since this is the one
+   field people actually need to proofread while typing. */
+#eventTitle {
+    font-family: "Gotham";
+    font-size: 15px;
+}
+
 .time-grid {
     display: flex;
     gap: 10px;
@@ -769,6 +777,20 @@ body.mode-global {
 .visibility-row label {
     font-size: 11px;
     color: rgba(255, 255, 255, 0.75);
+}
+
+/* Was never styled, so it fell back to the browser default (black)
+   on this dark form — basically invisible. */
+.visibility-locked-hint {
+    margin-top: -6px;
+    margin-bottom: 14px;
+    padding: 0 2px;
+
+    font-family: "VHS";
+    font-size: 10.5px;
+    line-height: 1.4;
+
+    color: white;
 }
 
 
