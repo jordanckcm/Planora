@@ -38,6 +38,28 @@ app.secret_key = os.environ["SECRET_KEY"]
 
 
 # =========================================================
+# JSON ERROR HANDLERS
+# Every response the frontend gets back needs to be JSON,
+# because api.js always calls response.json() on it. Without
+# these, an unmatched route (typo'd URL, etc.) or a bug that
+# raises an exception falls through to Flask's default error
+# page — which is HTML, not JSON. Trying to JSON-parse that
+# HTML is exactly what throws the cryptic "Unexpected token
+# ... in JSON" error in the browser, even though nothing about
+# the actual request (like a delete) failed.
+# =========================================================
+
+@app.errorhandler(404)
+def handle_not_found(e):
+    return jsonify({"error": "That route doesn't exist."}), 404
+
+
+@app.errorhandler(500)
+def handle_server_error(e):
+    return jsonify({"error": "Something went wrong on the server. Try again."}), 500
+
+
+# =========================================================
 # OUR "DATABASE" (just lists in memory, nothing fancy)
 # =========================================================
 
@@ -399,6 +421,9 @@ def get_events():
         event_copy = dict(event)
         event_copy.setdefault("color", EVENT_COLORS[0])
         event_copy.setdefault("icon", EVENT_ICONS[0])
+        event_copy.setdefault("end_date", event_copy["date"])
+        event_copy.setdefault("start_time", "")
+        event_copy.setdefault("end_time", "")
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
         if mode == "global":
@@ -442,6 +467,16 @@ def add_event():
     if not title or not date:
         return jsonify({"error": "Add a name and date first."}), 400
 
+    # Optional: what time it starts/ends, and — for something that runs
+    # more than one day — when it ends. Leaving these blank just means
+    # "no specific time, single day", same as before.
+    start_time = data.get("startTime", "").strip()
+    end_time = data.get("endTime", "").strip()
+    end_date = data.get("endDate", "").strip() or date
+
+    if end_date < date:
+        return jsonify({"error": "End date can't be before the start date."}), 400
+
     role = user["role"]
     mine = [e for e in events if e["owner"].lower() == user["username"].lower()]
 
@@ -470,6 +505,9 @@ def add_event():
         "title": title,
         "description": description,
         "date": date,
+        "end_date": end_date,
+        "start_time": start_time,
+        "end_time": end_time,
         "visibility": visibility,
         "color": color,
         "icon": icon,
@@ -522,6 +560,9 @@ def add_to_my_calendar(event_id):
         "title": source_event["title"],
         "description": source_event["description"],
         "date": source_event["date"],
+        "end_date": source_event.get("end_date", source_event["date"]),
+        "start_time": source_event.get("start_time", ""),
+        "end_time": source_event.get("end_time", ""),
         "visibility": "local",
         "color": source_event.get("color", EVENT_COLORS[0]),
         "icon": source_event.get("icon", EVENT_ICONS[0]),
