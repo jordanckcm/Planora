@@ -23,6 +23,13 @@ const yearDisplay = document.getElementById("year");
 const localButton = document.querySelector(".local-button");
 const globalButton = document.querySelector(".global-button");
 
+// same palette as the profile avatar picker, reused for event color-tags
+const EVENT_COLORS = ["#c9a227", "#489c48", "#b6453f", "#4a7fc9", "#9a56c9", "#c96f2e"];
+const EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "🌙", "🔥", "🎬"];
+
+let selectedEventColor = EVENT_COLORS[0];
+let selectedEventIcon = EVENT_ICONS[0];
+
 
 function toast(message, type = "") {
     const stack = document.getElementById("toastStack");
@@ -31,6 +38,28 @@ function toast(message, type = "") {
     el.textContent = message;
     stack.appendChild(el);
     setTimeout(() => el.remove(), 3200);
+}
+
+/* "Today" / "Tomorrow" / "In 4 days" close to now, falls back to a
+   normal short date further out. */
+function formatEventDate(dateStr) {
+    const eventDate = new Date(dateStr + "T00:00:00");
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const diffDays = Math.round((eventDate - today) / 86400000);
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    if (diffDays === -1) return "Yesterday";
+    if (diffDays > 1 && diffDays <= 6) return `In ${diffDays} days`;
+    if (diffDays < -1 && diffDays >= -6) return `${Math.abs(diffDays)} days ago`;
+
+    return eventDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+function isRecentlyPosted(event) {
+    return Date.now() - event.created_at < 24 * 60 * 60 * 1000;
 }
 
 
@@ -304,6 +333,13 @@ async function buildEventCard(event) {
 
     const card = document.createElement("div");
     card.className = "event";
+    if (isRecentlyPosted(event)) card.classList.add("event-new");
+
+    const cover = document.createElement("div");
+    cover.className = "event-cover";
+    cover.style.background = `${event.color || EVENT_COLORS[0]}26`; // ~15% tint
+    cover.textContent = event.icon || EVENT_ICONS[0];
+    card.appendChild(cover);
 
     const main = document.createElement("div");
     main.className = "event-main";
@@ -311,6 +347,7 @@ async function buildEventCard(event) {
     const dayEl = document.createElement("div");
     dayEl.className = "event-day";
     dayEl.textContent = day;
+    dayEl.style.color = event.color || EVENT_COLORS[0];
 
     const info = document.createElement("div");
     info.className = "event-info";
@@ -322,6 +359,13 @@ async function buildEventCard(event) {
     titleEl.className = "event-title";
     titleEl.textContent = event.title; // textContent, never innerHTML, for user-typed text
     titleRow.appendChild(titleEl);
+
+    if (isRecentlyPosted(event)) {
+        const newBadge = document.createElement("span");
+        newBadge.className = "event-new-badge";
+        newBadge.textContent = "NEW";
+        titleRow.appendChild(newBadge);
+    }
 
     if (mode === "global") {
         const authorEl = document.createElement("div");
@@ -341,8 +385,31 @@ async function buildEventCard(event) {
 
     const dateEl = document.createElement("div");
     dateEl.className = "event-date";
-    dateEl.textContent = event.date;
+    dateEl.textContent = formatEventDate(event.date);
     info.appendChild(dateEl);
+
+    if (mode === "global" && event.addedBy && event.addedBy.length > 0) {
+        const goingRow = document.createElement("div");
+        goingRow.className = "event-going";
+
+        const stack = document.createElement("div");
+        stack.className = "event-going-avatars";
+        event.addedBy.slice(0, 5).forEach(person => {
+            const dot = document.createElement("div");
+            dot.className = "event-going-avatar";
+            dot.style.background = person.avatarColor;
+            dot.title = "@" + person.username;
+            stack.appendChild(dot);
+        });
+        goingRow.appendChild(stack);
+
+        const count = document.createElement("span");
+        count.className = "event-going-count";
+        count.textContent = event.addedBy.length === 1 ? "1 going" : `${event.addedBy.length} going`;
+        goingRow.appendChild(count);
+
+        info.appendChild(goingRow);
+    }
 
     main.appendChild(dayEl);
     main.appendChild(info);
@@ -672,6 +739,12 @@ function buildAddEventUI() {
             <textarea id="eventDescription" placeholder="Description" maxlength="400"></textarea>
             <input type="date" id="eventDate">
 
+            <div class="field-label">Icon</div>
+            <div class="event-icon-row" id="eventIconRow"></div>
+
+            <div class="field-label">Color</div>
+            <div class="event-color-row" id="eventColorRow"></div>
+
             <div class="visibility-row">
                 <input type="checkbox" id="eventVisibility">
                 <label for="eventVisibility">Post to Global (everyone can see this)</label>
@@ -688,6 +761,34 @@ function buildAddEventUI() {
     `;
     document.body.appendChild(eventForm);
 
+    const iconRow = eventForm.querySelector("#eventIconRow");
+    EVENT_ICONS.forEach(icon => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "event-icon-dot" + (icon === selectedEventIcon ? " selected" : "");
+        btn.textContent = icon;
+        btn.addEventListener("click", () => {
+            selectedEventIcon = icon;
+            iconRow.querySelectorAll(".event-icon-dot").forEach(el => el.classList.remove("selected"));
+            btn.classList.add("selected");
+        });
+        iconRow.appendChild(btn);
+    });
+
+    const colorRow = eventForm.querySelector("#eventColorRow");
+    EVENT_COLORS.forEach(color => {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "event-color-dot" + (color === selectedEventColor ? " selected" : "");
+        dot.style.background = color;
+        dot.addEventListener("click", () => {
+            selectedEventColor = color;
+            colorRow.querySelectorAll(".event-color-dot").forEach(el => el.classList.remove("selected"));
+            dot.classList.add("selected");
+        });
+        colorRow.appendChild(dot);
+    });
+
     // Community accounts can't post to Global — hide the option rather
     // than let them pick it and get a 403 back from the server.
     if (currentUser.role === "community") {
@@ -701,6 +802,11 @@ function buildAddEventUI() {
         document.getElementById("eventDescription").value = "";
         document.getElementById("eventDate").value = "";
         document.getElementById("eventVisibility").checked = false;
+
+        selectedEventIcon = EVENT_ICONS[0];
+        selectedEventColor = EVENT_COLORS[0];
+        iconRow.querySelectorAll(".event-icon-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
+        colorRow.querySelectorAll(".event-color-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
     });
 
     document.getElementById("cancelEvent").addEventListener("click", () => {
@@ -724,7 +830,9 @@ function buildAddEventUI() {
                 title,
                 description,
                 date,
-                visibility: isPublic ? "global" : "local"
+                visibility: isPublic ? "global" : "local",
+                icon: selectedEventIcon,
+                color: selectedEventColor
             });
         } catch (err) {
             toast(err.message, "error");
