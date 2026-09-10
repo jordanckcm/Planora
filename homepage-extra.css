@@ -407,7 +407,7 @@ body.mode-global {
    decorative VHS font every other input gets, since this is the one
    field people actually need to proofread while typing. */
 #eventTitle {
-    font-family: "Gotham";
+    font-family: "VHS";
     font-size: 15px;
 }
 
