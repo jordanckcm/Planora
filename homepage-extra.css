@@ -893,6 +893,128 @@ body.mode-global {
 
 
 /* =========================
+   TODAY BUTTON
+   Sits next to the year arrows — jumps back to the current
+   year/month without hunting for it manually.
+========================= */
+
+.today-button {
+    width: auto !important;
+
+    padding: 0 16px !important;
+
+    border-radius: 20px !important;
+
+    font-family: "VHS";
+    font-size: 10px !important;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+
+/* =========================
+   SEARCH BAR
+   Filters events by title/description across every month at
+   once. Matching months auto-expand; the rest collapse out of
+   the way instead of forcing you to click through all twelve.
+========================= */
+
+.search-bar {
+    position: relative;
+    z-index: 2;
+
+    display: flex;
+    align-items: center;
+
+    width: min(94%, 900px);
+
+    margin: 0 auto 18px;
+}
+
+.search-input {
+    width: 100%;
+    height: 42px;
+
+    padding: 0 40px 0 16px;
+
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+
+    background: rgba(30, 30, 30, 0.8);
+    color: white;
+
+    font-family: "VHS";
+    font-size: 12px;
+
+    outline: none;
+
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.search-input::placeholder {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.search-input:focus {
+    background: rgb(38, 38, 38);
+    border-color: rgba(255, 255, 255, 0.35);
+}
+
+.clear-search {
+    position: absolute;
+    right: 10px;
+
+    width: 24px;
+    height: 24px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    border: none;
+    border-radius: 50%;
+
+    background: transparent;
+    color: rgba(255, 255, 255, 0.5);
+
+    font-size: 18px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.clear-search:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+/* Months with no match while searching — collapsed out of the
+   layout entirely rather than just visually hidden, so the
+   remaining months sit flush together. */
+.month-wrapper.search-hidden {
+    display: none;
+}
+
+
+/* =========================
+   DEEP-LINK HIGHLIGHT
+   Briefly pulses the event a "Copy link" URL pointed at, so
+   it's obvious which card you were sent to.
+========================= */
+
+@keyframes eventHighlightPulse {
+    0%   { border-color: rgba(72, 156, 72, 0.9); box-shadow: 0 0 0 3px rgba(72, 156, 72, 0.25); }
+    100% { border-color: rgba(255, 255, 255, 0.08); box-shadow: none; }
+}
+
+.event.event-highlight {
+    animation: eventHighlightPulse 1.8s ease;
+}
+
+
+/* =========================
    MOBILE
 ========================= */
 
@@ -900,6 +1022,15 @@ body.mode-global {
 
     .event-actions {
         flex-direction: column;
+    }
+
+    .search-bar {
+        margin-bottom: 14px;
+    }
+
+    .search-input {
+        height: 38px;
+        font-size: 11px;
     }
 
 }
