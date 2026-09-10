@@ -590,7 +590,7 @@ body.mode-global {
     transform: translateY(-4px);
     pointer-events: none;
 
-    transition: 0.15s ease;
+    transition: opacity 0.15s ease, transform 0.15s ease;
 
     z-index: 40;
 }
