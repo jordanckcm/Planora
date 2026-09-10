@@ -166,6 +166,9 @@ function bindModeButtons() {
 function setActiveModeButton() {
     localButton.classList.toggle("mode-active", mode === "local");
     globalButton.classList.toggle("mode-active", mode === "global");
+
+    document.body.classList.toggle("mode-local", mode === "local");
+    document.body.classList.toggle("mode-global", mode === "global");
 }
 
 function bindYearButtons() {
@@ -450,11 +453,16 @@ async function buildComments(event) {
             const c = document.createElement("div");
             c.className = "comment";
 
+            const isAuthor = currentUser.username.toLowerCase() === comment.author.toLowerCase();
+            const canEdit = isAuthor;
+            const canDelete = isAuthor || canModerate;
+
             const author = document.createElement("span");
             author.className = "comment-author";
             author.textContent = "@" + comment.author;
 
             const text = document.createElement("span");
+            text.className = "comment-text";
             text.textContent = comment.text;
 
             const body = document.createElement("span");
@@ -462,25 +470,108 @@ async function buildComments(event) {
             body.appendChild(author);
             body.appendChild(text);
 
-            c.appendChild(body);
+            if (comment.edited) {
+                const edited = document.createElement("span");
+                edited.className = "comment-edited";
+                edited.textContent = "(edited)";
+                body.appendChild(edited);
+            }
 
-            if (canModerate) {
-                const remove = document.createElement("button");
-                remove.className = "comment-delete";
-                remove.textContent = "Remove";
-                remove.setAttribute("aria-label", "Delete comment");
-                remove.addEventListener("click", async (e) => {
-                    e.stopPropagation();
+            function enterEditMode() {
+                const editInput = document.createElement("input");
+                editInput.className = "comment-edit-input";
+                editInput.value = comment.text;
+                editInput.maxLength = 240;
+
+                const saveBtn = document.createElement("button");
+                saveBtn.className = "comment-edit-save";
+                saveBtn.textContent = "Save";
+
+                const cancelBtn = document.createElement("button");
+                cancelBtn.className = "comment-edit-cancel";
+                cancelBtn.textContent = "Cancel";
+
+                const editRow = document.createElement("div");
+                editRow.className = "comment-edit-row";
+                editRow.appendChild(editInput);
+                editRow.appendChild(saveBtn);
+                editRow.appendChild(cancelBtn);
+
+                body.replaceWith(editRow);
+                editInput.focus();
+                editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+
+                async function save() {
+                    if (!editInput.value.trim()) return;
                     try {
-                        await PlanoraData.deleteComment(event.id, comment.id);
+                        await PlanoraData.editComment(event.id, comment.id, editInput.value);
                         render();
                     } catch (err) {
                         toast(err.message, "error");
                     }
+                }
+
+                saveBtn.addEventListener("click", (e) => { e.stopPropagation(); save(); });
+                cancelBtn.addEventListener("click", (e) => { e.stopPropagation(); render(); });
+                editInput.addEventListener("click", (e) => e.stopPropagation());
+                editInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") save();
+                    if (e.key === "Escape") render();
                 });
-                c.appendChild(remove);
             }
 
+            if (canEdit || canDelete) {
+                const menuWrap = document.createElement("div");
+                menuWrap.className = "comment-menu";
+
+                const menuButton = document.createElement("button");
+                menuButton.className = "comment-menu-button";
+                menuButton.textContent = "⋮";
+                menuButton.setAttribute("aria-label", "Comment options");
+                menuButton.setAttribute("aria-haspopup", "true");
+
+                const dropdown = document.createElement("div");
+                dropdown.className = "comment-dropdown";
+
+                if (canEdit) {
+                    const editItem = document.createElement("button");
+                    editItem.className = "comment-dropdown-item";
+                    editItem.textContent = "Edit";
+                    editItem.addEventListener("click", (e) => {
+                        e.stopPropagation();
+                        dropdown.classList.remove("show");
+                        enterEditMode();
+                    });
+                    dropdown.appendChild(editItem);
+                }
+
+                if (canDelete) {
+                    const deleteItem = document.createElement("button");
+                    deleteItem.className = "comment-dropdown-item danger";
+                    deleteItem.textContent = "Delete";
+                    deleteItem.addEventListener("click", async (e) => {
+                        e.stopPropagation();
+                        try {
+                            await PlanoraData.deleteComment(event.id, comment.id);
+                            render();
+                        } catch (err) {
+                            toast(err.message, "error");
+                        }
+                    });
+                    dropdown.appendChild(deleteItem);
+                }
+
+                menuButton.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    dropdown.classList.toggle("show");
+                });
+
+                menuWrap.appendChild(menuButton);
+                menuWrap.appendChild(dropdown);
+                c.appendChild(menuWrap);
+            }
+
+            c.appendChild(body);
             list.appendChild(c);
         });
     }
