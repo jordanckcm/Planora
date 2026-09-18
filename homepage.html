@@ -38,6 +38,14 @@
             Global
         </button>
 
+        <button class="custom-button timeline-button">
+            Timeline
+        </button>
+
+        <button class="custom-button today-button" id="todayButton">
+            Today
+        </button>
+
     </div>
 
 
@@ -54,10 +62,6 @@
 
         <button id="nextYear">
             →
-        </button>
-
-        <button id="todayButton" class="today-button">
-            Today
         </button>
 
     </div>
@@ -216,6 +220,14 @@
         <div class="events-container"></div>
 
     </div>
+
+
+    <!-- =========================
+         TIMELINE (roadmap-style view)
+         Populated by homepage.js when the Timeline tab is active.
+    ========================== -->
+
+    <div class="timeline-container" id="timelineContainer"></div>
 
 
     <div class="toast-stack" id="toastStack"></div>
