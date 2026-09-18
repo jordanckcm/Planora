@@ -14,7 +14,7 @@
 
 let currentUser = null;
 let currentYear = new Date().getFullYear();
-let mode = "local"; // "local" | "global"
+let mode = "local"; // "local" | "global" | "timeline"
 let openMonth = null;
 let shownOfflineToast = false;
 let searchQuery = "";
@@ -23,6 +23,8 @@ const monthButtons = document.querySelectorAll(".month-events-container");
 const yearDisplay = document.getElementById("year");
 const localButton = document.querySelector(".local-button");
 const globalButton = document.querySelector(".global-button");
+const timelineButton = document.querySelector(".timeline-button");
+const timelineContainer = document.getElementById("timelineContainer");
 
 // same palette as the profile avatar picker, reused for event color-tags
 const EVENT_COLORS = ["#c9a227", "#489c48", "#b6453f", "#4a7fc9", "#9a56c9", "#c96f2e"];
@@ -324,14 +326,22 @@ function bindModeButtons() {
         openMonth = null;
         render();
     });
+
+    timelineButton.addEventListener("click", () => {
+        mode = "timeline";
+        setActiveModeButton();
+        render();
+    });
 }
 
 function setActiveModeButton() {
     localButton.classList.toggle("mode-active", mode === "local");
     globalButton.classList.toggle("mode-active", mode === "global");
+    timelineButton.classList.toggle("mode-active", mode === "timeline");
 
     document.body.classList.toggle("mode-local", mode === "local");
     document.body.classList.toggle("mode-global", mode === "global");
+    document.body.classList.toggle("mode-timeline", mode === "timeline");
 }
 
 function bindYearButtons() {
@@ -381,6 +391,13 @@ function bindTodayButton() {
         // a stale search could hide the very month we're jumping to
         clearSearchIfActive();
 
+        // the timeline view has no months to scroll to, so jump back
+        // into the month grid first
+        if (mode === "timeline") {
+            mode = "local";
+            setActiveModeButton();
+        }
+
         if (targetYear !== currentYear) {
             const direction = targetYear > currentYear ? "next" : "prev";
             currentYear = targetYear;
@@ -407,7 +424,8 @@ function scrollToMonth(monthNumber) {
    Filters events by title/description across every month at
    once. Matching months auto-expand; months with nothing
    matching collapse out of the way instead of making you
-   click through all twelve to find something.
+   click through all twelve to find something. In Timeline
+   mode, it just filters the dot list the same way.
 ========================= */
 
 function bindSearch() {
@@ -537,9 +555,15 @@ async function render() {
     yearDisplay.textContent = currentYear;
     closeAllCommentDropdowns();
 
+    // Timeline has no local/global split of its own — it always shows
+    // your personal calendar's events, just laid out as a chronological
+    // roadmap instead of grouped by month.
+    const isTimeline = mode === "timeline";
+    const fetchMode = isTimeline ? "local" : mode;
+
     let events;
     try {
-        events = await PlanoraData.getEvents(mode, currentYear);
+        events = await PlanoraData.getEvents(fetchMode, currentYear);
         if (events.fromCache) {
             if (!shownOfflineToast) {
                 toast("You're offline — showing your last saved local events.");
@@ -555,6 +579,18 @@ async function render() {
 
     const query = searchQuery.trim().toLowerCase();
     const isSearching = query.length > 0;
+
+    const monthWrapperEls = document.querySelectorAll(".month-wrapper");
+
+    if (isTimeline) {
+        monthWrapperEls.forEach(wrapper => wrapper.style.display = "none");
+        timelineContainer.classList.add("active");
+        renderTimeline(events, query);
+        return;
+    }
+
+    monthWrapperEls.forEach(wrapper => wrapper.style.display = "");
+    timelineContainer.classList.remove("active");
 
     for (const monthEl of monthButtons) {
         const monthNumber = Number(monthEl.dataset.month);
@@ -620,6 +656,100 @@ async function renderMonthEvents(container, monthEvents) {
     for (const event of monthEvents) {
         inner.appendChild(await buildEventCard(event));
     }
+}
+
+
+/* =========================
+   TIMELINE VIEW
+   A flat, chronological "roadmap" of every event on your
+   calendar for the selected year — a dot per event, connected
+   by a line, in the order they happen.
+========================= */
+
+function renderTimeline(events, query) {
+    let list = events.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (query) {
+        list = list.filter(e =>
+            e.title.toLowerCase().includes(query) ||
+            (e.description && e.description.toLowerCase().includes(query))
+        );
+    }
+
+    timelineContainer.innerHTML = "";
+
+    if (list.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "no-events";
+        empty.textContent = query
+            ? "No matches."
+            : "No events yet — tap + to add something.";
+        timelineContainer.appendChild(empty);
+        return;
+    }
+
+    list.forEach(event => {
+        const entry = document.createElement("div");
+        entry.className = "timeline-entry";
+        entry.dataset.eventId = event.id;
+
+        const track = document.createElement("div");
+        track.className = "timeline-track";
+
+        const dot = document.createElement("div");
+        dot.className = "timeline-dot";
+        dot.style.color = event.color || EVENT_COLORS[0];
+
+        const line = document.createElement("div");
+        line.className = "timeline-line";
+
+        track.appendChild(dot);
+        track.appendChild(line);
+
+        const body = document.createElement("div");
+        body.className = "timeline-body";
+        body.style.cursor = "pointer";
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "timeline-title";
+        titleEl.textContent = `${event.icon || EVENT_ICONS[0]}  ${event.title}`;
+
+        const dateEl = document.createElement("div");
+        dateEl.className = "timeline-date";
+        dateEl.textContent = formatEventWhen(event);
+
+        body.appendChild(titleEl);
+        if (event.description) {
+            const descEl = document.createElement("div");
+            descEl.className = "event-description";
+            descEl.style.marginTop = "4px";
+            descEl.textContent = event.description;
+            body.appendChild(descEl);
+        }
+        body.appendChild(dateEl);
+
+        // tapping a dot/card jumps you into the normal month view for
+        // that event, same destination as a search hit would land on
+        body.addEventListener("click", () => {
+            mode = "local";
+            setActiveModeButton();
+            openMonth = new Date(event.date).getMonth() + 1;
+            render().then(() => {
+                const card = document.querySelector(`.event[data-event-id="${event.id}"]`);
+                if (card) {
+                    card.scrollIntoView({ behavior: "smooth", block: "center" });
+                    card.classList.add("event-highlight");
+                    setTimeout(() => card.classList.remove("event-highlight"), 1800);
+                } else {
+                    scrollToMonth(openMonth);
+                }
+            });
+        });
+
+        entry.appendChild(track);
+        entry.appendChild(body);
+        timelineContainer.appendChild(entry);
+    });
 }
 
 async function buildEventCard(event) {
