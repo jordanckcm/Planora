@@ -12,10 +12,20 @@
    permissions and limits, so nothing here is a security boundary.
 
    EVENT ACTIONS:
-   Every per-event action (Add to calendar / Remove / admin removal)
-   lives in a ⋮ menu in the card's top-right corner — the same portal
-   machinery the comment menus use. Cards with nothing you're allowed
-   to do simply don't get a ⋮.
+   Every per-event action (Add to calendar / Remove / admin removal /
+   Make public or private) lives in a ⋮ menu in the card's top-right
+   corner — the same portal machinery the comment menus use. Cards
+   with nothing you're allowed to do simply don't get a ⋮.
+
+   VISIBILITY (the + form):
+     Private - only your calendar
+     Public  - your calendar AND your profile page
+     Global  - the Global feed, with comments (Community+ / Admin)
+   Public and Global are different things on purpose.
+
+   PROFILES + REPLIES:
+   Names and avatars on cards and comments link to profile.html?u=NAME.
+   Comments can be replied to (one level deep, handled by the server).
 ========================================================= */
 
 let currentUser = null;
@@ -40,6 +50,15 @@ let selectedEventColor = EVENT_COLORS[0];
 let selectedEventIcon = EVENT_ICONS[0];
 let selectedEventImage = "";
 
+// "private" | "public" | "global" — what the + form will send
+let newEventVisibility = "private";
+
+const VISIBILITY_HINTS = {
+    private: "Only you can see this.",
+    public: "Also shows on your profile for anyone who visits it.",
+    global: "Posts to the Global feed for everyone, with comments."
+};
+
 
 /* image resizing for the event-cover picker lives in api.js now, shared
    with the profile-picture picker — see Planora.resizeImage */
@@ -52,6 +71,15 @@ function toast(message, type = "") {
     el.textContent = message;
     stack.appendChild(el);
     setTimeout(() => el.remove(), 3200);
+}
+
+/* Where someone's profile lives. Always encode the username. */
+function profileUrl(username) {
+    return "profile.html?u=" + encodeURIComponent(username);
+}
+
+function goToProfile(username) {
+    window.location.href = profileUrl(username);
 }
 
 /* "Today" / "Tomorrow" / "In 4 days" close to now, falls back to a
@@ -495,6 +523,7 @@ function buildProfileMenu() {
         }
     });
 
+    // no ?u= means "my own profile"
     document.getElementById("viewProfileItem").addEventListener("click", () => {
         window.location.href = "profile.html";
     });
@@ -960,7 +989,7 @@ function renderTimeline(events, query) {
    One menu in the card's top-right corner instead of a row of
    buttons. What's in it depends on the card:
 
-     your own event          → Remove
+     your own calendar event → Make public / Make private, Remove
      someone's global post   → Add to calendar
      ...and if you're admin  → Remove (admin)
 
@@ -977,6 +1006,30 @@ function buildEventMenu(event) {
                 try {
                     await PlanoraData.addToMyCalendar(event.id);
                     toast(`Added "${event.title}" to your calendar.`, "success");
+                    render();
+                } catch (err) {
+                    toast(err.message, "error");
+                }
+            }
+        });
+    }
+
+    // Flip your own calendar event between Private and Public. Copies of
+    // other people's Global posts (cloned_from set) stay private - the
+    // server refuses to publish those, so don't offer it.
+    const isOwnCalendarEvent = mode === "local"
+        && event.isMine
+        && (event.cloned_from === null || event.cloned_from === undefined)
+        && (event.visibility === "local" || event.visibility === "public");
+
+    if (isOwnCalendarEvent) {
+        const makePublic = event.visibility !== "public";
+        items.push({
+            label: makePublic ? "Make public" : "Make private",
+            run: async () => {
+                try {
+                    await PlanoraData.setEventVisibility(event.id, makePublic ? "public" : "private");
+                    toast(makePublic ? "Now public — it shows on your profile." : "Now private.", "success");
                     render();
                 } catch (err) {
                     toast(err.message, "error");
@@ -1039,12 +1092,14 @@ async function buildEventCard(event) {
 
     // Host's @username, top-left — mirrors the ⋮ menu's top-right spot,
     // shown on every card (not just Global) alongside the avatar.
-    const ownerLabel = document.createElement("div");
+    // Links to their profile.
+    const ownerLabel = document.createElement("a");
     ownerLabel.className = "event-owner-label";
+    ownerLabel.href = profileUrl(event.owner);
     ownerLabel.textContent = event.isMine ? "You" : "@" + event.owner;
-    if (mode === "global") {
-        ownerLabel.title = `Posted ${formatFullTimestamp(event.created_at)}`;
-    }
+    ownerLabel.title = mode === "global"
+        ? `View profile · posted ${formatFullTimestamp(event.created_at)}`
+        : "View profile";
     card.appendChild(ownerLabel);
 
     const cover = document.createElement("div");
@@ -1063,6 +1118,7 @@ async function buildEventCard(event) {
 
     // Host's face instead of a bare day number — the day is still there,
     // just as a small badge on the avatar's corner, so nothing is lost.
+    // Tap it to open their profile.
     const avatar = document.createElement("div");
     avatar.className = "event-avatar";
     const ownerInitial = (event.ownerDisplayName || event.owner || "?").charAt(0).toUpperCase();
@@ -1073,6 +1129,14 @@ async function buildEventCard(event) {
         avatar.textContent = ownerInitial;
     }
     avatar.title = event.isMine ? "You" : "@" + event.owner;
+    avatar.style.cursor = "pointer";
+    avatar.setAttribute("role", "link");
+    avatar.setAttribute("tabindex", "0");
+    avatar.setAttribute("aria-label", `View @${event.owner}'s profile`);
+    avatar.addEventListener("click", () => goToProfile(event.owner));
+    avatar.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") goToProfile(event.owner);
+    });
 
     const info = document.createElement("div");
     info.className = "event-info";
@@ -1090,6 +1154,16 @@ async function buildEventCard(event) {
         newBadge.className = "event-new-badge";
         newBadge.textContent = "NEW";
         titleRow.appendChild(newBadge);
+    }
+
+    // Public events on your own calendar get a small marker so you can
+    // tell them apart from private ones at a glance.
+    if (mode === "local" && event.visibility === "public") {
+        const publicBadge = document.createElement("span");
+        publicBadge.className = "event-visibility-badge";
+        publicBadge.textContent = "PUBLIC";
+        publicBadge.title = "Shows on your profile";
+        titleRow.appendChild(publicBadge);
     }
 
     info.appendChild(titleRow);
@@ -1124,6 +1198,8 @@ async function buildEventCard(event) {
             dot.title = person.addedAt
                 ? `@${person.username} · added ${formatFullTimestamp(person.addedAt)}`
                 : "@" + person.username;
+            dot.style.cursor = "pointer";
+            dot.addEventListener("click", () => goToProfile(person.username));
             stack.appendChild(dot);
         });
         goingRow.appendChild(stack);
@@ -1150,6 +1226,10 @@ async function buildEventCard(event) {
 
 /* =========================
    COMMENTS
+   Names and avatars link to profiles. Each comment has a Reply
+   button; replies sit indented under the top-level comment they
+   belong to (the server keeps replies one level deep, and remembers
+   who you were answering in reply_to).
 ========================= */
 
 async function buildComments(event) {
@@ -1166,133 +1246,203 @@ async function buildComments(event) {
         // if this fails we just show an empty thread instead of breaking the page
     }
 
+    // which comment (if any) the next post is a reply to
+    let replyingTo = null;
+
+    const replyBanner = document.createElement("div");
+    replyBanner.className = "reply-banner";
+
+    const replyLabel = document.createElement("span");
+    replyLabel.className = "reply-banner-label";
+
+    const replyCancel = document.createElement("button");
+    replyCancel.type = "button";
+    replyCancel.className = "reply-banner-cancel";
+    replyCancel.textContent = "×";
+    replyCancel.setAttribute("aria-label", "Cancel reply");
+
+    replyBanner.appendChild(replyLabel);
+    replyBanner.appendChild(replyCancel);
+
+    const canModerate = currentUser.role === "admin"
+        || currentUser.username.toLowerCase() === event.owner.toLowerCase();
+
+    function buildCommentRow(comment, isReply) {
+        const c = document.createElement("div");
+        c.className = "comment" + (isReply ? " comment-reply" : "");
+
+        const isAuthor = currentUser.username.toLowerCase() === comment.author.toLowerCase();
+        const canEdit = isAuthor;
+        const canDelete = isAuthor || canModerate;
+
+        const displayName = comment.authorDisplayName || comment.author;
+
+        const avatar = document.createElement("a");
+        avatar.className = "comment-avatar";
+        avatar.href = profileUrl(comment.author);
+        avatar.title = displayName;
+        avatar.setAttribute("aria-label", `View @${comment.author}'s profile`);
+        if (comment.authorAvatarImage) {
+            avatar.style.background = `center / cover no-repeat url("${comment.authorAvatarImage}")`;
+        } else {
+            avatar.style.background = `linear-gradient(135deg, ${comment.authorAvatarColor || EVENT_COLORS[0]}, #1b1b1b)`;
+            avatar.textContent = displayName.charAt(0).toUpperCase();
+        }
+
+        const author = document.createElement("a");
+        author.className = "comment-author";
+        author.href = profileUrl(comment.author);
+        author.title = displayName;
+        author.textContent = "@" + comment.author;
+
+        const time = document.createElement("span");
+        time.className = "comment-time";
+        time.textContent = formatRelativeShort(comment.created_at);
+        time.title = formatFullTimestamp(comment.created_at);
+
+        const text = document.createElement("span");
+        text.className = "comment-text";
+
+        // "@name" in front of a reply, linking to whoever it answers
+        if (comment.reply_to) {
+            const mention = document.createElement("a");
+            mention.className = "comment-mention";
+            mention.href = profileUrl(comment.reply_to);
+            mention.textContent = "@" + comment.reply_to;
+            text.appendChild(mention);
+            text.appendChild(document.createTextNode(" "));
+        }
+        text.appendChild(document.createTextNode(comment.text));
+
+        const body = document.createElement("span");
+        body.className = "comment-body";
+        body.appendChild(author);
+        body.appendChild(time);
+        body.appendChild(text);
+
+        if (comment.edited) {
+            const edited = document.createElement("span");
+            edited.className = "comment-edited";
+            edited.textContent = "(edited)";
+            body.appendChild(edited);
+        }
+
+        const replyButton = document.createElement("button");
+        replyButton.type = "button";
+        replyButton.className = "comment-reply-button";
+        replyButton.textContent = "Reply";
+        replyButton.addEventListener("click", (e) => {
+            e.stopPropagation();
+            startReply(comment);
+        });
+        body.appendChild(replyButton);
+
+        function enterEditMode() {
+            const editInput = document.createElement("input");
+            editInput.className = "comment-edit-input";
+            editInput.value = comment.text;
+            editInput.maxLength = 240;
+
+            const saveBtn = document.createElement("button");
+            saveBtn.className = "comment-edit-save";
+            saveBtn.textContent = "Save";
+
+            const cancelBtn = document.createElement("button");
+            cancelBtn.className = "comment-edit-cancel";
+            cancelBtn.textContent = "Cancel";
+
+            const editRow = document.createElement("div");
+            editRow.className = "comment-edit-row";
+            editRow.appendChild(editInput);
+            editRow.appendChild(saveBtn);
+            editRow.appendChild(cancelBtn);
+
+            body.replaceWith(editRow);
+            editInput.focus();
+            editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+
+            function exitEditMode() {
+                document.removeEventListener("click", cancelOnOutsideClick);
+                render();
+            }
+
+            async function save() {
+                if (!editInput.value.trim()) return;
+                try {
+                    await PlanoraData.editComment(event.id, comment.id, editInput.value);
+                    toast("Comment updated.");
+                    exitEditMode();
+                } catch (err) {
+                    toast(err.message, "error");
+                }
+            }
+
+            saveBtn.addEventListener("click", (e) => { e.stopPropagation(); save(); });
+            cancelBtn.addEventListener("click", (e) => { e.stopPropagation(); exitEditMode(); });
+            editInput.addEventListener("click", (e) => e.stopPropagation());
+            editInput.addEventListener("keydown", (e) => {
+                if (e.key === "Enter") save();
+                if (e.key === "Escape") exitEditMode();
+            });
+
+            // clicking anywhere else on the page cancels the edit,
+            // same principle as the dropdown menus dismissing on
+            // outside click
+            function cancelOnOutsideClick(e) {
+                if (!editRow.contains(e.target)) exitEditMode();
+            }
+            setTimeout(() => document.addEventListener("click", cancelOnOutsideClick), 0);
+        }
+
+        const items = [];
+        if (canEdit) items.push({ label: "Edit", run: () => enterEditMode() });
+        if (canDelete) {
+            items.push({
+                label: "Delete",
+                danger: true,
+                run: async () => {
+                    try {
+                        await PlanoraData.deleteComment(event.id, comment.id);
+                        toast(isReply ? "Reply deleted." : "Comment deleted.");
+                        render();
+                    } catch (err) {
+                        toast(err.message, "error");
+                    }
+                }
+            });
+        }
+
+        const menu = buildDotsMenu(items, {
+            buttonClass: "comment-menu-button",
+            dropdownClass: "comment-dropdown",
+            ariaLabel: "Comment options"
+        });
+        if (menu) c.appendChild(menu);
+
+        c.appendChild(avatar);
+        c.appendChild(body);
+        return c;
+    }
+
     if (comments.length === 0) {
         const empty = document.createElement("div");
         empty.className = "comment-empty";
         empty.textContent = "No comments yet — say something.";
         list.appendChild(empty);
     } else {
-        const canModerate = currentUser.role === "admin"
-            || currentUser.username.toLowerCase() === event.owner.toLowerCase();
+        // top-level comments in order, each followed by its replies.
+        // A reply whose parent isn't in the list (shouldn't happen, the
+        // server cleans those up) is shown as a normal comment instead
+        // of vanishing.
+        const knownIds = new Set(comments.map(c => c.id));
+        const topLevel = comments.filter(c => !c.parent_id || !knownIds.has(c.parent_id));
 
-        comments.forEach(comment => {
-            const c = document.createElement("div");
-            c.className = "comment";
+        topLevel.forEach(top => {
+            list.appendChild(buildCommentRow(top, false));
 
-            const isAuthor = currentUser.username.toLowerCase() === comment.author.toLowerCase();
-            const canEdit = isAuthor;
-            const canDelete = isAuthor || canModerate;
-
-            const author = document.createElement("span");
-            author.className = "comment-author";
-            author.textContent = "@" + comment.author;
-
-            const time = document.createElement("span");
-            time.className = "comment-time";
-            time.textContent = formatRelativeShort(comment.created_at);
-            time.title = formatFullTimestamp(comment.created_at);
-
-            const text = document.createElement("span");
-            text.className = "comment-text";
-            text.textContent = comment.text;
-
-            const body = document.createElement("span");
-            body.className = "comment-body";
-            body.appendChild(author);
-            body.appendChild(time);
-            body.appendChild(text);
-
-            if (comment.edited) {
-                const edited = document.createElement("span");
-                edited.className = "comment-edited";
-                edited.textContent = "(edited)";
-                body.appendChild(edited);
-            }
-
-            function enterEditMode() {
-                const editInput = document.createElement("input");
-                editInput.className = "comment-edit-input";
-                editInput.value = comment.text;
-                editInput.maxLength = 240;
-
-                const saveBtn = document.createElement("button");
-                saveBtn.className = "comment-edit-save";
-                saveBtn.textContent = "Save";
-
-                const cancelBtn = document.createElement("button");
-                cancelBtn.className = "comment-edit-cancel";
-                cancelBtn.textContent = "Cancel";
-
-                const editRow = document.createElement("div");
-                editRow.className = "comment-edit-row";
-                editRow.appendChild(editInput);
-                editRow.appendChild(saveBtn);
-                editRow.appendChild(cancelBtn);
-
-                body.replaceWith(editRow);
-                editInput.focus();
-                editInput.setSelectionRange(editInput.value.length, editInput.value.length);
-
-                function exitEditMode() {
-                    document.removeEventListener("click", cancelOnOutsideClick);
-                    render();
-                }
-
-                async function save() {
-                    if (!editInput.value.trim()) return;
-                    try {
-                        await PlanoraData.editComment(event.id, comment.id, editInput.value);
-                        toast("Comment updated.");
-                        exitEditMode();
-                    } catch (err) {
-                        toast(err.message, "error");
-                    }
-                }
-
-                saveBtn.addEventListener("click", (e) => { e.stopPropagation(); save(); });
-                cancelBtn.addEventListener("click", (e) => { e.stopPropagation(); exitEditMode(); });
-                editInput.addEventListener("click", (e) => e.stopPropagation());
-                editInput.addEventListener("keydown", (e) => {
-                    if (e.key === "Enter") save();
-                    if (e.key === "Escape") exitEditMode();
-                });
-
-                // clicking anywhere else on the page cancels the edit,
-                // same principle as the dropdown menus dismissing on
-                // outside click
-                function cancelOnOutsideClick(e) {
-                    if (!editRow.contains(e.target)) exitEditMode();
-                }
-                setTimeout(() => document.addEventListener("click", cancelOnOutsideClick), 0);
-            }
-
-            const items = [];
-            if (canEdit) items.push({ label: "Edit", run: () => enterEditMode() });
-            if (canDelete) {
-                items.push({
-                    label: "Delete",
-                    danger: true,
-                    run: async () => {
-                        try {
-                            await PlanoraData.deleteComment(event.id, comment.id);
-                            toast("Comment deleted.");
-                            render();
-                        } catch (err) {
-                            toast(err.message, "error");
-                        }
-                    }
-                });
-            }
-
-            const menu = buildDotsMenu(items, {
-                buttonClass: "comment-menu-button",
-                dropdownClass: "comment-dropdown",
-                ariaLabel: "Comment options"
-            });
-            if (menu) c.appendChild(menu);
-
-            c.appendChild(body);
-            list.appendChild(c);
+            comments
+                .filter(r => r.parent_id === top.id)
+                .forEach(reply => list.appendChild(buildCommentRow(reply, true)));
         });
     }
 
@@ -1308,12 +1458,29 @@ async function buildComments(event) {
     submit.className = "comment-submit";
     submit.textContent = "Post";
 
+    function startReply(comment) {
+        replyingTo = comment;
+        replyLabel.textContent = `Replying to @${comment.author}`;
+        replyBanner.classList.add("show");
+        input.placeholder = `Reply to @${comment.author}...`;
+        input.focus();
+    }
+
+    function cancelReply() {
+        replyingTo = null;
+        replyBanner.classList.remove("show");
+        input.placeholder = "Add a comment...";
+    }
+
+    replyCancel.addEventListener("click", (e) => { e.stopPropagation(); cancelReply(); });
+
     async function postComment() {
         if (!input.value.trim()) return;
+        const wasReply = Boolean(replyingTo);
         try {
-            await PlanoraData.addComment(event.id, input.value);
+            await PlanoraData.addComment(event.id, input.value, replyingTo ? replyingTo.id : null);
             input.value = "";
-            toast("Comment posted.", "success");
+            toast(wasReply ? "Reply posted." : "Comment posted.", "success");
             render();
         } catch (err) {
             toast(err.message, "error");
@@ -1324,12 +1491,14 @@ async function buildComments(event) {
     input.addEventListener("click", (e) => e.stopPropagation());
     input.addEventListener("keydown", (e) => {
         if (e.key === "Enter") postComment();
+        if (e.key === "Escape" && replyingTo) cancelReply();
     });
 
     form.appendChild(input);
     form.appendChild(submit);
 
     wrap.appendChild(list);
+    wrap.appendChild(replyBanner);
     wrap.appendChild(form);
 
     return wrap;
@@ -1399,10 +1568,13 @@ function buildAddEventUI() {
                 </div>
             </div>
 
-            <div class="visibility-row">
-                <input type="checkbox" id="eventVisibility">
-                <label for="eventVisibility">Post to Global (everyone can see this)</label>
+            <div class="field-label">Who can see this?</div>
+            <div class="visibility-toggle" id="visibilityToggle" role="radiogroup" aria-label="Who can see this event">
+                <button type="button" class="vis-option active" data-visibility="private" role="radio" aria-checked="true">Private</button>
+                <button type="button" class="vis-option" data-visibility="public" role="radio" aria-checked="false">Public</button>
+                <button type="button" class="vis-option" data-visibility="global" role="radio" aria-checked="false">Global</button>
             </div>
+            <div class="vis-hint" id="visibilityHint">${VISIBILITY_HINTS.private}</div>
             <div class="visibility-locked-hint" id="visibilityLockedHint" style="display:none;">
                 Global posting needs Community+ or Admin. Ask an admin to upgrade your account.
             </div>
@@ -1498,10 +1670,29 @@ function buildAddEventUI() {
 
     removeImageBtn.addEventListener("click", () => setEventImage(""));
 
+    // Private / Public / Global switch
+    const visibilityHint = eventForm.querySelector("#visibilityHint");
+    const visibilityOptions = eventForm.querySelectorAll("#visibilityToggle .vis-option");
+
+    function setNewEventVisibility(value) {
+        newEventVisibility = value;
+        visibilityOptions.forEach(option => {
+            const isOn = option.dataset.visibility === value;
+            option.classList.toggle("active", isOn);
+            option.setAttribute("aria-checked", String(isOn));
+        });
+        visibilityHint.textContent = VISIBILITY_HINTS[value];
+    }
+
+    visibilityOptions.forEach(option => {
+        option.addEventListener("click", () => setNewEventVisibility(option.dataset.visibility));
+    });
+
     // Community accounts can't post to Global — hide the option rather
-    // than let them pick it and get a 403 back from the server.
+    // than let them pick it and get a 403 back from the server. Public
+    // and Private are open to everyone.
     if (currentUser.role === "community") {
-        eventForm.querySelector(".visibility-row").style.display = "none";
+        eventForm.querySelector('.vis-option[data-visibility="global"]').style.display = "none";
         eventForm.querySelector("#visibilityLockedHint").style.display = "block";
     }
 
@@ -1513,7 +1704,7 @@ function buildAddEventUI() {
         document.getElementById("eventEndDate").value = "";
         document.getElementById("eventStartTime").value = "";
         document.getElementById("eventEndTime").value = "";
-        document.getElementById("eventVisibility").checked = false;
+        setNewEventVisibility("private");
         eventForm.querySelector(".event-more").open = false;
         setEventImage("");
 
@@ -1528,9 +1719,10 @@ function buildAddEventUI() {
     });
 
     // Enter submits from any single-line field (title, date, time) —
-    // skips the description textarea so Enter still just makes a new line there.
+    // skips the description textarea so Enter still just makes a new line there,
+    // and skips buttons/the "More options" summary so Enter still presses them.
     eventForm.addEventListener("keydown", (e) => {
-        if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
+        if (e.key === "Enter" && !["TEXTAREA", "BUTTON", "SUMMARY"].includes(e.target.tagName)) {
             e.preventDefault();
             document.getElementById("saveEvent").click();
         }
@@ -1543,8 +1735,12 @@ function buildAddEventUI() {
         const endDate = document.getElementById("eventEndDate").value;
         const startTime = document.getElementById("eventStartTime").value;
         const endTime = document.getElementById("eventEndTime").value;
-        const isPublic = currentUser.role !== "community"
-            && document.getElementById("eventVisibility").checked;
+
+        // a Community account can't have Global selected (the button is
+        // hidden), but never trust that here - fall back to Private
+        const visibility = (newEventVisibility === "global" && currentUser.role === "community")
+            ? "private"
+            : newEventVisibility;
 
         if (!title || !date) {
             toast("Add a name and date first.", "error");
@@ -1567,7 +1763,7 @@ function buildAddEventUI() {
                 // only matters when there's a clock time to convert; the
                 // server drops it for all-day events regardless
                 timezone: startTime ? VIEWER_TZ : "",
-                visibility: isPublic ? "global" : "local",
+                visibility,
                 icon: selectedEventIcon,
                 color: selectedEventColor,
                 image: selectedEventImage
@@ -1584,7 +1780,13 @@ function buildAddEventUI() {
         mode = "local";
         setActiveModeButton();
 
-        toast(isPublic ? "Posted to Global and your calendar." : "Added to your calendar.", "success");
+        if (visibility === "global") {
+            toast("Posted to Global and your calendar.", "success");
+        } else if (visibility === "public") {
+            toast("Added to your calendar and your profile.", "success");
+        } else {
+            toast("Added to your calendar.", "success");
+        }
         render();
     });
 }
