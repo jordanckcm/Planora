@@ -32,7 +32,40 @@ const EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "�
 
 let selectedEventColor = EVENT_COLORS[0];
 let selectedEventIcon = EVENT_ICONS[0];
+let selectedEventImage = "";
 
+/* Shrinks a picked image to at most 900px wide and returns a JPEG data URL
+   (usually 60-150 KB), so uploads stay small and fast. */
+function resizeImage(file, maxWidth = 900, quality = 0.75) {
+    return new Promise((resolve, reject) => {
+        if (!file.type.startsWith("image/")) {
+            reject(new Error("That file isn't an image."));
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error("Couldn't read that file."));
+        reader.onload = () => {
+            const img = new Image();
+            img.onerror = () => reject(new Error("Couldn't open that image."));
+            img.onload = () => {
+                const scale = Math.min(1, maxWidth / img.width);
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+
+                const ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#131313"; // transparent PNGs land on the page color
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                resolve(canvas.toDataURL("image/jpeg", quality));
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+    });
+}
 
 function toast(message, type = "") {
     const stack = document.getElementById("toastStack");
@@ -709,6 +742,10 @@ function renderTimeline(events, query) {
         const body = document.createElement("div");
         body.className = "timeline-body";
         body.style.cursor = "pointer";
+        if (event.image) {
+            body.classList.add("has-image");
+            body.style.setProperty("--tl-image", `url("${event.image}")`);
+        }
 
         const titleEl = document.createElement("div");
         titleEl.className = "timeline-title";
@@ -762,8 +799,13 @@ async function buildEventCard(event) {
 
     const cover = document.createElement("div");
     cover.className = "event-cover";
-    cover.style.background = `${event.color || EVENT_COLORS[0]}26`; // ~15% tint
+    // backgroundColor (not the `background` shorthand) so the image can show
+    cover.style.backgroundColor = `${event.color || EVENT_COLORS[0]}26`; // ~15% tint
     cover.textContent = event.icon || EVENT_ICONS[0];
+    if (event.image) {
+        cover.classList.add("has-image");
+        cover.style.setProperty("--cover-image", `url("${event.image}")`);
+    }
     card.appendChild(cover);
 
     const main = document.createElement("div");
@@ -879,7 +921,8 @@ async function buildEventCard(event) {
                     endTime: event.end_time || "",
                     visibility: "local",
                     icon: event.icon || EVENT_ICONS[0],
-                    color: event.color || EVENT_COLORS[0]
+                    color: event.color || EVENT_COLORS[0],
+                    image: event.image || ""
                 });
                 toast(`Duplicated "${event.title}" to your calendar.`, "success");
                 render();
@@ -1243,6 +1286,14 @@ function buildAddEventUI() {
                 <input type="time" id="eventEndTime">
             </div>
 
+            <div class="field-label">Cover image (optional)</div>
+            <div class="image-picker">
+                <label class="image-pick-button" for="eventImage">Choose image</label>
+                <input type="file" id="eventImage" accept="image/*" hidden>
+                <button type="button" class="image-remove" id="removeEventImage" style="display:none;">Remove</button>
+                <div class="image-preview" id="imagePreview"></div>
+            </div>
+
             <div class="field-label">Icon</div>
             <div class="event-icon-row" id="eventIconRow"></div>
 
@@ -1293,6 +1344,30 @@ function buildAddEventUI() {
         colorRow.appendChild(dot);
     });
 
+    const imageInput = eventForm.querySelector("#eventImage");
+    const imagePreview = eventForm.querySelector("#imagePreview");
+    const removeImageBtn = eventForm.querySelector("#removeEventImage");
+
+    function setEventImage(dataUrl) {
+        selectedEventImage = dataUrl;
+        imagePreview.style.backgroundImage = dataUrl ? `url("${dataUrl}")` : "";
+        imagePreview.classList.toggle("show", Boolean(dataUrl));
+        removeImageBtn.style.display = dataUrl ? "inline-flex" : "none";
+        imageInput.value = ""; // lets you pick the same file twice in a row
+    }
+
+    imageInput.addEventListener("change", async () => {
+        const file = imageInput.files[0];
+        if (!file) return;
+        try {
+            setEventImage(await resizeImage(file));
+        } catch (err) {
+            toast(err.message, "error");
+        }
+    });
+
+    removeImageBtn.addEventListener("click", () => setEventImage(""));
+
     // Community accounts can't post to Global — hide the option rather
     // than let them pick it and get a 403 back from the server.
     if (currentUser.role === "community") {
@@ -1309,6 +1384,7 @@ function buildAddEventUI() {
         document.getElementById("eventStartTime").value = "";
         document.getElementById("eventEndTime").value = "";
         document.getElementById("eventVisibility").checked = false;
+        setEventImage("");
 
         selectedEventIcon = EVENT_ICONS[0];
         selectedEventColor = EVENT_COLORS[0];
@@ -1359,7 +1435,8 @@ function buildAddEventUI() {
                 endTime,
                 visibility: isPublic ? "global" : "local",
                 icon: selectedEventIcon,
-                color: selectedEventColor
+                color: selectedEventColor,
+                image: selectedEventImage
             });
         } catch (err) {
             toast(err.message, "error");
