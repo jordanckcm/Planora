@@ -1,16 +1,20 @@
 /* =========================================================
-   PLANORA — MODE SWITCH EFFECTS
-   Adds the animations when you switch between Local / Global /
-   Timeline. It doesn't touch homepage.js: it just watches for
-   the mode classes homepage.js already puts on <body>.
+   PLANORA — MOTION
+   Adds the animations without touching homepage.js: it just
+   watches for changes homepage.js already makes to the page.
 
-   What it does on every switch:
-     - slides a glowing pill from the old tab to the new one
-     - sends a color ripple out from the tab you clicked
-     - glitches the big year (VHS-style)
+   TAB SWITCHING (Local / Global / Timeline)
+     - a glowing pill slides from the old tab to the new one
+     - a color ripple spreads out from the tab you clicked
+     - the big year glitches (VHS-style)
      - Local <-> Global: months slide in from the side you moved toward
-     - Timeline: the spine draws itself, dots pop in, cards fly in
-       from alternating sides
+     - Timeline: the spine draws itself, dots pop, cards fly in
+
+   CURTAIN LOADING
+     - when the page loads, the months drop down one by one
+     - when you open a month, its event cards lower into place
+       one after another, top to bottom
+
    Respects "reduce motion" system settings.
 ========================================================= */
 
@@ -28,6 +32,21 @@
     let pendingMonths = null;    // waiting for month cards to reappear
     let pendingMonthsAt = 0;
     const PENDING_TIMEOUT = 4000; // give up if the data never arrives
+
+
+    /* ---------- keep months hidden until their first curtain ----------
+       Without this, the months would flash on screen for a moment
+       before the page-load animation starts. A safety timer makes
+       sure they can never stay hidden. */
+
+    const waitStyle = document.createElement("style");
+    waitStyle.textContent = ".curtain-wait .month-wrapper { opacity: 0; }";
+    document.head.appendChild(waitStyle);
+
+    if (!reduceMotion.matches) {
+        document.documentElement.classList.add("curtain-wait");
+        setTimeout(() => document.documentElement.classList.remove("curtain-wait"), 4000);
+    }
 
 
     /* ---------- elements this script adds ---------- */
@@ -72,7 +91,68 @@
     }
 
 
-    /* ---------- effects ---------- */
+    /* ---------- curtain reveal ----------
+       The element is uncovered from its top edge downward while it
+       drops a few pixels into place, like a curtain being lowered.
+       Stagger the delay across elements to make them go one by one. */
+
+    function curtain(el, delay = 0, distance = -14, duration = 520, endOpacity = 1) {
+        el.animate(
+            [
+                { clipPath: "inset(0 0 100% 0)", opacity: 0, transform: `translateY(${distance}px)` },
+                { clipPath: "inset(0 0 0 0)", opacity: endOpacity, transform: "translateY(0)" }
+            ],
+            { duration, delay, easing: "cubic-bezier(.22,.8,.2,1)", fill: "backwards" }
+        );
+    }
+
+    /* Page load: the twelve month bars lower one after another. */
+    function curtainMonths() {
+        document.documentElement.classList.remove("curtain-wait");
+
+        document.querySelectorAll(".month-wrapper").forEach((wrapper, i) => {
+            curtain(wrapper, i * 90, -22, 600);
+        });
+    }
+
+    /* Opening a month: its event cards lower into place one by one.
+       We only do this right after a month opens (not on every re-render,
+       like posting a comment), and cards can arrive at different times
+       when comments are loading, so each card is animated as it appears. */
+
+    const CURTAIN_WINDOW = 3000;
+    const openedAt = new WeakMap(); // events-container -> when it last opened
+
+    document.querySelectorAll(".events-container").forEach(container => {
+
+        new MutationObserver(() => {
+            if (container.classList.contains("open")) {
+                openedAt.set(container, Date.now());
+            } else {
+                openedAt.delete(container);
+            }
+        }).observe(container, { attributes: true, attributeFilter: ["class"] });
+
+        new MutationObserver(records => {
+            const stamp = openedAt.get(container);
+            if (!stamp || Date.now() - stamp > CURTAIN_WINDOW || reduceMotion.matches) return;
+
+            records.forEach(record => {
+                record.addedNodes.forEach(node => {
+                    if (!(node instanceof HTMLElement)) return;
+                    if (!node.matches(".event, .no-events")) return;
+
+                    const index = [...node.parentElement.children].indexOf(node);
+                    const endOpacity = node.classList.contains("no-events") ? 0.5 : 1;
+
+                    curtain(node, Math.min(index, 10) * 110, -14, 520, endOpacity);
+                });
+            });
+        }).observe(container, { childList: true, subtree: true });
+    });
+
+
+    /* ---------- tab switch effects ---------- */
 
     /* Color ripple expanding from the clicked tab, in the new mode's color. */
     function playWash(button) {
@@ -190,9 +270,9 @@
 
         if (reduceMotion.matches) return;
 
-        // first load: one gentle cascade of the months, nothing else
+        // first load: the months lower like a curtain, nothing else
         if (previous === null) {
-            animateMonths("forward");
+            curtainMonths();
             return;
         }
 
