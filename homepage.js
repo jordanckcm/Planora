@@ -1052,10 +1052,24 @@ async function buildEventCard(event) {
     const main = document.createElement("div");
     main.className = "event-main";
 
-    const dayEl = document.createElement("div");
-    dayEl.className = "event-day";
-    dayEl.textContent = day;
-    dayEl.style.color = event.color || EVENT_COLORS[0];
+    // Host's face instead of a bare day number — the day is still there,
+    // just as a small badge on the avatar's corner, so nothing is lost.
+    const avatar = document.createElement("div");
+    avatar.className = "event-avatar";
+    const ownerInitial = (event.ownerDisplayName || event.owner || "?").charAt(0).toUpperCase();
+    if (event.ownerAvatarImage) {
+        avatar.style.background = `center / cover no-repeat url("${event.ownerAvatarImage}")`;
+    } else {
+        avatar.style.background = `linear-gradient(135deg, ${event.ownerAvatarColor || EVENT_COLORS[0]}, #1b1b1b)`;
+        avatar.textContent = ownerInitial;
+    }
+    avatar.title = event.isMine ? "You" : "@" + event.owner;
+
+    const dayBadge = document.createElement("div");
+    dayBadge.className = "event-day-badge";
+    dayBadge.textContent = day;
+    dayBadge.style.borderColor = event.color || EVENT_COLORS[0];
+    avatar.appendChild(dayBadge);
 
     const info = document.createElement("div");
     info.className = "event-info";
@@ -1127,7 +1141,7 @@ async function buildEventCard(event) {
         info.appendChild(goingRow);
     }
 
-    main.appendChild(dayEl);
+    main.appendChild(avatar);
     main.appendChild(info);
     card.appendChild(main);
 
@@ -1381,33 +1395,9 @@ function buildAddEventUI() {
             <div class="form-title">Create event</div>
 
             <input type="text" id="eventTitle" placeholder="Event name" maxlength="80">
-            <textarea id="eventDescription" placeholder="Description" maxlength="400"></textarea>
 
-            <div class="field-label">Starts</div>
+            <div class="field-label">Date</div>
             <input type="date" id="eventDate">
-
-            <div class="field-label">Ends (optional — leave blank for a single day)</div>
-            <input type="date" id="eventEndDate">
-
-            <div class="field-label">Time (optional)</div>
-            <div class="time-grid">
-                <input type="time" id="eventStartTime">
-                <input type="time" id="eventEndTime">
-            </div>
-
-            <div class="field-label">Cover image (optional)</div>
-            <div class="image-picker">
-                <label class="image-pick-button" for="eventImage">Choose image</label>
-                <input type="file" id="eventImage" accept="image/*" hidden>
-                <button type="button" class="image-remove" id="removeEventImage" style="display:none;">Remove</button>
-                <div class="image-preview" id="imagePreview"></div>
-            </div>
-
-            <div class="field-label">Icon</div>
-            <div class="event-icon-row" id="eventIconRow"></div>
-
-            <div class="field-label">Color</div>
-            <div class="event-color-row" id="eventColorRow"></div>
 
             <div class="visibility-row">
                 <input type="checkbox" id="eventVisibility">
@@ -1416,6 +1406,37 @@ function buildAddEventUI() {
             <div class="visibility-locked-hint" id="visibilityLockedHint" style="display:none;">
                 Global posting needs Community+ or Admin. Ask an admin to upgrade your account.
             </div>
+
+            <details class="event-more">
+                <summary>More options <span class="event-more-hint">description, time, image, icon, color</span></summary>
+
+                <div class="event-more-body">
+                    <textarea id="eventDescription" placeholder="Description" maxlength="400"></textarea>
+
+                    <div class="field-label">Ends (optional — leave blank for a single day)</div>
+                    <input type="date" id="eventEndDate">
+
+                    <div class="field-label">Time (optional)</div>
+                    <div class="time-grid">
+                        <input type="time" id="eventStartTime">
+                        <input type="time" id="eventEndTime">
+                    </div>
+
+                    <div class="field-label">Cover image (optional)</div>
+                    <div class="image-picker">
+                        <label class="image-pick-button" for="eventImage">Choose image</label>
+                        <input type="file" id="eventImage" accept="image/*" hidden>
+                        <button type="button" class="image-remove" id="removeEventImage" style="display:none;">Remove</button>
+                        <div class="image-preview" id="imagePreview"></div>
+                    </div>
+
+                    <div class="field-label">Icon</div>
+                    <div class="event-icon-row" id="eventIconRow"></div>
+
+                    <div class="field-label">Color</div>
+                    <div class="event-color-row" id="eventColorRow"></div>
+                </div>
+            </details>
 
             <div class="form-buttons">
                 <button id="cancelEvent">Cancel</button>
@@ -1493,6 +1514,7 @@ function buildAddEventUI() {
         document.getElementById("eventStartTime").value = "";
         document.getElementById("eventEndTime").value = "";
         document.getElementById("eventVisibility").checked = false;
+        eventForm.querySelector(".event-more").open = false;
         setEventImage("");
 
         selectedEventIcon = EVENT_ICONS[0];
