@@ -228,3 +228,38 @@ body { font-family: var(--font-discord); }
     color: #fff;
     font-weight: 700;
 }
+
+
+/* =========================
+   TODAY BUTTON
+   Moved out of .topbar (see homepage.html) so that row can't overflow
+   and become horizontally drag-scrollable on narrow screens.
+========================= */
+
+.today-row {
+    display: flex;
+    justify-content: center;
+    margin: 2px 0 10px;
+}
+
+.today-pill {
+    padding: 6px 18px;
+    border: 1px solid #3a3a3a;
+    border-radius: 999px;
+    background: #1e1e1e;
+    color: #ddd;
+    font: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background .15s ease, border-color .15s ease;
+}
+
+.today-pill:hover {
+    background: #272727;
+    border-color: #4a4a4a;
+}
+
+.today-pill:active {
+    background: #2f2f2f;
+}
