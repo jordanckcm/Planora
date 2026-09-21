@@ -1028,7 +1028,6 @@ function buildEventMenu(event) {
 
 async function buildEventCard(event) {
     const viewerLocal = toViewerLocal(event);
-    const day = parseEventDate(viewerLocal.date).getDate();
 
     const card = document.createElement("div");
     card.className = "event";
@@ -1037,6 +1036,16 @@ async function buildEventCard(event) {
 
     const menu = buildEventMenu(event);
     if (menu) card.appendChild(menu);
+
+    // Host's @username, top-left — mirrors the ⋮ menu's top-right spot,
+    // shown on every card (not just Global) alongside the avatar.
+    const ownerLabel = document.createElement("div");
+    ownerLabel.className = "event-owner-label";
+    ownerLabel.textContent = event.isMine ? "You" : "@" + event.owner;
+    if (mode === "global") {
+        ownerLabel.title = `Posted ${formatFullTimestamp(event.created_at)}`;
+    }
+    card.appendChild(ownerLabel);
 
     const cover = document.createElement("div");
     cover.className = "event-cover";
@@ -1065,12 +1074,6 @@ async function buildEventCard(event) {
     }
     avatar.title = event.isMine ? "You" : "@" + event.owner;
 
-    const dayBadge = document.createElement("div");
-    dayBadge.className = "event-day-badge";
-    dayBadge.textContent = day;
-    dayBadge.style.borderColor = event.color || EVENT_COLORS[0];
-    avatar.appendChild(dayBadge);
-
     const info = document.createElement("div");
     info.className = "event-info";
 
@@ -1087,14 +1090,6 @@ async function buildEventCard(event) {
         newBadge.className = "event-new-badge";
         newBadge.textContent = "NEW";
         titleRow.appendChild(newBadge);
-    }
-
-    if (mode === "global") {
-        const authorEl = document.createElement("div");
-        authorEl.className = "event-author";
-        authorEl.textContent = event.isMine ? "you" : "@" + event.owner;
-        authorEl.title = `Posted ${formatFullTimestamp(event.created_at)}`;
-        titleRow.appendChild(authorEl);
     }
 
     info.appendChild(titleRow);
@@ -1394,10 +1389,15 @@ function buildAddEventUI() {
         <div class="event-form-box">
             <div class="form-title">Create event</div>
 
-            <input type="text" id="eventTitle" placeholder="Event name" maxlength="80">
-
-            <div class="field-label">Date</div>
-            <input type="date" id="eventDate">
+            <div class="event-primary-row">
+                <div class="event-primary-field">
+                    <input type="text" id="eventTitle" placeholder="Event name" maxlength="80">
+                </div>
+                <div class="event-primary-field">
+                    <div class="field-label">Date</div>
+                    <input type="date" id="eventDate">
+                </div>
+            </div>
 
             <div class="visibility-row">
                 <input type="checkbox" id="eventVisibility">
