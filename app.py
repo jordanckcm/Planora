@@ -19,26 +19,49 @@ ROLES
                        Global, up to a smaller cap.
     admin           - no caps. Can manage users (change role / delete)
                        and delete ANY event, not just their own.
+
+GLOBAL vs LOCAL (important - this changed)
+    A Global post and your own calendar copy of it are now TWO separate
+    records. Posting to Global creates the global event AND a private
+    local copy owned by you, linked by cloned_from. Deleting the local
+    copy only removes it from your calendar; the Global post stays up.
+    Deleting the Global post itself still removes everyone's copies.
 """
 
-import hashlib
 import re
-import secrets
 import time
 import os
+from datetime import timedelta
 from functools import wraps
 
 from flask import Flask, request, jsonify, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 app = Flask(__name__, static_folder=".", static_url_path="")
 
 app.secret_key = os.environ["SECRET_KEY"]
 
+# "Remember me" sessions last this long; without it they die with the browser.
+app.permanent_session_lifetime = timedelta(days=30)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
 # Images are stored as small base64 data URLs on the event itself.
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024   # reject any request over 2 MB
 MAX_IMAGE_CHARS = 300_000                             # roughly a 220 KB image
 IMAGE_PATTERN = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
+
+# Match the maxlength values the frontend forms use, so someone hand-rolling
+# a request can't stuff a megabyte of text into a display name.
+MAX_TITLE = 80
+MAX_DESCRIPTION = 400
+MAX_DISPLAY_NAME = 40
+MAX_BIO = 200
+MAX_COMMENT = 240
+
+DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+TIME_PATTERN = re.compile(r"^\d{2}:\d{2}$")
 
 
 @app.errorhandler(404)
@@ -76,6 +99,18 @@ COMMUNITY_PLUS_LOCAL_LIMIT = 25
 COMMUNITY_PLUS_GLOBAL_LIMIT = 1
 
 
+def body():
+    """request.get_json() raises a 400 on a missing/odd body. This never does."""
+    data = request.get_json(silent=True)
+    return data if isinstance(data, dict) else {}
+
+
+def clean_text(value, limit):
+    if not isinstance(value, str):
+        return ""
+    return value.strip()[:limit]
+
+
 def clean_image(value):
     """Returns (image, error). An empty string means 'no image'."""
     if not value:
@@ -87,6 +122,11 @@ def clean_image(value):
     return value, None
 
 
+def clean_time(value):
+    value = value.strip() if isinstance(value, str) else ""
+    return value if TIME_PATTERN.match(value) else ""
+
+
 def find_user(username):
     for user in users:
         if user["username"].lower() == username.lower():
@@ -94,13 +134,11 @@ def find_user(username):
     return None
 
 
-def make_salt():
-    return secrets.token_hex(8)
-
-
-def hash_password(password, salt):
-    combined = salt + password
-    return hashlib.sha256(combined.encode()).hexdigest()
+def find_event(event_id):
+    for event in events:
+        if event["id"] == event_id:
+            return event
+    return None
 
 
 def pick_avatar_color(username):
@@ -116,6 +154,7 @@ def user_public_info(user):
         "displayName": user["display_name"],
         "bio": user["bio"],
         "avatarColor": user["avatar_color"],
+        "avatarImage": user.get("avatar_image", ""),
         "createdAt": user["created_at"],
         "role": user["role"],
     }
@@ -159,19 +198,52 @@ def now_in_ms():
     return int(time.time() * 1000)
 
 
+def local_event_count(username):
+    return len([
+        e for e in events
+        if e["owner"].lower() == username.lower() and e["visibility"] == "local"
+    ])
+
+
 def cascade_delete_event(deleted_event):
+    """
+    Removes the fallout of an already-removed event: if it was a Global
+    post, everyone's local copies of it go too, along with the comments
+    on the post and on those copies.
+    """
     removed_ids = {deleted_event["id"]}
     if deleted_event["visibility"] == "global":
-        clone_ids = {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
-        removed_ids |= clone_ids
+        removed_ids |= {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
         events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
     comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
 
 
+def make_local_copy(source_event, username):
+    """A private calendar copy of a Global post. Caller appends it."""
+    global next_event_id
+
+    copy = {
+        "id": next_event_id,
+        "owner": username,
+        "title": source_event["title"],
+        "description": source_event["description"],
+        "date": source_event["date"],
+        "end_date": source_event.get("end_date", source_event["date"]),
+        "start_time": source_event.get("start_time", ""),
+        "end_time": source_event.get("end_time", ""),
+        "visibility": "local",
+        "color": source_event.get("color", EVENT_COLORS[0]),
+        "icon": source_event.get("icon", EVENT_ICONS[0]),
+        "image": source_event.get("image", ""),
+        "cloned_from": source_event["id"],
+        "created_at": now_in_ms(),
+    }
+    next_event_id += 1
+    return copy
+
+
 def add_demo_data():
-    demo_salt = make_salt()
     planora_password = os.environ["PLANORA_ADMIN_PASSWORD"]
-    planora_password_hash = hash_password(planora_password, demo_salt)
 
     demo_users = [
         {"username": "Jordan", "role": "admin"},
@@ -183,43 +255,16 @@ def add_demo_data():
         users.append({
             "username": name,
             "display_name": name.capitalize(),
-            "salt": demo_salt,
-            "password_hash": planora_password_hash,
+            # hashed per-user, so two accounts sharing a password don't
+            # share a hash
+            "password_hash": generate_password_hash(planora_password),
             "bio": "",
             "avatar_color": pick_avatar_color(name),
+            "avatar_image": "",
             "created_at": now_in_ms(),
             "role": demo["role"],
         })
 
-    global next_event_id
-    year = time.localtime().tm_year
-
-"""
-    demo_events = [
-        {"owner": "sable", "title": "Rooftop Card Night",
-         "description": "Bring your own deck, we'll bring the snacks.",
-         "date": f"{year}-06-14"},
-        {"owner": "vex", "title": "Open Mic @ The Landing",
-         "description": "Sign-ups open 30 minutes before doors.",
-         "date": f"{year}-07-02"},
-        {"owner": "juno", "title": "City Marathon",
-         "description": "Route closes at 1PM sharp, start early!",
-         "date": f"{year}-10-11"},
-    ]
-
-    for demo_event in demo_events:
-        events.append({
-            "id": next_event_id,
-            "owner": demo_event["owner"],
-            "title": demo_event["title"],
-            "description": demo_event["description"],
-            "date": demo_event["date"],
-            "visibility": "global",
-            "cloned_from": None,
-            "created_at": now_in_ms(),
-        })
-        next_event_id += 1
-"""
 
 add_demo_data()
 
@@ -231,11 +276,14 @@ def serve_home_page():
 
 @app.route("/api/signup", methods=["POST"])
 def signup():
-    data = request.get_json()
+    data = body()
 
-    username = data.get("username", "").strip()
-    display_name = data.get("displayName", "").strip() or username
+    username = clean_text(data.get("username", ""), 40)
+    display_name = clean_text(data.get("displayName", ""), MAX_DISPLAY_NAME) or username
     password = data.get("password", "")
+
+    if not isinstance(password, str):
+        password = ""
 
     if len(username) < 3:
         return jsonify({"error": "Username needs to be at least 3 characters."}), 400
@@ -252,16 +300,13 @@ def signup():
     if password.isalpha() or password.isdigit():
         return jsonify({"error": "Mix letters and numbers in your password."}), 400
 
-    salt = make_salt()
-    password_hash = hash_password(password, salt)
-
     new_user = {
         "username": username,
         "display_name": display_name,
-        "salt": salt,
-        "password_hash": password_hash,
+        "password_hash": generate_password_hash(password),
         "bio": "",
         "avatar_color": pick_avatar_color(username),
+        "avatar_image": "",
         "created_at": now_in_ms(),
         "role": "community",
     }
@@ -273,11 +318,14 @@ def signup():
 
 @app.route("/api/login", methods=["POST"])
 def login():
-    data = request.get_json()
+    data = body()
 
-    username = data.get("username", "").strip()
+    username = clean_text(data.get("username", ""), 40)
     password = data.get("password", "")
-    remember = data.get("remember", False)
+    remember = bool(data.get("remember", False))
+
+    if not isinstance(password, str):
+        password = ""
 
     key = username.lower()
     attempt = login_attempts.get(key)
@@ -288,21 +336,16 @@ def login():
 
     user = find_user(username)
 
-    if not user:
+    # check_password_hash is constant-time, so a wrong password and a
+    # missing account take the same path and the same shape of answer
+    if not user or not check_password_hash(user["password_hash"], password):
         register_failed_login(key)
         return jsonify({"error": "Incorrect username or password."}), 401
 
-    password_hash = hash_password(password, user["salt"])
-
-    if password_hash != user["password_hash"]:
-        register_failed_login(key)
-        return jsonify({"error": "Incorrect username or password."}), 401
-
-    if key in login_attempts:
-        del login_attempts[key]
+    login_attempts.pop(key, None)
 
     session["username"] = user["username"]
-    session.permanent = bool(remember)
+    session.permanent = remember
 
     return jsonify(user_public_info(user))
 
@@ -329,23 +372,33 @@ def get_me():
 
 @app.route("/api/me", methods=["PUT"])
 def update_me():
-    username = get_logged_in_username()
-    if not username:
+    user = get_logged_in_user()
+    if not user:
         return jsonify({"error": "Not signed in."}), 401
 
-    user = find_user(username)
-    data = request.get_json()
+    data = body()
 
     if "displayName" in data:
-        new_name = data["displayName"].strip()
+        new_name = clean_text(data["displayName"], MAX_DISPLAY_NAME)
         if new_name == "":
             return jsonify({"error": "Display name can't be empty."}), 400
         user["display_name"] = new_name
 
     if "bio" in data:
-        user["bio"] = data["bio"].strip()
+        user["bio"] = clean_text(data["bio"], MAX_BIO)
 
+    # Profile picture. Same rules as event covers: small base64 data URL,
+    # JPEG/PNG/WebP only. Send "" to go back to the plain color circle.
+    if "avatarImage" in data:
+        image, image_error = clean_image(data["avatarImage"])
+        if image_error:
+            return jsonify({"error": image_error}), 400
+        user["avatar_image"] = image
+
+    # kept as the fallback/background behind a picture
     if "avatarColor" in data:
+        if data["avatarColor"] not in AVATAR_COLORS:
+            return jsonify({"error": "That isn't one of the avatar colors."}), 400
         user["avatar_color"] = data["avatarColor"]
 
     return jsonify(user_public_info(user))
@@ -363,7 +416,12 @@ def get_events():
     if mode == "global":
         matching_events = [e for e in events if e["visibility"] == "global"]
     else:
-        matching_events = [e for e in events if e["owner"].lower() == username.lower()]
+        # only your private calendar records - your Global posts are
+        # represented here by their own local copy, never the post itself
+        matching_events = [
+            e for e in events
+            if e["owner"].lower() == username.lower() and e["visibility"] == "local"
+        ]
 
     if year:
         matching_events = [e for e in matching_events if e["date"].startswith(year)]
@@ -382,14 +440,19 @@ def get_events():
         if mode == "global":
             adders = []
             for e in events:
-                if e.get("cloned_from") == event["id"]:
-                    adder = find_user(e["owner"])
-                    if adder:
-                        adders.append({
-                            "username": adder["username"],
-                            "avatarColor": adder["avatar_color"],
-                            "addedAt": e.get("created_at"),
-                        })
+                if e.get("cloned_from") != event["id"]:
+                    continue
+                # the poster's own auto-copy isn't them "going" to it
+                if e["owner"].lower() == event["owner"].lower():
+                    continue
+                adder = find_user(e["owner"])
+                if adder:
+                    adders.append({
+                        "username": adder["username"],
+                        "avatarColor": adder["avatar_color"],
+                        "avatarImage": adder.get("avatar_image", ""),
+                        "addedAt": e.get("created_at"),
+                    })
             event_copy["addedBy"] = adders
 
         result.append(event_copy)
@@ -405,9 +468,9 @@ def add_event():
     if not user:
         return jsonify({"error": "Not signed in."}), 401
 
-    data = request.get_json()
-    title = data.get("title", "").strip()
-    description = data.get("description", "").strip()
+    data = body()
+    title = clean_text(data.get("title", ""), MAX_TITLE)
+    description = clean_text(data.get("description", ""), MAX_DESCRIPTION)
     date = data.get("date", "")
     visibility = "global" if data.get("visibility") == "global" else "local"
 
@@ -419,12 +482,17 @@ def add_event():
     if icon not in EVENT_ICONS:
         icon = EVENT_ICONS[0]
 
-    if not title or not date:
+    if not title or not isinstance(date, str) or not DATE_PATTERN.match(date):
         return jsonify({"error": "Add a name and date first."}), 400
 
-    start_time = data.get("startTime", "").strip()
-    end_time = data.get("endTime", "").strip()
-    end_date = data.get("endDate", "").strip() or date
+    start_time = clean_time(data.get("startTime", ""))
+    end_time = clean_time(data.get("endTime", ""))
+
+    end_date = data.get("endDate", "")
+    end_date = end_date.strip() if isinstance(end_date, str) else ""
+    if end_date and not DATE_PATTERN.match(end_date):
+        return jsonify({"error": "That end date isn't a real date."}), 400
+    end_date = end_date or date
 
     if end_date < date:
         return jsonify({"error": "End date can't be before the start date."}), 400
@@ -449,8 +517,7 @@ def add_event():
     else:
         if role != "admin":
             limit = COMMUNITY_LOCAL_LIMIT if role == "community" else COMMUNITY_PLUS_LOCAL_LIMIT
-            current_local = len([e for e in mine if e["visibility"] == "local"])
-            if current_local >= limit:
+            if local_event_count(user["username"]) >= limit:
                 return jsonify({
                     "error": f"You've hit your local event limit ({limit}). Remove one to add another."
                 }), 403
@@ -472,29 +539,39 @@ def add_event():
         "created_at": now_in_ms(),
     }
     next_event_id += 1
-
     events.append(new_event)
-    return jsonify(new_event)
+
+    # Posting to Global also drops a copy on your own calendar, as its own
+    # record. Removing that copy later leaves the Global post standing.
+    # Deliberately exempt from the local cap - you didn't ask for it.
+    if visibility == "global":
+        events.append(make_local_copy(new_event, user["username"]))
+
+    response = dict(new_event)
+    response["isMine"] = True
+    return jsonify(response)
 
 
 @app.route("/api/events/<int:event_id>/add", methods=["POST"])
 def add_to_my_calendar(event_id):
-    global next_event_id
-
     user = get_logged_in_user()
     if not user:
         return jsonify({"error": "Not signed in."}), 401
 
     username = user["username"]
 
-    source_event = None
-    for event in events:
-        if event["id"] == event_id:
-            source_event = event
-            break
-
+    source_event = find_event(event_id)
     if not source_event:
         return jsonify({"error": "Event not found."}), 404
+
+    # Only Global posts are addable. Without this check anyone could copy
+    # a stranger's private event - title, description, cover and all - just
+    # by guessing its id.
+    if source_event["visibility"] != "global":
+        return jsonify({"error": "That event isn't posted to Global."}), 403
+
+    if source_event["owner"].lower() == username.lower():
+        return jsonify({"error": "That's already on your calendar."}), 400
 
     for event in events:
         if event["owner"].lower() == username.lower() and event.get("cloned_from") == event_id:
@@ -502,33 +579,12 @@ def add_to_my_calendar(event_id):
 
     if user["role"] != "admin":
         limit = COMMUNITY_LOCAL_LIMIT if user["role"] == "community" else COMMUNITY_PLUS_LOCAL_LIMIT
-        current_local = len([
-            e for e in events
-            if e["owner"].lower() == username.lower() and e["visibility"] == "local"
-        ])
-        if current_local >= limit:
+        if local_event_count(username) >= limit:
             return jsonify({
                 "error": f"You've hit your local event limit ({limit}). Remove one to add another."
             }), 403
 
-    clone = {
-        "id": next_event_id,
-        "owner": username,
-        "title": source_event["title"],
-        "description": source_event["description"],
-        "date": source_event["date"],
-        "end_date": source_event.get("end_date", source_event["date"]),
-        "start_time": source_event.get("start_time", ""),
-        "end_time": source_event.get("end_time", ""),
-        "visibility": "local",
-        "color": source_event.get("color", EVENT_COLORS[0]),
-        "icon": source_event.get("icon", EVENT_ICONS[0]),
-        "image": source_event.get("image", ""),
-        "cloned_from": event_id,
-        "created_at": now_in_ms(),
-    }
-    next_event_id += 1
-
+    clone = make_local_copy(source_event, username)
     events.append(clone)
     return jsonify(clone)
 
@@ -536,25 +592,25 @@ def add_to_my_calendar(event_id):
 @app.route("/api/events/<int:event_id>", methods=["DELETE"])
 def delete_event(event_id):
     """
-    Deletes an event you own. This is unrelated to role — every role
+    Deletes an event you own. This is unrelated to role - every role
     (Community, Community+, Admin) can always delete their own events.
     Deleting events you DON'T own is handled separately, by admins only,
     at /api/admin/events/<id>.
 
-    If it was a Global event, this also removes everyone's local copies
-    of it (and comments on those copies) — see cascade_delete_event.
+    Deleting a local copy only affects your calendar. Deleting a Global
+    post takes everyone's copies of it with it - see cascade_delete_event.
     """
     username = get_logged_in_username()
     if not username:
         return jsonify({"error": "Not signed in."}), 401
 
-    for event in events:
-        if event["id"] == event_id and event["owner"].lower() == username.lower():
-            events.remove(event)
-            cascade_delete_event(event)
-            return jsonify({"ok": True})
+    event = find_event(event_id)
+    if not event or event["owner"].lower() != username.lower():
+        return jsonify({"error": "Event not found."}), 404
 
-    return jsonify({"error": "Event not found."}), 404
+    events.remove(event)
+    cascade_delete_event(event)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/events/<int:event_id>/comments", methods=["GET"])
@@ -575,8 +631,10 @@ def add_comment(event_id):
     if not username:
         return jsonify({"error": "Not signed in."}), 401
 
-    data = request.get_json()
-    text = data.get("text", "").strip()
+    if not find_event(event_id):
+        return jsonify({"error": "Event not found."}), 404
+
+    text = clean_text(body().get("text", ""), MAX_COMMENT)
 
     if not text:
         return jsonify({"error": "Comment can't be empty."}), 400
@@ -597,7 +655,7 @@ def add_comment(event_id):
 
 @app.route("/api/events/<int:event_id>/comments/<int:comment_id>", methods=["PUT"])
 def edit_comment(event_id, comment_id):
-    """Only the comment's own author can edit it — not the event's poster or an admin."""
+    """Only the comment's own author can edit it - not the event's poster or an admin."""
     username = get_logged_in_username()
     if not username:
         return jsonify({"error": "Not signed in."}), 401
@@ -609,8 +667,7 @@ def edit_comment(event_id, comment_id):
     if comment["author"].lower() != username.lower():
         return jsonify({"error": "You can only edit your own comments."}), 403
 
-    data = request.get_json()
-    text = data.get("text", "").strip()
+    text = clean_text(body().get("text", ""), MAX_COMMENT)
     if not text:
         return jsonify({"error": "Comment can't be empty."}), 400
 
@@ -631,7 +688,7 @@ def delete_comment(event_id, comment_id):
     if not user:
         return jsonify({"error": "Not signed in."}), 401
 
-    event = next((e for e in events if e["id"] == event_id), None)
+    event = find_event(event_id)
     if not event:
         return jsonify({"error": "Event not found."}), 404
 
@@ -656,15 +713,15 @@ def get_stats():
     if not username:
         return jsonify({"error": "Not signed in."}), 401
 
-    event_count = 0
-    for event in events:
-        if event["owner"].lower() == username.lower():
-            event_count += 1
+    # count what you actually made, not the auto-copies of it
+    event_count = len([
+        e for e in events
+        if e["owner"].lower() == username.lower() and e.get("cloned_from") is None
+    ])
 
-    comment_count = 0
-    for comment in comments:
-        if comment["author"].lower() == username.lower():
-            comment_count += 1
+    comment_count = len([
+        c for c in comments if c["author"].lower() == username.lower()
+    ])
 
     return jsonify({"events": event_count, "comments": comment_count})
 
@@ -672,11 +729,7 @@ def get_stats():
 @app.route("/api/admin/users", methods=["GET"])
 @require_role("admin")
 def admin_list_users(current_user):
-    result = []
-    for u in users:
-        info = user_public_info(u)
-        result.append(info)
-    return jsonify(result)
+    return jsonify([user_public_info(u) for u in users])
 
 
 @app.route("/api/admin/users/<username>/role", methods=["PUT"])
@@ -686,8 +739,7 @@ def admin_set_role(current_user, username):
     if not target:
         return jsonify({"error": "User not found."}), 404
 
-    data = request.get_json()
-    new_role = data.get("role")
+    new_role = body().get("role")
 
     if new_role not in VALID_ROLES:
         return jsonify({"error": "Invalid role."}), 400
@@ -711,7 +763,13 @@ def admin_delete_user(current_user, username):
 
     users.remove(target)
 
+    # take their events with them, and then everyone's copies of whatever
+    # Global posts they had up
+    theirs = [e for e in events if e["owner"].lower() == username.lower()]
     events[:] = [e for e in events if e["owner"].lower() != username.lower()]
+    for event in theirs:
+        cascade_delete_event(event)
+
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
 
     return jsonify({"ok": True})
@@ -727,22 +785,20 @@ def admin_list_events(current_user):
 @require_role("admin")
 def admin_delete_event(current_user, event_id):
     """
-    Lets an admin remove ANY event, not just their own — e.g. to take
+    Lets an admin remove ANY event, not just their own - e.g. to take
     down something inappropriate someone posted to Global. Also cascades:
     see cascade_delete_event.
     """
-    for event in events:
-        if event["id"] == event_id:
-            events.remove(event)
-            cascade_delete_event(event)
-            return jsonify({"ok": True})
+    event = find_event(event_id)
+    if not event:
+        return jsonify({"error": "Event not found."}), 404
 
-    return jsonify({"error": "Event not found."}), 404
+    events.remove(event)
+    cascade_delete_event(event)
+    return jsonify({"ok": True})
 
 
 if __name__ == "__main__":
-    import os
-
     port = int(os.environ.get("PORT", 5000))
 
     app.run(
