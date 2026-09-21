@@ -263,3 +263,127 @@ body { font-family: var(--font-discord); }
 .today-pill:active {
     background: #2f2f2f;
 }
+
+
+/* =========================
+   EVENT HOST AVATAR
+   Replaces the old plain day-number tile. The day number survives as a
+   small badge on the avatar's corner instead of disappearing.
+========================= */
+
+.event-avatar {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.event-day-badge {
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 3px;
+    border-radius: 999px;
+    border: 2px solid;               /* color set per-event in JS */
+    background: #141414;
+    color: #eee;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+}
+
+
+/* =========================
+   SIMPLER "CREATE EVENT" FORM
+   Title, date and the Global toggle are the only things visible by
+   default — everything else (description, end date, time, cover image,
+   icon, color) lives behind a native <details> disclosure, so a first
+   event takes three taps instead of ten decisions.
+========================= */
+
+.event-more {
+    margin: 4px 0 14px;
+    border: 1px solid #2c2c2c;
+    border-radius: 8px;
+    background: #1a1a1a;
+    overflow: hidden;
+}
+
+.event-more summary {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 12px 14px;     /* generous tap target for mobile */
+    color: #ddd;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    list-style: none;              /* hide the default triangle marker... */
+    -webkit-tap-highlight-color: transparent;
+}
+
+.event-more summary::-webkit-details-marker {
+    display: none;                 /* ...in Safari/Chrome too */
+}
+
+.event-more summary::before {
+    content: "›";
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 700;
+    color: #888;
+    transition: transform .15s ease;
+}
+
+.event-more[open] summary::before {
+    transform: rotate(90deg);
+}
+
+.event-more-hint {
+    color: #777;
+    font-size: 12px;
+    font-weight: 400;
+}
+
+.event-more-body {
+    padding: 2px 14px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+/* Everything below keeps the app usable on narrow phones regardless of
+   what homepage.css already does for these elements. */
+@media (max-width: 480px) {
+    .event-form-box {
+        max-width: 100%;
+    }
+
+    .time-grid {
+        grid-template-columns: 1fr;   /* stack start/end time if it's a grid... */
+        flex-direction: column;       /* ...or a flex row - whichever homepage.css uses */
+        gap: 8px;
+    }
+
+    .image-picker {
+        flex-wrap: wrap;
+    }
+
+    .event-icon-row,
+    .event-color-row {
+        flex-wrap: wrap;
+    }
+}
