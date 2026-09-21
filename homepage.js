@@ -109,6 +109,105 @@ function parseEventDate(dateStr) {
     return new Date(dateStr + "T00:00:00");
 }
 
+
+/* =========================
+   TIMEZONES
+   Events store the organizer's IANA zone (e.g. "Asia/Manila") alongside
+   a plain wall-clock time ("19:30"). Nothing here rewrites what the
+   organizer typed - buildEventCard/formatEventWhen show that alongside
+   the viewer's own converted time, so both sides always see the truth.
+   Only events WITH a start_time carry a timezone: an all-day event
+   ("June 14th", no clock time) is the same day everywhere, so there's
+   no instant to convert and the server drops any timezone sent for one.
+========================= */
+
+const VIEWER_TZ = (() => {
+    try {
+        return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch {
+        return "";
+    }
+})();
+
+/* Interprets `timeStr` on `dateStr` as wall-clock time IN `zone`, and
+   returns the actual instant (a Date) that represents. Asks the zone what
+   offset applies at roughly that moment rather than assuming a fixed one,
+   so this comes out right across a DST boundary too. */
+function zonedWallTimeToInstant(dateStr, timeStr, zone) {
+    const [y, mo, d] = dateStr.split("-").map(Number);
+    const [h, mi] = timeStr.split(":").map(Number);
+    const guessUTC = Date.UTC(y, mo - 1, d, h, mi);
+
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: zone, hour12: false,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+    }).formatToParts(new Date(guessUTC)).reduce((acc, p) => {
+        acc[p.type] = p.value;
+        return acc;
+    }, {});
+
+    const hour = parts.hour === "24" ? 0 : Number(parts.hour);
+    const asIfUTC = Date.UTC(
+        Number(parts.year), Number(parts.month) - 1, Number(parts.day),
+        hour, Number(parts.minute), Number(parts.second)
+    );
+    return new Date(guessUTC - (asIfUTC - guessUTC));
+}
+
+function instantToZonedParts(instant, zone) {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: zone, hour12: false,
+        year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit"
+    }).formatToParts(instant).reduce((acc, p) => {
+        acc[p.type] = p.value;
+        return acc;
+    }, {});
+    return {
+        date: `${parts.year}-${parts.month}-${parts.day}`,
+        time: `${parts.hour === "24" ? "00" : parts.hour}:${parts.minute}`
+    };
+}
+
+/* Re-expresses an event's date/end-date/start/end time in the VIEWER's
+   own timezone. Can land on a different calendar date than what the
+   organizer typed - that's correct, not a bug, and is exactly why the
+   month grid, day number and sort order all go through this too rather
+   than reading event.date directly. Falls through unchanged for all-day
+   events and for events saved before timezones were tracked (empty
+   event.timezone) - there's nothing to convert either way. */
+function toViewerLocal(event) {
+    const passthrough = {
+        date: event.date,
+        endDate: event.end_date || event.date,
+        startTime: event.start_time || "",
+        endTime: event.end_time || "",
+        converted: false
+    };
+
+    if (!event.start_time || !event.timezone || !VIEWER_TZ) return passthrough;
+    if (event.timezone === VIEWER_TZ) return passthrough;
+
+    const start = instantToZonedParts(
+        zonedWallTimeToInstant(event.date, event.start_time, event.timezone),
+        VIEWER_TZ
+    );
+
+    let endDate = event.end_date || event.date;
+    let endTime = "";
+    if (event.end_time) {
+        const end = instantToZonedParts(
+            zonedWallTimeToInstant(event.end_date || event.date, event.end_time, event.timezone),
+            VIEWER_TZ
+        );
+        endDate = end.date;
+        endTime = end.time;
+    }
+
+    return { date: start.date, endDate, startTime: start.time, endTime, converted: true };
+}
+
 function isRecentlyPosted(event) {
     return Date.now() - event.created_at < 24 * 60 * 60 * 1000;
 }
@@ -266,30 +365,41 @@ function formatTime(hhmm) {
 }
 
 /* Combines the date/date-range with the start/end time, whichever of
-   those the event actually has. All of it is optional, so this reads
-   fine whether an event has a full range or just a single plain date. */
-function formatEventWhen(event) {
-    let dateLabel;
+   those the event actually has, IN THE VIEWER'S OWN TIMEZONE when the
+   event has one on record (see toViewerLocal). If that conversion also
+   shifted the calendar date, the date shown here follows it. When the
+   viewer's zone differs from the organizer's, the organizer's original
+   wall-clock time is appended in parentheses, same way a lot of chat
+   apps show a converted time next to the sender's own. */
+function formatEventWhen(event, viewerLocal) {
+    const vl = viewerLocal || toViewerLocal(event);
 
-    if (event.end_date && event.end_date !== event.date) {
-        const start = parseEventDate(event.date);
-        const end = parseEventDate(event.end_date);
+    let dateLabel;
+    if (vl.endDate && vl.endDate !== vl.date) {
+        const start = parseEventDate(vl.date);
+        const end = parseEventDate(vl.endDate);
         const days = Math.round((end - start) / 86400000) + 1;
         const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
         const endLabel = end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
         dateLabel = `${startLabel} – ${endLabel} · ${days} days`;
     } else {
-        dateLabel = formatEventDate(event.date);
+        dateLabel = formatEventDate(vl.date);
     }
 
-    if (event.start_time) {
-        const timeLabel = event.end_time
+    if (!vl.startTime) return dateLabel;
+
+    const timeLabel = vl.endTime
+        ? `${formatTime(vl.startTime)} – ${formatTime(vl.endTime)}`
+        : formatTime(vl.startTime);
+
+    if (vl.converted) {
+        const originalLabel = event.end_time
             ? `${formatTime(event.start_time)} – ${formatTime(event.end_time)}`
             : formatTime(event.start_time);
-        return `${dateLabel} · ${timeLabel}`;
+        return `${dateLabel} · ${timeLabel} (${originalLabel} organizer's time)`;
     }
 
-    return dateLabel;
+    return `${dateLabel} · ${timeLabel}`;
 }
 
 
@@ -619,7 +729,7 @@ async function focusEvent(eventId) {
         return;
     }
 
-    openMonth = parseEventDate(target.date).getMonth() + 1;
+    openMonth = parseEventDate(toViewerLocal(target).date).getMonth() + 1;
     await render();
 
     const card = document.querySelector(`.event[data-event-id="${eventId}"]`);
@@ -704,9 +814,12 @@ async function render() {
         const wrapper = monthEl.closest(".month-wrapper");
         const container = monthEl.parentElement.querySelector(".events-container");
 
+        // Grouped and sorted by each event's date AS THE VIEWER WOULD SEE
+        // IT, not the raw stored date - a 11PM event in the organizer's
+        // zone can land on the viewer's next calendar day.
         let monthEvents = events
-            .filter(e => parseEventDate(e.date).getMonth() + 1 === monthNumber)
-            .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date));
+            .filter(e => parseEventDate(toViewerLocal(e).date).getMonth() + 1 === monthNumber)
+            .sort((a, b) => parseEventDate(toViewerLocal(a).date) - parseEventDate(toViewerLocal(b).date));
 
         if (isSearching) {
             monthEvents = monthEvents.filter(e =>
@@ -773,7 +886,9 @@ async function renderMonthEvents(container, monthEvents) {
 ========================= */
 
 function renderTimeline(events, query) {
-    let list = events.slice().sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date));
+    let list = events.slice().sort((a, b) =>
+        parseEventDate(toViewerLocal(a).date) - parseEventDate(toViewerLocal(b).date)
+    );
 
     if (query) {
         list = list.filter(e =>
@@ -844,7 +959,7 @@ function renderTimeline(events, query) {
         body.addEventListener("click", () => {
             mode = "local";
             setActiveModeButton();
-            openMonth = parseEventDate(event.date).getMonth() + 1;
+            openMonth = parseEventDate(toViewerLocal(event).date).getMonth() + 1;
             render().then(() => {
                 const card = document.querySelector(`.event[data-event-id="${event.id}"]`);
                 if (card) {
@@ -936,7 +1051,8 @@ function buildEventMenu(event) {
 }
 
 async function buildEventCard(event) {
-    const day = parseEventDate(event.date).getDate();
+    const viewerLocal = toViewerLocal(event);
+    const day = parseEventDate(viewerLocal.date).getDate();
 
     const card = document.createElement("div");
     card.className = "event";
@@ -1002,7 +1118,7 @@ async function buildEventCard(event) {
 
     const dateEl = document.createElement("div");
     dateEl.className = "event-date";
-    dateEl.textContent = formatEventWhen(event);
+    dateEl.textContent = formatEventWhen(event, viewerLocal);
     info.appendChild(dateEl);
 
     if (mode === "global" && event.addedBy && event.addedBy.length > 0) {
@@ -1450,6 +1566,9 @@ function buildAddEventUI() {
                 endDate,
                 startTime,
                 endTime,
+                // only matters when there's a clock time to convert; the
+                // server drops it for all-day events regardless
+                timezone: startTime ? VIEWER_TZ : "",
                 visibility: isPublic ? "global" : "local",
                 icon: selectedEventIcon,
                 color: selectedEventColor,
