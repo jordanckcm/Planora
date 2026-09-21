@@ -1716,3 +1716,162 @@ body.mode-timeline {
         mask-image: linear-gradient(to left, #000 0%, transparent 80%);
     }
 }
+/* =========================================================
+   MODE SWITCH STYLES
+   Paste at the very bottom of homepage-extra.css.
+   Works together with mode-effects.js.
+
+   Each mode now has its own color running through the whole
+   page (set by --accent on <body> in the earlier block):
+     Local    green
+     Global   blue
+     Timeline purple
+========================================================= */
+
+
+/* --- Tabs: one shared pill slides between them --- */
+
+.topbar .custom-button {
+    position: relative;
+    z-index: 1;
+}
+
+.custom-button:active {
+    transform: scale(0.94);
+}
+
+/* the tabs themselves no longer fill in; the sliding pill does that */
+.local-button.mode-active,
+.global-button.mode-active,
+.timeline-button.mode-active,
+.local-button.mode-active:hover,
+.global-button.mode-active:hover,
+.timeline-button.mode-active:hover {
+    background: transparent;
+    border-color: transparent;
+    color: white;
+}
+
+.mode-indicator {
+    position: absolute;
+    top: 50%;
+    left: 0;
+    z-index: 0;
+
+    height: 34px;
+    margin-top: -17px;
+
+    border-radius: 20px;
+    border: 1px solid rgba(var(--accent), 0.9);
+
+    background: rgba(var(--accent), 0.2);
+    box-shadow: 0 0 18px rgba(var(--accent), 0.35);
+
+    pointer-events: none;
+
+    opacity: 0;
+
+    /* springy overshoot on the slide */
+    transition:
+        transform 0.55s cubic-bezier(.34, 1.45, .64, 1),
+        width 0.55s cubic-bezier(.34, 1.45, .64, 1),
+        background 0.4s ease,
+        border-color 0.4s ease,
+        box-shadow 0.4s ease,
+        opacity 0.3s ease;
+}
+
+.mode-indicator.ready {
+    opacity: 1;
+}
+
+.mode-indicator.no-anim {
+    transition: none;
+}
+
+
+/* --- Ripple layer (animated from JS) --- */
+
+.mode-wash {
+    position: fixed;
+    inset: 0;
+
+    /* under the top bar (100), over the page content */
+    z-index: 90;
+
+    pointer-events: none;
+
+    opacity: 0;
+
+    background: rgba(var(--accent), 0.16);
+}
+
+
+/* --- Make the mode obvious everywhere else --- */
+
+/* the giant year takes on the mode's color */
+.year {
+    color: rgba(var(--accent), 0.17);
+
+    transition: color 0.6s ease;
+}
+
+/* month cards get a colored edge that changes with the mode */
+.month-events-container {
+    box-shadow: inset 3px 0 0 rgba(var(--accent), 0.55);
+
+    transition:
+        transform 0.25s ease,
+        background 0.25s ease,
+        border 0.25s ease,
+        box-shadow 0.5s ease;
+}
+
+.month-events-container:hover {
+    border-color: rgba(var(--accent), 0.55);
+}
+
+.month-events-container.month-open {
+    background:
+        linear-gradient(rgba(var(--accent), 0.13), rgba(var(--accent), 0.13)),
+        rgb(30, 30, 30);
+    border-color: rgba(var(--accent), 0.55);
+}
+
+/* "new" markers, comment buttons etc. follow the mode too
+   (so Global's comments are blue instead of green) */
+.event.event-new {
+    border-color: rgba(var(--accent), 0.45);
+}
+
+.event-new-badge {
+    background: rgba(var(--accent), 0.18);
+    color: color-mix(in srgb, rgb(var(--accent)) 55%, white);
+}
+
+.comment-author {
+    color: color-mix(in srgb, rgb(var(--accent)) 75%, white);
+}
+
+.comment-submit,
+.comment-edit-save,
+.comment-submit:hover,
+.comment-edit-save:hover {
+    background: rgb(var(--accent));
+}
+
+.comment-submit:hover,
+.comment-edit-save:hover {
+    filter: brightness(1.15);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+
+    .mode-indicator,
+    .year,
+    .month-events-container {
+        transition: none;
+    }
+
+}
