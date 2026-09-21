@@ -149,3 +149,82 @@ body { font-family: var(--font-discord); }
 .comment-dropdown.dropdown-portal {
     z-index: 9999;
 }
+
+
+/* =========================
+   IMAGE PICKER
+   Shared shape for the event-cover picker (homepage.js) and the
+   new profile-picture picker (profile.js). If homepage.css already
+   styles .image-picker for the event form, these rules load after
+   it and may need trimming to avoid fighting your existing look —
+   they're written to be plain enough that shouldn't happen.
+========================= */
+
+.image-picker {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 8px 0 16px;
+}
+
+.image-pick-button {
+    padding: 8px 14px;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    background: #232323;
+    color: #ddd;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.image-pick-button:hover {
+    background: #2c2c2c;
+}
+
+.image-remove {
+    padding: 8px 12px;
+    border: 1px solid #3a3a3a;
+    border-radius: 6px;
+    background: none;
+    color: #e06a63;
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.image-remove:hover {
+    background: #3a1f1d;
+}
+
+.image-preview {
+    width: 56px;
+    height: 56px;
+    border-radius: 8px;
+    background-color: #232323;
+    background-size: cover;
+    background-position: center;
+    flex-shrink: 0;
+}
+
+/* Profile pictures read as circular avatars, not rectangular covers,
+   and get a bit more room since it's the one photo that represents you. */
+.avatar-preview {
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+    font-size: 26px;
+}
+
+.avatar-big {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-weight: 700;
+}
