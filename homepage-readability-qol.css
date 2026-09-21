@@ -224,9 +224,11 @@
 
 /* =========================
    3. COMMENT COMPOSER
-   Auto-growing textarea + character counter, replacing the old
-   single-line input. homepage.js sizes/disables it; this just
-   makes that visible.
+   Same idle size and pill shape as the old single-line input
+   (34px tall, 20px radius) — it just also grows automatically
+   once what you're typing needs more than one line.
+   homepage.js drives the actual resizing; this sets the numbers
+   it's resizing between.
 ========================= */
 
 .comment-form {
@@ -247,14 +249,17 @@ textarea.comment-input {
     min-height: 34px;
     max-height: 120px;
 
-    padding: 8px 44px 8px 14px;
+    /* 7px top/bottom + a 20px line-height = 34px total on one line,
+       matching the old input's fixed height exactly at rest */
+    padding: 7px 44px 7px 14px;
 
-    border-radius: 16px;
+    border-radius: 20px;
 
     resize: none;
     overflow-y: hidden;
 
-    line-height: 1.4;
+    font-size: 13px;
+    line-height: 20px;
 }
 
 .comment-counter {
