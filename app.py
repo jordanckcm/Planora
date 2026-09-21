@@ -22,6 +22,7 @@ ROLES
 """
 
 import hashlib
+import re
 import secrets
 import time
 import os
@@ -33,6 +34,10 @@ from flask import Flask, request, jsonify, session
 app = Flask(__name__, static_folder=".", static_url_path="")
 
 app.secret_key = os.environ["SECRET_KEY"]
+# Images are stored as small base64 data URLs on the event itself.
+app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024   # reject any request over 2 MB
+MAX_IMAGE_CHARS = 300_000                             # roughly a 220 KB image
+IMAGE_PATTERN = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
 
 
 @app.errorhandler(404)
@@ -43,6 +48,10 @@ def handle_not_found(e):
 @app.errorhandler(500)
 def handle_server_error(e):
     return jsonify({"error": "Something went wrong on the server. Try again."}), 500
+
+@app.errorhandler(413)
+def handle_too_large(e):
+    return jsonify({"error": "That image is too big. Try a smaller one."}), 413
 
 
 users = []
@@ -64,6 +73,15 @@ COMMUNITY_LOCAL_LIMIT = 10
 COMMUNITY_PLUS_LOCAL_LIMIT = 25
 COMMUNITY_PLUS_GLOBAL_LIMIT = 1
 
+def clean_image(value):
+    """Returns (image, error). An empty string means 'no image'."""
+    if not value:
+        return "", None
+    if not isinstance(value, str) or len(value) > MAX_IMAGE_CHARS:
+        return "", "That image is too big. Try a smaller one."
+    if not IMAGE_PATTERN.match(value):
+        return "", "Only JPEG, PNG or WebP images are allowed."
+    return value, None
 
 def find_user(username):
     for user in users:
@@ -354,6 +372,7 @@ def get_events():
         event_copy.setdefault("end_date", event_copy["date"])
         event_copy.setdefault("start_time", "")
         event_copy.setdefault("end_time", "")
+        event_copy.setdefault("image", "")
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
         if mode == "global":
@@ -406,6 +425,10 @@ def add_event():
     if end_date < date:
         return jsonify({"error": "End date can't be before the start date."}), 400
 
+        image, image_error = clean_image(data.get("image", ""))
+    if image_error:
+        return jsonify({"error": image_error}), 400
+
     role = user["role"]
     mine = [e for e in events if e["owner"].lower() == user["username"].lower()]
 
@@ -440,6 +463,7 @@ def add_event():
         "visibility": visibility,
         "color": color,
         "icon": icon,
+        "image": image,
         "cloned_from": None,
         "created_at": now_in_ms(),
     }
@@ -495,6 +519,7 @@ def add_to_my_calendar(event_id):
         "visibility": "local",
         "color": source_event.get("color", EVENT_COLORS[0]),
         "icon": source_event.get("icon", EVENT_ICONS[0]),
+        "image": source_event.get("image", ""),
         "cloned_from": event_id,
         "created_at": now_in_ms(),
     }
