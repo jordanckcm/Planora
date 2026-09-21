@@ -20,12 +20,30 @@ ROLES
     admin           - no caps. Can manage users (change role / delete)
                        and delete ANY event, not just their own.
 
-GLOBAL vs LOCAL (important - this changed)
-    A Global post and your own calendar copy of it are now TWO separate
+EVENT VISIBILITY (three kinds now)
+    local   - PRIVATE. Only on your own calendar. (Shown as "Private" in the UI.)
+    public  - on your calendar AND listed on your profile, so anyone who
+              views your profile can see it. This is NOT the same as Global.
+    global  - posted to the Global feed for everyone, with comments.
+              Community+ / admin only.
+
+GLOBAL vs LOCAL
+    A Global post and your own calendar copy of it are TWO separate
     records. Posting to Global creates the global event AND a private
     local copy owned by you, linked by cloned_from. Deleting the local
     copy only removes it from your calendar; the Global post stays up.
     Deleting the Global post itself still removes everyone's copies.
+
+PROFILES
+    Anyone signed in can open GET /api/users/<username>. They see the
+    profile fields plus that person's PUBLIC events. Only the owner also
+    gets their private events back. You usually get there by clicking
+    someone's name on a comment.
+
+REPLIES
+    Comments can have replies (parentId). Replies are one level deep:
+    replying to a reply attaches it to the same top-level comment and
+    remembers who you were answering (reply_to).
 """
 
 import re
@@ -61,8 +79,20 @@ MAX_DISPLAY_NAME = 40
 MAX_BIO = 200
 MAX_COMMENT = 240
 
+# profile extras
+MAX_PRONOUNS = 20
+MAX_LOCATION = 40
+MAX_STATUS_EMOJI = 8
+MAX_STATUS_TEXT = 60
+MAX_NOW_PLAYING = 60
+MAX_LINK = 100
+MAX_INTERESTS = 5
+MAX_INTEREST_LENGTH = 20
+
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_PATTERN = re.compile(r"^\d{2}:\d{2}$")
+LINK_PATTERN = re.compile(r"^https?://[^\s<>\"']+$")
+ACCENT_PATTERN = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 # Real IANA zone names ("Asia/Manila", "America/New_York"), loaded once at
 # startup. The frontend sends Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -104,12 +134,16 @@ login_attempts = {}
 AVATAR_COLORS = ["#c9a227", "#489c48", "#b6453f", "#4a7fc9", "#9a56c9", "#c96f2e"]
 EVENT_COLORS = AVATAR_COLORS
 EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "🌙", "🔥", "🎬"]
+DEFAULT_ACCENT = AVATAR_COLORS[0]
 
 VALID_ROLES = ("community", "community_plus", "admin")
 
 COMMUNITY_LOCAL_LIMIT = 10
 COMMUNITY_PLUS_LOCAL_LIMIT = 25
 COMMUNITY_PLUS_GLOBAL_LIMIT = 1
+
+# "local" is the private kind. The frontend may also send "private".
+CALENDAR_VISIBILITIES = ("local", "public")
 
 
 def body():
@@ -170,6 +204,17 @@ def user_public_info(user):
         "avatarImage": user.get("avatar_image", ""),
         "createdAt": user["created_at"],
         "role": user["role"],
+        # profile extras - .get() so accounts made before these existed still work
+        "bannerImage": user.get("banner_image", ""),
+        "accent": user.get("accent", "") or user["avatar_color"],
+        "pronouns": user.get("pronouns", ""),
+        "location": user.get("location", ""),
+        "link": user.get("link", ""),
+        "statusEmoji": user.get("status_emoji", ""),
+        "statusText": user.get("status_text", ""),
+        "nowSong": user.get("now_song", ""),
+        "nowArtist": user.get("now_artist", ""),
+        "interests": user.get("interests", []),
     }
 
 
@@ -212,10 +257,19 @@ def now_in_ms():
 
 
 def local_event_count(username):
+    """Private + public events both count toward the calendar cap."""
     return len([
         e for e in events
-        if e["owner"].lower() == username.lower() and e["visibility"] == "local"
+        if e["owner"].lower() == username.lower() and e["visibility"] in CALENDAR_VISIBILITIES
     ])
+
+
+def can_see_event(user, event):
+    """Global and public events are visible to any signed-in user. Private
+    ones only to their owner (or an admin)."""
+    if event["visibility"] in ("global", "public"):
+        return True
+    return user["role"] == "admin" or event["owner"].lower() == user["username"].lower()
 
 
 def cascade_delete_event(deleted_event):
@@ -229,6 +283,13 @@ def cascade_delete_event(deleted_event):
         removed_ids |= {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
         events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
     comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
+
+
+def prune_orphan_replies():
+    """If a comment vanished (its author's account was deleted, say), the
+    replies hanging off it go with it."""
+    alive = {c["id"] for c in comments}
+    comments[:] = [c for c in comments if c.get("parent_id") is None or c["parent_id"] in alive]
 
 
 def make_local_copy(source_event, username):
@@ -254,6 +315,36 @@ def make_local_copy(source_event, username):
     }
     next_event_id += 1
     return copy
+
+
+def profile_event_view(event):
+    """The trimmed-down shape of an event shown on a profile page."""
+    return {
+        "id": event["id"],
+        "title": event["title"],
+        "description": event["description"],
+        "date": event["date"],
+        "end_date": event.get("end_date", event["date"]),
+        "start_time": event.get("start_time", ""),
+        "end_time": event.get("end_time", ""),
+        "color": event.get("color", EVENT_COLORS[0]),
+        "icon": event.get("icon", EVENT_ICONS[0]),
+        "image": event.get("image", ""),
+        "visibility": event["visibility"],
+    }
+
+
+def comment_view(comment):
+    """A comment plus enough about its author to draw a name, a face,
+    and a link to their profile."""
+    out = dict(comment)
+    out.setdefault("parent_id", None)
+    out.setdefault("reply_to", None)
+    author = find_user(comment["author"])
+    out["authorDisplayName"] = author["display_name"] if author else comment["author"]
+    out["authorAvatarColor"] = author["avatar_color"] if author else AVATAR_COLORS[0]
+    out["authorAvatarImage"] = author.get("avatar_image", "") if author else ""
+    return out
 
 
 def add_demo_data():
@@ -392,30 +483,121 @@ def update_me():
 
     data = body()
 
+    # Validate everything first and only apply it at the end, so a bad
+    # field can't leave the profile half-updated.
+    updates = {}
+
     if "displayName" in data:
         new_name = clean_text(data["displayName"], MAX_DISPLAY_NAME)
         if new_name == "":
             return jsonify({"error": "Display name can't be empty."}), 400
-        user["display_name"] = new_name
+        updates["display_name"] = new_name
 
     if "bio" in data:
-        user["bio"] = clean_text(data["bio"], MAX_BIO)
+        updates["bio"] = clean_text(data["bio"], MAX_BIO)
 
-    # Profile picture. Same rules as event covers: small base64 data URL,
-    # JPEG/PNG/WebP only. Send "" to go back to the plain color circle.
+    # Profile picture and banner. Same rules as event covers: small base64
+    # data URL, JPEG/PNG/WebP only. Send "" to remove.
     if "avatarImage" in data:
         image, image_error = clean_image(data["avatarImage"])
         if image_error:
             return jsonify({"error": image_error}), 400
-        user["avatar_image"] = image
+        updates["avatar_image"] = image
+
+    if "bannerImage" in data:
+        image, image_error = clean_image(data["bannerImage"])
+        if image_error:
+            return jsonify({"error": image_error}), 400
+        updates["banner_image"] = image
 
     # kept as the fallback/background behind a picture
     if "avatarColor" in data:
         if data["avatarColor"] not in AVATAR_COLORS:
             return jsonify({"error": "That isn't one of the avatar colors."}), 400
-        user["avatar_color"] = data["avatarColor"]
+        updates["avatar_color"] = data["avatarColor"]
 
+    # accent = the color that tints your whole profile (banner fallback,
+    # stats, tabs). Any #rrggbb.
+    if "accent" in data:
+        if not isinstance(data["accent"], str) or not ACCENT_PATTERN.match(data["accent"]):
+            return jsonify({"error": "Pick a valid accent color."}), 400
+        updates["accent"] = data["accent"].lower()
+
+    plain_fields = {
+        "pronouns": ("pronouns", MAX_PRONOUNS),
+        "location": ("location", MAX_LOCATION),
+        "statusEmoji": ("status_emoji", MAX_STATUS_EMOJI),
+        "statusText": ("status_text", MAX_STATUS_TEXT),
+        "nowSong": ("now_song", MAX_NOW_PLAYING),
+        "nowArtist": ("now_artist", MAX_NOW_PLAYING),
+    }
+    for key, (field, limit) in plain_fields.items():
+        if key in data:
+            updates[field] = clean_text(data[key], limit)
+
+    if "link" in data:
+        link = clean_text(data["link"], MAX_LINK)
+        if link and not LINK_PATTERN.match(link):
+            return jsonify({"error": "Links need to start with http:// or https://"}), 400
+        updates["link"] = link
+
+    if "interests" in data:
+        raw = data["interests"] if isinstance(data["interests"], list) else []
+        cleaned = []
+        for item in raw:
+            tag = clean_text(item, MAX_INTEREST_LENGTH).lstrip("#").strip()
+            if tag and tag.lower() not in [t.lower() for t in cleaned]:
+                cleaned.append(tag)
+            if len(cleaned) >= MAX_INTERESTS:
+                break
+        updates["interests"] = cleaned
+
+    user.update(updates)
     return jsonify(user_public_info(user))
+
+
+@app.route("/api/users/<username>", methods=["GET"])
+def get_user_profile(username):
+    """
+    Someone's profile page data. Any signed-in user can open any profile.
+    Everyone sees the profile fields and PUBLIC events. Only the owner
+    also gets privateEvents back.
+    """
+    viewer = get_logged_in_user()
+    if not viewer:
+        return jsonify({"error": "Not signed in."}), 401
+
+    target = find_user(username)
+    if not target:
+        return jsonify({"error": "User not found."}), 404
+
+    is_self = target["username"].lower() == viewer["username"].lower()
+    owned = [e for e in events if e["owner"].lower() == target["username"].lower()]
+
+    public_events = sorted(
+        [e for e in owned if e["visibility"] == "public"],
+        key=lambda e: (e["date"], e.get("start_time", "")),
+    )
+
+    info = user_public_info(target)
+    info["isSelf"] = is_self
+    info["stats"] = {
+        "events": len([e for e in owned if e.get("cloned_from") is None]),
+        "publicEvents": len(public_events),
+        "comments": len([c for c in comments if c["author"].lower() == target["username"].lower()]),
+    }
+    info["publicEvents"] = [profile_event_view(e) for e in public_events]
+
+    if is_self:
+        private_events = sorted(
+            # copies of Global posts you added are calendar bookkeeping,
+            # not "your" private events
+            [e for e in owned if e["visibility"] == "local" and e.get("cloned_from") is None],
+            key=lambda e: (e["date"], e.get("start_time", "")),
+        )
+        info["privateEvents"] = [profile_event_view(e) for e in private_events]
+
+    return jsonify(info)
 
 
 @app.route("/api/events", methods=["GET"])
@@ -430,11 +612,11 @@ def get_events():
     if mode == "global":
         matching_events = [e for e in events if e["visibility"] == "global"]
     else:
-        # only your private calendar records - your Global posts are
+        # your own calendar: private + public events. Your Global posts are
         # represented here by their own local copy, never the post itself
         matching_events = [
             e for e in events
-            if e["owner"].lower() == username.lower() and e["visibility"] == "local"
+            if e["owner"].lower() == username.lower() and e["visibility"] in CALENDAR_VISIBILITIES
         ]
 
     if year:
@@ -494,7 +676,14 @@ def add_event():
     title = clean_text(data.get("title", ""), MAX_TITLE)
     description = clean_text(data.get("description", ""), MAX_DESCRIPTION)
     date = data.get("date", "")
-    visibility = "global" if data.get("visibility") == "global" else "local"
+
+    # "local" (alias "private"), "public" or "global". Anything else
+    # falls back to private, the safest default.
+    visibility = data.get("visibility")
+    if visibility == "private":
+        visibility = "local"
+    if visibility not in ("local", "public", "global"):
+        visibility = "local"
 
     color = data.get("color")
     if color not in EVENT_COLORS:
@@ -541,6 +730,7 @@ def add_event():
                     "error": f"You've hit your Global post limit ({COMMUNITY_PLUS_GLOBAL_LIMIT}). Remove one to add another."
                 }), 403
     else:
+        # private and public both live on your calendar, so both use the cap
         if role != "admin":
             limit = COMMUNITY_LOCAL_LIMIT if role == "community" else COMMUNITY_PLUS_LOCAL_LIMIT
             if local_event_count(user["username"]) >= limit:
@@ -579,6 +769,41 @@ def add_event():
     return jsonify(response)
 
 
+@app.route("/api/events/<int:event_id>/visibility", methods=["PUT"])
+def set_event_visibility(event_id):
+    """
+    Flip one of your own calendar events between Private and Public
+    without re-creating it. Global posts aren't switchable here - Global
+    is its own thing.
+    """
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    event = find_event(event_id)
+    if not event or event["owner"].lower() != user["username"].lower():
+        return jsonify({"error": "Event not found."}), 404
+
+    if event["visibility"] not in CALENDAR_VISIBILITIES:
+        return jsonify({"error": "Global posts can't be switched to public or private."}), 400
+
+    new_visibility = body().get("visibility")
+    if new_visibility == "private":
+        new_visibility = "local"
+    if new_visibility not in CALENDAR_VISIBILITIES:
+        return jsonify({"error": "Choose public or private."}), 400
+
+    # a copy of somebody else's Global post keeps its link to that post,
+    # so it stays private - it isn't yours to publish
+    if event.get("cloned_from") is not None and new_visibility == "public":
+        return jsonify({"error": "Events you added from Global can't be made public."}), 400
+
+    event["visibility"] = new_visibility
+    response = dict(event)
+    response["isMine"] = True
+    return jsonify(response)
+
+
 @app.route("/api/events/<int:event_id>/add", methods=["POST"])
 def add_to_my_calendar(event_id):
     user = get_logged_in_user()
@@ -593,7 +818,8 @@ def add_to_my_calendar(event_id):
 
     # Only Global posts are addable. Without this check anyone could copy
     # a stranger's private event - title, description, cover and all - just
-    # by guessing its id.
+    # by guessing its id. (Public events are viewable on profiles, but
+    # they're not a Global feed, so they aren't addable either.)
     if source_event["visibility"] != "global":
         return jsonify({"error": "That event isn't posted to Global."}), 403
 
@@ -642,11 +868,15 @@ def delete_event(event_id):
 
 @app.route("/api/events/<int:event_id>/comments", methods=["GET"])
 def get_comments(event_id):
-    username = get_logged_in_username()
-    if not username:
+    user = get_logged_in_user()
+    if not user:
         return jsonify({"error": "Not signed in."}), 401
 
-    matching_comments = [c for c in comments if c["event_id"] == event_id]
+    event = find_event(event_id)
+    if not event or not can_see_event(user, event):
+        return jsonify({"error": "Event not found."}), 404
+
+    matching_comments = [comment_view(c) for c in comments if c["event_id"] == event_id]
     return jsonify(matching_comments)
 
 
@@ -654,30 +884,54 @@ def get_comments(event_id):
 def add_comment(event_id):
     global next_comment_id
 
-    username = get_logged_in_username()
-    if not username:
+    user = get_logged_in_user()
+    if not user:
         return jsonify({"error": "Not signed in."}), 401
 
-    if not find_event(event_id):
+    event = find_event(event_id)
+    if not event or not can_see_event(user, event):
         return jsonify({"error": "Event not found."}), 404
 
-    text = clean_text(body().get("text", ""), MAX_COMMENT)
+    data = body()
+    text = clean_text(data.get("text", ""), MAX_COMMENT)
 
     if not text:
         return jsonify({"error": "Comment can't be empty."}), 400
 
+    # Replies. Only one level deep: reply to a reply and it hangs off the
+    # same top-level comment, with reply_to remembering who you answered.
+    parent_id = None
+    reply_to = None
+    requested_parent = data.get("parentId")
+
+    if requested_parent is not None:
+        if not isinstance(requested_parent, int) or isinstance(requested_parent, bool):
+            return jsonify({"error": "That comment can't be replied to."}), 400
+
+        parent = next(
+            (c for c in comments if c["id"] == requested_parent and c["event_id"] == event_id),
+            None,
+        )
+        if not parent:
+            return jsonify({"error": "The comment you're replying to is gone."}), 404
+
+        parent_id = parent["parent_id"] if parent.get("parent_id") is not None else parent["id"]
+        reply_to = parent["author"]
+
     new_comment = {
         "id": next_comment_id,
         "event_id": event_id,
-        "author": username,
+        "author": user["username"],
         "text": text,
         "edited": False,
+        "parent_id": parent_id,
+        "reply_to": reply_to,
         "created_at": now_in_ms(),
     }
     next_comment_id += 1
 
     comments.append(new_comment)
-    return jsonify(new_comment)
+    return jsonify(comment_view(new_comment))
 
 
 @app.route("/api/events/<int:event_id>/comments/<int:comment_id>", methods=["PUT"])
@@ -701,7 +955,7 @@ def edit_comment(event_id, comment_id):
     comment["text"] = text
     comment["edited"] = True
 
-    return jsonify(comment)
+    return jsonify(comment_view(comment))
 
 
 @app.route("/api/events/<int:event_id>/comments/<int:comment_id>", methods=["DELETE"])
@@ -709,7 +963,7 @@ def delete_comment(event_id, comment_id):
     """
     The comment's own author can always delete it. The event's poster or
     an admin can also delete ANY comment on that event, same as event
-    moderation elsewhere.
+    moderation elsewhere. Deleting a comment also deletes its replies.
     """
     user = get_logged_in_user()
     if not user:
@@ -730,7 +984,10 @@ def delete_comment(event_id, comment_id):
     if not (is_admin or is_event_owner or is_comment_author):
         return jsonify({"error": "You don't have permission to delete that comment."}), 403
 
-    comments.remove(comment)
+    comments[:] = [
+        c for c in comments
+        if c["id"] != comment["id"] and c.get("parent_id") != comment["id"]
+    ]
     return jsonify({"ok": True})
 
 
@@ -746,11 +1003,16 @@ def get_stats():
         if e["owner"].lower() == username.lower() and e.get("cloned_from") is None
     ])
 
+    public_count = len([
+        e for e in events
+        if e["owner"].lower() == username.lower() and e["visibility"] == "public"
+    ])
+
     comment_count = len([
         c for c in comments if c["author"].lower() == username.lower()
     ])
 
-    return jsonify({"events": event_count, "comments": comment_count})
+    return jsonify({"events": event_count, "publicEvents": public_count, "comments": comment_count})
 
 
 @app.route("/api/admin/users", methods=["GET"])
@@ -798,6 +1060,7 @@ def admin_delete_user(current_user, username):
         cascade_delete_event(event)
 
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
+    prune_orphan_replies()
 
     return jsonify({"ok": True})
 
