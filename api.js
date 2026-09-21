@@ -93,12 +93,13 @@ const Planora = (() => {
     async function getCurrentUser() {
         try {
             const user = await apiRequest("/api/me");
-            // avatarImage can be ~200KB; the offline identity cache doesn't
-            // need it (nothing reads it from the cached copy but the name/
-            // role/etc used for the "you're offline" experience), and
-            // keeping it out leaves headroom in localStorage's ~5MB budget
-            // for the event cache in PlanoraData.getEvents below.
-            const { avatarImage, ...cacheable } = user;
+            // avatarImage and bannerImage can each be ~200KB; the offline
+            // identity cache doesn't need them (nothing reads them from the
+            // cached copy but the name/role/etc used for the "you're
+            // offline" experience), and keeping them out leaves headroom in
+            // localStorage's ~5MB budget for the event cache in
+            // PlanoraData.getEvents below.
+            const { avatarImage, bannerImage, ...cacheable } = user;
             try { localStorage.setItem("planora_cached_me", JSON.stringify(cacheable)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
             return user;
         } catch (err) {
@@ -128,6 +129,12 @@ const Planora = (() => {
 
     async function updateProfile(updates) {
         return apiRequest("/api/me", { method: "PUT", body: updates });
+    }
+
+    /* Someone's public profile: their details, stats and public events.
+       Yours also includes your private events. Used by profile.js. */
+    async function getProfile(username) {
+        return apiRequest(`/api/users/${encodeURIComponent(username)}`);
     }
 
     /* Shared by the profile-picture picker (profile.js) and the event-cover
@@ -174,6 +181,7 @@ const Planora = (() => {
         getCurrentUser,
         requireAuth,
         updateProfile,
+        getProfile,
         resizeImage
     };
 
@@ -219,6 +227,11 @@ const PlanoraData = (() => {
         return apiRequest("/api/events", { method: "POST", body: event });
     }
 
+    // Flip one of your own calendar events between "private" and "public".
+    async function setEventVisibility(eventId, visibility) {
+        return apiRequest(`/api/events/${eventId}/visibility`, { method: "PUT", body: { visibility } });
+    }
+
     async function addToMyCalendar(eventId) {
         return apiRequest(`/api/events/${eventId}/add`, { method: "POST" });
     }
@@ -238,8 +251,11 @@ const PlanoraData = (() => {
         return apiRequest(`/api/events/${eventId}/comments`);
     }
 
-    async function addComment(eventId, text) {
-        return apiRequest(`/api/events/${eventId}/comments`, { method: "POST", body: { text } });
+    // parentId is optional: pass a comment's id to reply to it.
+    async function addComment(eventId, text, parentId = null) {
+        const body = { text };
+        if (parentId !== null && parentId !== undefined) body.parentId = parentId;
+        return apiRequest(`/api/events/${eventId}/comments`, { method: "POST", body });
     }
 
     async function deleteComment(eventId, commentId) {
@@ -257,6 +273,7 @@ const PlanoraData = (() => {
     return {
         getEvents,
         addEvent,
+        setEventVisibility,
         addToMyCalendar,
         deleteEvent,
         adminDeleteEvent,
