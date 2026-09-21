@@ -93,7 +93,13 @@ const Planora = (() => {
     async function getCurrentUser() {
         try {
             const user = await apiRequest("/api/me");
-            try { localStorage.setItem("planora_cached_me", JSON.stringify(user)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
+            // avatarImage can be ~200KB; the offline identity cache doesn't
+            // need it (nothing reads it from the cached copy but the name/
+            // role/etc used for the "you're offline" experience), and
+            // keeping it out leaves headroom in localStorage's ~5MB budget
+            // for the event cache in PlanoraData.getEvents below.
+            const { avatarImage, ...cacheable } = user;
+            try { localStorage.setItem("planora_cached_me", JSON.stringify(cacheable)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
             return user;
         } catch (err) {
             // Only fall back to the cached identity when we couldn't reach
@@ -124,6 +130,41 @@ const Planora = (() => {
         return apiRequest("/api/me", { method: "PUT", body: updates });
     }
 
+    /* Shared by the profile-picture picker (profile.js) and the event-cover
+       picker (homepage.js): shrinks a chosen image to at most `maxWidth`
+       and returns a JPEG data URL, so uploads stay small and fast no
+       matter what the source photo's original size was. */
+    function resizeImage(file, maxWidth = 900, quality = 0.75) {
+        return new Promise((resolve, reject) => {
+            if (!file.type.startsWith("image/")) {
+                reject(new Error("That file isn't an image."));
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("Couldn't read that file."));
+            reader.onload = () => {
+                const img = new Image();
+                img.onerror = () => reject(new Error("Couldn't open that image."));
+                img.onload = () => {
+                    const scale = Math.min(1, maxWidth / img.width);
+                    const canvas = document.createElement("canvas");
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+
+                    const ctx = canvas.getContext("2d");
+                    ctx.fillStyle = "#131313"; // transparent PNGs land on the page color
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    resolve(canvas.toDataURL("image/jpeg", quality));
+                };
+                img.src = reader.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
     return {
         escapeHTML,
         passwordStrength,
@@ -132,7 +173,8 @@ const Planora = (() => {
         logout,
         getCurrentUser,
         requireAuth,
-        updateProfile
+        updateProfile,
+        resizeImage
     };
 
 })();
