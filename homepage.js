@@ -1756,15 +1756,31 @@ function buildAddEventUI() {
         <div class="event-form-box">
             <div class="form-title">Create event</div>
 
+            <div class="event-preview" id="eventPreview">
+                <div class="preview-cover" id="previewCover"></div>
+                <div class="preview-info">
+                    <div class="preview-title-row">
+                        <span class="preview-title" id="previewTitle">Your event</span>
+                        <span class="preview-vis-badge" id="previewVisBadge"></span>
+                    </div>
+                    <div class="preview-date" id="previewDate">Pick a date</div>
+                    <div class="preview-desc" id="previewDesc"></div>
+                </div>
+            </div>
+
             <div class="event-primary-row">
                 <div class="event-primary-field">
-                    <input type="text" id="eventTitle" placeholder="Event name" maxlength="80">
+                    <div class="field-label">Event name</div>
+                    <input type="text" id="eventTitle" placeholder="What's happening?" maxlength="80">
                 </div>
                 <div class="event-primary-field">
                     <div class="field-label">Date</div>
                     <input type="date" id="eventDate">
                 </div>
             </div>
+
+            <div class="field-label">Description <span class="optional-tag">optional</span></div>
+            <textarea id="eventDescription" placeholder="Add some details..." maxlength="400"></textarea>
 
             <div class="field-label">Who can see this?</div>
             <div class="visibility-toggle" id="visibilityToggle" role="radiogroup" aria-label="Who can see this event">
@@ -1778,11 +1794,9 @@ function buildAddEventUI() {
             </div>
 
             <details class="event-more">
-                <summary>More options <span class="event-more-hint">description, time, image, icon, color</span></summary>
+                <summary>More options <span class="event-more-hint">time, image, icon, color</span></summary>
 
                 <div class="event-more-body">
-                    <textarea id="eventDescription" placeholder="Description" maxlength="400"></textarea>
-
                     <div class="field-label">Ends (optional — leave blank for a single day)</div>
                     <input type="date" id="eventEndDate">
 
@@ -1816,6 +1830,72 @@ function buildAddEventUI() {
     `;
     document.body.appendChild(eventForm);
 
+    // === LIVE PREVIEW ===
+    // Mirrors buildEventCard's cover/date formatting at a smaller scale,
+    // updated on every relevant input instead of waiting for a save.
+    const previewCover = eventForm.querySelector("#previewCover");
+    const previewTitle = eventForm.querySelector("#previewTitle");
+    const previewVisBadge = eventForm.querySelector("#previewVisBadge");
+    const previewDate = eventForm.querySelector("#previewDate");
+    const previewDesc = eventForm.querySelector("#previewDesc");
+
+    const PREVIEW_VIS_LABEL = { private: "", public: "PUBLIC", global: "GLOBAL" };
+
+    function previewDateLabel() {
+        const date = document.getElementById("eventDate").value;
+        if (!date) return "Pick a date";
+
+        const endDate = document.getElementById("eventEndDate").value;
+        const startTime = document.getElementById("eventStartTime").value;
+        const endTime = document.getElementById("eventEndTime").value;
+
+        let label;
+        if (endDate && endDate !== date) {
+            const start = parseEventDate(date);
+            const end = parseEventDate(endDate);
+            const days = Math.round((end - start) / 86400000) + 1;
+            const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            const endLabel = end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+            label = `${startLabel} – ${endLabel} · ${days} days`;
+        } else {
+            label = formatEventDate(date);
+        }
+
+        if (startTime) {
+            label += " · " + (endTime ? `${formatTime(startTime)} – ${formatTime(endTime)}` : formatTime(startTime));
+        }
+
+        return label;
+    }
+
+    function updateEventPreview() {
+        const title = document.getElementById("eventTitle").value.trim();
+        const description = document.getElementById("eventDescription").value.trim();
+
+        previewTitle.textContent = title || "Your event";
+        previewTitle.classList.toggle("placeholder", !title);
+
+        previewDate.textContent = previewDateLabel();
+        previewDate.classList.toggle("placeholder", !document.getElementById("eventDate").value);
+
+        previewDesc.textContent = description;
+        previewDesc.style.display = description ? "" : "none";
+
+        previewVisBadge.textContent = PREVIEW_VIS_LABEL[newEventVisibility] || "";
+        previewVisBadge.style.display = PREVIEW_VIS_LABEL[newEventVisibility] ? "" : "none";
+
+        previewCover.style.backgroundColor = `${selectedEventColor}26`;
+        if (selectedEventImage) {
+            previewCover.classList.add("has-image");
+            previewCover.style.setProperty("--cover-image", `url("${selectedEventImage}")`);
+            previewCover.textContent = "";
+        } else {
+            previewCover.classList.remove("has-image");
+            previewCover.style.removeProperty("--cover-image");
+            previewCover.textContent = selectedEventIcon;
+        }
+    }
+
     const iconRow = eventForm.querySelector("#eventIconRow");
     EVENT_ICONS.forEach(icon => {
         const btn = document.createElement("button");
@@ -1826,6 +1906,7 @@ function buildAddEventUI() {
             selectedEventIcon = icon;
             iconRow.querySelectorAll(".event-icon-dot").forEach(el => el.classList.remove("selected"));
             btn.classList.add("selected");
+            updateEventPreview();
         });
         iconRow.appendChild(btn);
     });
@@ -1840,6 +1921,7 @@ function buildAddEventUI() {
             selectedEventColor = color;
             colorRow.querySelectorAll(".event-color-dot").forEach(el => el.classList.remove("selected"));
             dot.classList.add("selected");
+            updateEventPreview();
         });
         colorRow.appendChild(dot);
     });
@@ -1854,6 +1936,7 @@ function buildAddEventUI() {
         imagePreview.classList.toggle("show", Boolean(dataUrl));
         removeImageBtn.style.display = dataUrl ? "inline-flex" : "none";
         imageInput.value = ""; // lets you pick the same file twice in a row
+        updateEventPreview();
     }
 
     imageInput.addEventListener("change", async () => {
@@ -1880,6 +1963,7 @@ function buildAddEventUI() {
             option.setAttribute("aria-checked", String(isOn));
         });
         visibilityHint.textContent = VISIBILITY_HINTS[value];
+        updateEventPreview();
     }
 
     visibilityOptions.forEach(option => {
@@ -1893,6 +1977,14 @@ function buildAddEventUI() {
         eventForm.querySelector('.vis-option[data-visibility="global"]').style.display = "none";
         eventForm.querySelector("#visibilityLockedHint").style.display = "block";
     }
+
+    // Everything the preview reads from directly
+    ["eventTitle", "eventDescription", "eventDate", "eventEndDate", "eventStartTime", "eventEndTime"]
+        .forEach(id => {
+            const field = document.getElementById(id);
+            field.addEventListener("input", updateEventPreview);
+            field.addEventListener("change", updateEventPreview);
+        });
 
     addButton.addEventListener("click", () => {
         eventForm.classList.add("show");
@@ -1910,6 +2002,8 @@ function buildAddEventUI() {
         selectedEventColor = EVENT_COLORS[0];
         iconRow.querySelectorAll(".event-icon-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
         colorRow.querySelectorAll(".event-color-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
+
+        updateEventPreview();
     });
 
     document.getElementById("cancelEvent").addEventListener("click", () => {
