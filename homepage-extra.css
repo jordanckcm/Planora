@@ -1875,3 +1875,207 @@ body.mode-timeline {
     }
 
 }
+
+/* =========================================================
+   PLANORA — PUBLIC/PRIVATE TOGGLE, PROFILE LINKS, REPLIES
+   Paste at the very bottom of homepage-extra.css
+   (after the "MODE SWITCH STYLES" block).
+   Uses the same --accent variable as the mode colors, so the
+   toggle turns green / blue / purple with the current mode.
+========================================================= */
+
+
+/* --- Private / Public / Global toggle in the + form --- */
+
+.visibility-toggle {
+    display: flex;
+    gap: 4px;
+
+    padding: 4px;
+
+    background: rgb(19, 19, 19);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 20px;
+}
+
+.vis-option {
+    flex: 1;
+    height: 32px;
+
+    border: none;
+    border-radius: 16px;
+
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+
+    font-family: "VHS";
+    font-size: 11px;
+
+    cursor: pointer;
+
+    transition: background 0.2s ease, color 0.2s ease;
+}
+
+.vis-option:hover {
+    color: white;
+}
+
+.vis-option.active {
+    background: rgba(var(--accent), 0.28);
+    color: white;
+}
+
+.vis-hint {
+    min-height: 14px;
+
+    margin: 8px 6px 14px;
+
+    font-family: "VHS";
+    font-size: 10.5px;
+    line-height: 1.4;
+
+    color: rgba(255, 255, 255, 0.5);
+}
+
+
+/* --- Event cards: host link + Public marker --- */
+
+a.event-owner-label {
+    text-decoration: none;
+    cursor: pointer;
+}
+
+a.event-owner-label:hover {
+    text-decoration: underline;
+}
+
+.event-avatar:focus-visible {
+    outline: 2px solid rgba(var(--accent), 0.9);
+    outline-offset: 2px;
+}
+
+.event-visibility-badge {
+    padding: 2px 7px;
+
+    border-radius: 20px;
+    border: 1px solid rgba(var(--accent), 0.5);
+
+    color: color-mix(in srgb, rgb(var(--accent)) 55%, white);
+
+    font-family: "VHS";
+    font-size: 8.5px;
+    letter-spacing: 0.06em;
+}
+
+
+/* --- Comments: avatar, profile links, replies --- */
+
+.comment-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    width: 24px;
+    height: 24px;
+
+    border-radius: 50%;
+
+    font-family: "VHS";
+    font-size: 10px;
+    color: white;
+    text-decoration: none;
+}
+
+.comment-reply .comment-avatar {
+    width: 20px;
+    height: 20px;
+
+    font-size: 9px;
+}
+
+.comment.comment-reply {
+    margin-left: 30px;
+}
+
+a.comment-author {
+    text-decoration: none;
+}
+
+a.comment-author:hover,
+a.comment-mention:hover {
+    text-decoration: underline;
+}
+
+.comment-mention {
+    margin-right: 2px;
+
+    color: color-mix(in srgb, rgb(var(--accent)) 75%, white);
+    text-decoration: none;
+}
+
+.comment-reply-button {
+    display: inline;
+
+    margin-left: 8px;
+    padding: 0;
+
+    border: none;
+    background: none;
+
+    color: rgba(255, 255, 255, 0.35);
+
+    font-family: "VHS";
+    font-size: 9px;
+
+    cursor: pointer;
+}
+
+.comment-reply-button:hover {
+    color: white;
+}
+
+
+/* --- "Replying to @name" strip above the comment box --- */
+
+.reply-banner {
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+
+    margin-bottom: 8px;
+    padding: 6px 8px 6px 14px;
+
+    background: rgba(var(--accent), 0.12);
+    border: 1px solid rgba(var(--accent), 0.35);
+    border-radius: 20px;
+
+    font-family: "VHS";
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.75);
+}
+
+.reply-banner.show {
+    display: flex;
+}
+
+.reply-banner-cancel {
+    width: 20px;
+    height: 20px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: transparent;
+    color: rgba(255, 255, 255, 0.55);
+
+    font-size: 15px;
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+.reply-banner-cancel:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: white;
+}
