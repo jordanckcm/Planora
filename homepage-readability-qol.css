@@ -1,0 +1,347 @@
+/* =========================================================
+   PLANORA — READABILITY + QOL PASS
+   Paste at the very bottom of homepage-extra.css, AFTER the
+   "homepage-social-additions.css" block you pasted last time.
+
+   WHAT THIS DOES
+   1. Swaps the decorative VHS font out of anything you have to
+      actually read at length — comments, replies, descriptions,
+      buttons, inputs — for a clean system UI font, the same
+      family Discord/Instagram fall back to on every platform.
+      VHS/Gotham/StarShield stay exactly where they add
+      personality: the giant year, month headers, stat numbers,
+      the "Create event" title.
+   2. Restyles comments Discord-style: bigger avatar, name +
+      timestamp on their own line, message text below it, a
+      hover highlight per row, and a left rule marking replies
+      instead of just an indent.
+   3. Small QoL touches to match: a growing comment box, a
+      character counter, a "scroll to top" button, and a
+      posting/creating disabled state on the two forms
+      (homepage.js already drives these — this just styles them).
+========================================================= */
+
+:root {
+    /* Same stack Discord and Instagram fall back to on every OS when
+       their own webfont isn't loaded — this IS that fallback, just
+       used on purpose instead of by accident. */
+    --font-ui: "gg sans", "Inter", -apple-system, BlinkMacSystemFont,
+               "Segoe UI", Roboto, Helvetica, Arial, sans-serif,
+               "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+
+/* =========================
+   1. FONT SWAP
+   Same selectors homepage.css / homepage-extra.css / the social
+   additions used to set font-family: "VHS" (or nothing, inheriting
+   it from the page-wide `* { font-family: "VHS" }`). Redeclaring
+   them here — after those files load — wins on source order.
+   Gotham/StarShield selectors are deliberately left out, so
+   headings and the year keep their look.
+========================= */
+
+* {
+    font-family: var(--font-ui);
+}
+
+.event-count,
+.event-title,
+.event-date,
+.event-owner-label,
+.event-description,
+.event-going-count,
+.event-form input,
+.event-form textarea,
+.form-buttons button,
+.field-label,
+.no-events,
+.toast,
+.role-badge,
+.event-action-btn,
+.event-author,
+#eventTitle,
+.comment,
+.comment-body,
+.comment-text,
+.comment-edited,
+.comment-dropdown-item,
+.comment-edit-input,
+.comment-edit-save,
+.comment-edit-cancel,
+.comment-author,
+.comment-time,
+.comment-empty,
+.comment-input,
+.comment-submit,
+.comment-counter,
+.comment-reply-button,
+.comment-mention,
+.visibility-row,
+.visibility-locked-hint,
+.vis-option,
+.vis-hint,
+.event-visibility-badge,
+.reply-banner,
+.timeline-title,
+.timeline-date,
+.image-pick-button,
+.image-remove,
+.profile-dropdown-item {
+    font-family: var(--font-ui);
+}
+
+/* A clean UI font reads fine several sizes smaller than a display
+   font does, but VHS was being propped up with slightly larger
+   sizes to stay legible. A couple of spots can come back down/up
+   to what actually looks balanced now. */
+.event-title {
+    font-size: 15px;
+    font-weight: 600;
+}
+
+.event-description {
+    font-size: 12.5px;
+    line-height: 1.5;
+}
+
+#eventTitle {
+    font-size: 15px;
+}
+
+
+/* =========================
+   2. COMMENTS — DISCORD LAYOUT
+   Avatar left, a name+timestamp row, message text on its own
+   line below. Replaces the previous single inline line.
+========================= */
+
+.comment-list {
+    gap: 2px;
+}
+
+.comment {
+    align-items: flex-start;
+    gap: 12px;
+
+    padding: 6px 8px;
+    margin: 0 -8px;
+    border-radius: 8px;
+
+    font-size: 13.5px;
+    line-height: 1.5;
+
+    transition: background 0.12s ease;
+}
+
+.comment:hover {
+    background: rgba(255, 255, 255, 0.035);
+}
+
+/* the ⋮ menu was positioned by normal flow before; now that .comment
+   hover has padding of its own, nudge it back to align with the text */
+.comment-menu-button-wrap {
+    order: 3;
+    margin-left: auto;
+    align-self: flex-start;
+}
+
+.comment-avatar {
+    width: 34px;
+    height: 34px;
+
+    font-size: 13px;
+}
+
+.comment-reply .comment-avatar {
+    width: 26px;
+    height: 26px;
+
+    font-size: 10.5px;
+}
+
+/* everything after the avatar stacks into two lines instead of one */
+.comment-body {
+    display: block;
+    flex: 1;
+    min-width: 0;
+}
+
+.comment-author {
+    font-size: 13px;
+    font-weight: 600;
+    color: white;
+    margin-right: 8px;
+}
+
+.comment-time {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.38);
+}
+
+.comment-text {
+    display: block;
+    margin-top: 2px;
+    color: rgba(255, 255, 255, 0.82);
+}
+
+.comment-edited {
+    display: inline;
+    margin-left: 6px;
+    font-size: 10.5px;
+}
+
+.comment-reply-button {
+    display: inline-block;
+    margin-top: 3px;
+    margin-left: 0;
+    opacity: 0.7;
+}
+
+.comment-reply-button:hover {
+    opacity: 1;
+}
+
+/* replies get a connecting rule instead of relying on indent alone —
+   easier to trace which top-level comment a reply belongs to at a
+   glance, the same trick Discord/Slack threads use */
+.comment.comment-reply {
+    margin-left: 0;
+    padding-left: 46px;
+    position: relative;
+}
+
+.comment.comment-reply::before {
+    content: "";
+    position: absolute;
+    left: 25px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+
+/* =========================
+   3. COMMENT COMPOSER
+   Auto-growing textarea + character counter, replacing the old
+   single-line input. homepage.js sizes/disables it; this just
+   makes that visible.
+========================= */
+
+.comment-form {
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.comment-input-row {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+
+textarea.comment-input {
+    display: block;
+    width: 100%;
+
+    min-height: 34px;
+    max-height: 120px;
+
+    padding: 8px 44px 8px 14px;
+
+    border-radius: 16px;
+
+    resize: none;
+    overflow-y: hidden;
+
+    line-height: 1.4;
+}
+
+.comment-counter {
+    position: absolute;
+    right: 12px;
+    bottom: 8px;
+
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.35);
+
+    pointer-events: none;
+}
+
+.comment-counter.low {
+    color: #e08b86;
+}
+
+.comment-submit:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.comment-submit:disabled:hover {
+    background: rgb(72, 156, 72);
+}
+
+
+/* =========================
+   SCROLL-TO-TOP BUTTON
+   Mirrors the + button on the opposite corner, only shows once
+   you've scrolled down a bit.
+========================= */
+
+.scroll-top-button {
+    position: fixed;
+    left: 25px;
+    bottom: 25px;
+    z-index: 200;
+
+    width: 46px;
+    height: 46px;
+
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+
+    background: rgba(30, 30, 30, 0.9);
+    backdrop-filter: blur(6px);
+    color: white;
+
+    font-size: 18px;
+    line-height: 1;
+
+    cursor: pointer;
+
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.35);
+
+    opacity: 0;
+    transform: translateY(12px);
+    pointer-events: none;
+
+    transition: opacity 0.2s ease, transform 0.2s ease, background 0.2s ease;
+}
+
+.scroll-top-button.show {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+}
+
+.scroll-top-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* stack above the add-event button's hide/show animation cleanly on
+   narrow screens where both sit near the bottom edge */
+@media (max-width: 600px) {
+    .scroll-top-button {
+        left: 18px;
+        bottom: 18px;
+        width: 42px;
+        height: 42px;
+        font-size: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .scroll-top-button {
+        transition: opacity 0.2s ease;
+    }
+}
