@@ -1052,3 +1052,173 @@ body.mode-global {
     }
 
 }
+
+/* =========================================================
+   TIMELINE / ROADMAP VIEW
+   Paste at the bottom of homepage-extra.css.
+   A chronological list of your events for the selected year:
+   one dot per event (in the event's color), joined by a line.
+   Hidden unless the Timeline tab is active.
+========================================================= */
+
+/* --- Timeline tab in the top bar (matches Local / Global) --- */
+
+.timeline-button {
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.timeline-button.mode-active {
+    background: rgb(72, 156, 72);
+    border-color: rgb(72, 156, 72);
+}
+
+.timeline-button.mode-active:hover {
+    background: rgb(85, 175, 85);
+}
+
+/* faint purple glow at the top, same idea as the Local (green)
+   and Global (blue) tints */
+body.mode-timeline {
+    background:
+        radial-gradient(ellipse 900px 500px at 50% 0%, rgba(154, 86, 201, 0.10), transparent 65%),
+        rgb(19, 19, 19);
+}
+
+
+/* --- The list --- */
+
+.timeline-container {
+    display: none;
+
+    position: relative;
+    z-index: 1;
+
+    width: min(94%, 900px);
+
+    /* extra bottom room so the + button never sits on the last entry */
+    margin: 12px auto 110px;
+}
+
+.timeline-container.active {
+    display: block;
+}
+
+.timeline-entry {
+    display: flex;
+    align-items: stretch;
+    gap: 16px;
+}
+
+/* dot + connecting line */
+
+.timeline-track {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    width: 16px;
+    flex-shrink: 0;
+}
+
+.timeline-dot {
+    width: 14px;
+    height: 14px;
+
+    margin-top: 18px;
+
+    border-radius: 50%;
+
+    /* JS sets the inline `color` to the event's color */
+    background: currentColor;
+
+    /* ring in the page background color so the line looks
+       like it passes behind the dot */
+    box-shadow:
+        0 0 0 4px rgb(19, 19, 19),
+        0 0 12px rgba(255, 255, 255, 0.15);
+
+    flex-shrink: 0;
+}
+
+.timeline-line {
+    flex: 1;
+
+    width: 2px;
+    min-height: 24px;
+
+    margin-top: 4px;
+
+    background: rgba(255, 255, 255, 0.15);
+}
+
+/* no dangling line after the final event */
+.timeline-entry:last-child .timeline-line {
+    display: none;
+}
+
+
+/* --- Event card --- */
+
+.timeline-body {
+    flex: 1;
+    min-width: 0;
+
+    margin-bottom: 14px;
+    padding: 14px 18px;
+
+    color: white;
+
+    background: rgb(27, 27, 27);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+
+    animation: eventAppear 0.25s ease;
+
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.timeline-body:hover {
+    background: rgb(32, 32, 32);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.timeline-title {
+    margin-bottom: 4px;
+
+    font-family: "VHS";
+    font-size: 15px;
+    word-break: break-word;
+}
+
+.timeline-date {
+    margin-top: 6px;
+
+    font-family: "VHS";
+    font-size: 10px;
+
+    opacity: 0.5;
+}
+
+/* brief highlight after jumping here from a card elsewhere */
+.timeline-entry.timeline-highlight .timeline-body {
+    animation: eventHighlightPulse 1.8s ease;
+}
+
+
+/* --- Mobile --- */
+
+@media (max-width: 600px) {
+
+    .timeline-entry {
+        gap: 12px;
+    }
+
+    .timeline-body {
+        padding: 11px 14px;
+    }
+
+    .timeline-title {
+        font-size: 13px;
+    }
+
+}
