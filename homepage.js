@@ -34,6 +34,7 @@ let selectedEventColor = EVENT_COLORS[0];
 let selectedEventIcon = EVENT_ICONS[0];
 let selectedEventImage = "";
 
+
 /* Shrinks a picked image to at most 900px wide and returns a JPEG data URL
    (usually 60-150 KB), so uploads stay small and fast. */
 function resizeImage(file, maxWidth = 900, quality = 0.75) {
@@ -66,6 +67,7 @@ function resizeImage(file, maxWidth = 900, quality = 0.75) {
         reader.readAsDataURL(file);
     });
 }
+
 
 function toast(message, type = "") {
     const stack = document.getElementById("toastStack");
@@ -742,6 +744,7 @@ function renderTimeline(events, query) {
         const body = document.createElement("div");
         body.className = "timeline-body";
         body.style.cursor = "pointer";
+
         if (event.image) {
             body.classList.add("has-image");
             body.style.setProperty("--tl-image", `url("${event.image}")`);
