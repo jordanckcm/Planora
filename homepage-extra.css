@@ -1565,3 +1565,154 @@ body.mode-timeline {
     }
 
 }
+
+/* =========================================================
+   EVENT IMAGES
+   Paste at the very bottom of homepage-extra.css (after the
+   background-and-timeline block).
+========================================================= */
+
+
+/* --- Create-event form: image picker --- */
+
+/* the form is getting tall; let it scroll instead of running off-screen */
+.event-form-box {
+    max-height: 92vh;
+    overflow-y: auto;
+}
+
+.image-picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+
+    margin-bottom: 14px;
+}
+
+.image-pick-button,
+.image-remove {
+    display: inline-flex;
+    align-items: center;
+
+    height: 34px;
+    padding: 0 14px;
+
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 20px;
+
+    background: transparent;
+    color: rgba(255, 255, 255, 0.7);
+
+    font-family: "VHS";
+    font-size: 10px;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.image-pick-button:hover,
+.image-remove:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: white;
+}
+
+.image-remove:hover {
+    background: rgba(182, 69, 63, 0.15);
+    color: #e08b86;
+    border-color: #b6453f;
+}
+
+.image-preview {
+    display: none;
+
+    width: 100%;
+    height: 110px;
+
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+
+    background-size: cover;
+    background-position: center;
+}
+
+.image-preview.show {
+    display: block;
+}
+
+
+/* --- Event cards: thumbnail across the top --- */
+
+.event-cover.has-image {
+    height: 130px;
+
+    /* icon moves to the bottom-left corner of the picture */
+    justify-content: flex-start;
+    align-items: flex-end;
+
+    padding: 0 14px 10px;
+
+    font-size: 20px;
+
+    /* the picture fades into the card color at the bottom */
+    background-image:
+        linear-gradient(to bottom, transparent 45%, rgb(27, 27, 27) 100%),
+        var(--cover-image);
+    background-size: cover;
+    background-position: center;
+}
+
+@media (max-width: 600px) {
+    .event-cover.has-image {
+        height: 110px;
+        padding: 0 12px 8px;
+    }
+}
+
+
+/* --- Timeline cards: image as a faded background --- */
+
+.timeline-body > * {
+    position: relative;
+    z-index: 1;
+}
+
+.timeline-body.has-image {
+    position: relative;
+}
+
+/* image sits behind the text and fades out toward the text side:
+   right-hand cards fade toward the left, left-hand cards toward the right */
+.timeline-body.has-image::after {
+    content: "";
+
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+
+    border-radius: inherit;
+    pointer-events: none;
+
+    background-image: var(--tl-image);
+    background-size: cover;
+    background-position: center;
+
+    opacity: 0.55;
+
+    -webkit-mask-image: linear-gradient(to left, #000 0%, transparent 80%);
+    mask-image: linear-gradient(to left, #000 0%, transparent 80%);
+}
+
+.timeline-entry:nth-child(even) .timeline-body.has-image::after {
+    -webkit-mask-image: linear-gradient(to right, #000 0%, transparent 80%);
+    mask-image: linear-gradient(to right, #000 0%, transparent 80%);
+}
+
+/* on phones every card is left-aligned, so every image fades leftward */
+@media (max-width: 700px) {
+    .timeline-entry:nth-child(even) .timeline-body.has-image::after {
+        -webkit-mask-image: linear-gradient(to left, #000 0%, transparent 80%);
+        mask-image: linear-gradient(to left, #000 0%, transparent 80%);
+    }
+}
