@@ -287,22 +287,37 @@ body { font-family: var(--font-discord); }
 }
 
 .event-day-badge {
+    /* no longer used — the day number was removed from the avatar per
+       request, formatEventWhen's date line covers it */
+    display: none;
+}
+
+.event-main {
+    gap: 16px;   /* was sitting too close to the avatar */
+}
+
+.event-info {
+    margin-left: 2px;
+}
+
+/* Host's @username, mirrors the ⋮ menu on the opposite corner. Both
+   float above the cover/avatar, so the card gets extra top padding to
+   keep the avatar from sitting underneath them. */
+.event {
+    padding-top: 34px;
+}
+
+.event-owner-label {
     position: absolute;
-    bottom: -4px;
-    right: -4px;
-    min-width: 18px;
-    height: 18px;
-    padding: 0 3px;
-    border-radius: 999px;
-    border: 2px solid;               /* color set per-event in JS */
-    background: #141414;
-    color: #eee;
-    font-size: 10px;
-    font-weight: 700;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    line-height: 1;
+    top: 8px;
+    left: 10px;
+    z-index: 3;
+    padding: 4px 9px;
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.45);
+    color: #ddd;
+    font-size: 12px;
+    font-weight: 600;
 }
 
 
@@ -385,5 +400,64 @@ body { font-family: var(--font-discord); }
     .event-icon-row,
     .event-color-row {
         flex-wrap: wrap;
+    }
+}
+
+.event-primary-row {
+    display: block;   /* stacked on mobile - same order as before */
+}
+
+.event-primary-field {
+    display: block;
+}
+
+/* On anything roomier than a phone, the create-event modal shouldn't be
+   a tall mobile sheet stretched vertically — wider and shorter instead,
+   with title/date side by side. */
+@media (min-width: 768px) {
+    .event-form-box {
+        max-width: 620px;
+        width: 90vw;
+        padding: 36px 40px;
+        border-radius: 16px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    }
+
+    .event-primary-row {
+        display: flex;
+        gap: 18px;
+        align-items: flex-start;
+    }
+
+    .event-primary-field {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .event-more-body {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 4px 20px;
+    }
+
+    /* full-width inside the 2-column grid rather than one per cell */
+    .event-more-body textarea,
+    .event-more-body .field-label,
+    .event-more-body .time-grid,
+    .event-more-body .image-picker,
+    .event-more-body .event-icon-row,
+    .event-more-body .event-color-row {
+        grid-column: 1 / -1;
+    }
+
+    .event-icon-dot,
+    .event-color-dot {
+        width: 34px;
+        height: 34px;
+    }
+
+    .form-buttons {
+        justify-content: flex-end;
+        gap: 12px;
     }
 }
