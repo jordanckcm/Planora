@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Planora</title>
+    <title>Profile · Planora</title>
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="profile.css">
     <link rel="stylesheet" href="planora-ui.css">
@@ -16,60 +16,203 @@
         <button class="custom-button logout-button" id="logoutButton">Log out</button>
     </div>
 
-    <main class="profile-shell">
+    <main class="profile-shell" id="profileShell">
 
-        <div class="profile-header">
-            <button class="avatar-big" id="avatarBig"></button>
-            <div class="profile-name" id="displayNameView"></div>
-            <div class="profile-username" id="usernameView"></div>
+        <!-- shown instead of the profile when /profile.html?u=nobody -->
+        <div class="empty-state not-found" id="notFound" hidden>
+            <div class="empty-title">That profile doesn't exist</div>
+            <p>The account may have been deleted, or the link has a typo.</p>
         </div>
 
-        <div class="stat-row">
-            <div class="stat">
-                <div class="stat-value" id="statEvents">0</div>
-                <div class="stat-label">Events</div>
+        <div id="profileContent" hidden>
+
+            <!-- HERO: banner + avatar + identity -->
+            <section class="hero">
+                <div class="hero-banner" id="heroBanner"></div>
+
+                <div class="hero-body">
+                    <div class="hero-top">
+                        <div class="avatar-big" id="avatarBig"></div>
+                        <button class="btn btn-solid edit-button" id="editProfileButton" hidden>Edit profile</button>
+                    </div>
+
+                    <div class="name-row">
+                        <h1 class="profile-name" id="displayNameView"></h1>
+                        <span class="role-chip" id="roleChip" hidden></span>
+                    </div>
+                    <div class="profile-username">
+                        <span id="usernameView"></span>
+                        <span class="pronouns" id="pronounsView" hidden></span>
+                    </div>
+
+                    <div class="status-pill" id="statusPill" hidden>
+                        <span class="status-emoji" id="statusEmoji"></span>
+                        <span id="statusText"></span>
+                    </div>
+
+                    <p class="profile-bio" id="bioView" hidden></p>
+
+                    <div class="meta-row">
+                        <span class="meta-item" id="locationView" hidden></span>
+                        <a class="meta-item meta-link" id="linkView" target="_blank" rel="noopener noreferrer nofollow" hidden></a>
+                        <span class="meta-item" id="joinedView"></span>
+                    </div>
+
+                    <div class="chip-row" id="interestChips"></div>
+                </div>
+            </section>
+
+            <!-- STATS -->
+            <div class="stat-row">
+                <div class="stat">
+                    <div class="stat-value" id="statPublic">0</div>
+                    <div class="stat-label">Public events</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="statEvents">0</div>
+                    <div class="stat-label">Events made</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="statComments">0</div>
+                    <div class="stat-label">Comments</div>
+                </div>
             </div>
-            <div class="stat">
-                <div class="stat-value" id="statComments">0</div>
-                <div class="stat-label">Comments</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value" id="statSince">—</div>
-                <div class="stat-label">Member since</div>
-            </div>
+
+            <!-- NOW LISTENING (Spotify-style) -->
+            <section class="now-playing" id="nowPlaying" hidden>
+                <div class="np-art" id="npArt">♪</div>
+                <div class="np-text">
+                    <div class="np-label">Now listening</div>
+                    <div class="np-song" id="npSong"></div>
+                    <div class="np-artist" id="npArtist"></div>
+                </div>
+                <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+            </section>
+
+            <!-- EVENTS -->
+            <section class="events-section">
+                <div class="tab-row" role="tablist">
+                    <button class="tab active" id="tabPublic" role="tab" aria-selected="true">Public</button>
+                    <button class="tab" id="tabPrivate" role="tab" aria-selected="false" hidden>Private</button>
+                </div>
+                <p class="tab-note" id="tabNote"></p>
+                <div class="event-grid" id="eventGrid"></div>
+            </section>
+
         </div>
-
-        <div class="profile-card">
-
-            <div class="card-title">Profile picture</div>
-            <div class="image-picker">
-                <label class="image-pick-button" for="avatarImageInput">Choose photo</label>
-                <input type="file" id="avatarImageInput" accept="image/*" hidden>
-                <button type="button" class="image-remove" id="removeAvatarImage" style="display:none;">Remove</button>
-                <div class="image-preview avatar-preview" id="avatarImagePreview"></div>
-            </div>
-
-            <label class="field-label" for="displayNameInput">Display name</label>
-            <input class="field-input" id="displayNameInput" maxlength="40">
-
-            <label class="field-label" for="bioInput">Bio</label>
-            <textarea class="field-input bio-input" id="bioInput" maxlength="200" placeholder="Say something about yourself..."></textarea>
-
-            <button class="btn btn-solid save-button" id="saveProfile">Save changes</button>
-            <div class="save-note" id="saveNote"></div>
-
-        </div>
-
-        <div class="profile-card">
-            <div class="card-title">Account</div>
-            <p class="account-note">
-                Your account lives on the Python server for now, kept in a plain list, not a real database —
-                restarting the server clears everyone's accounts.
-            </p>
-            <button class="btn btn-red" id="logoutButtonSecondary">Log out of Planora</button>
-        </div>
-
     </main>
+
+
+    <!-- =========================
+         PROFILE EDITOR (slide-in drawer, own profile only)
+    ========================== -->
+    <div class="editor-overlay" id="editorOverlay" hidden></div>
+
+    <aside class="editor" id="editor" aria-hidden="true" aria-label="Edit profile">
+
+        <div class="editor-head">
+            <div class="editor-title">Edit profile</div>
+            <button class="editor-close" id="closeEditor" aria-label="Close editor">×</button>
+        </div>
+
+        <div class="editor-scroll">
+
+            <!-- live preview: updates as you type -->
+            <div class="preview-card" id="previewCard">
+                <div class="preview-banner" id="previewBanner"></div>
+                <div class="preview-body">
+                    <div class="preview-avatar" id="previewAvatar"></div>
+                    <div class="preview-name" id="previewName"></div>
+                    <div class="preview-handle" id="previewHandle"></div>
+                    <div class="preview-status" id="previewStatus"></div>
+                </div>
+            </div>
+
+            <div class="editor-section">
+                <div class="section-title">Images</div>
+
+                <div class="image-row">
+                    <div>
+                        <div class="image-row-label">Profile picture</div>
+                        <div class="image-row-hint">Square works best</div>
+                    </div>
+                    <div class="image-row-actions">
+                        <label class="image-pick-button" for="avatarImageInput">Change</label>
+                        <input type="file" id="avatarImageInput" accept="image/*" hidden>
+                        <button type="button" class="image-remove" id="removeAvatarImage" style="display:none;">Remove</button>
+                    </div>
+                </div>
+
+                <div class="image-row">
+                    <div>
+                        <div class="image-row-label">Banner</div>
+                        <div class="image-row-hint">Wide photos work best. No banner uses your accent color.</div>
+                    </div>
+                    <div class="image-row-actions">
+                        <label class="image-pick-button" for="bannerImageInput">Change</label>
+                        <input type="file" id="bannerImageInput" accept="image/*" hidden>
+                        <button type="button" class="image-remove" id="removeBannerImage" style="display:none;">Remove</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="editor-section">
+                <div class="section-title">Accent color</div>
+                <div class="swatch-row" id="swatchRow"></div>
+                <label class="custom-color">
+                    <input type="color" id="customAccent" value="#c9a227">
+                    <span>Custom color</span>
+                </label>
+            </div>
+
+            <div class="editor-section">
+                <div class="section-title">About you</div>
+
+                <label class="field-label" for="displayNameInput">Display name</label>
+                <input class="field-input" id="displayNameInput" maxlength="40" autocomplete="off">
+
+                <label class="field-label" for="pronounsInput">Pronouns</label>
+                <input class="field-input" id="pronounsInput" maxlength="20" placeholder="she/her, he/him, they/them…" autocomplete="off">
+
+                <label class="field-label" for="bioInput">Bio <span class="counter" id="bioCount">0/200</span></label>
+                <textarea class="field-input bio-input" id="bioInput" maxlength="200" placeholder="Say something about yourself..."></textarea>
+
+                <label class="field-label" for="locationInput">Location</label>
+                <input class="field-input" id="locationInput" maxlength="40" placeholder="Davao City" autocomplete="off">
+
+                <label class="field-label" for="linkInput">Link</label>
+                <input class="field-input" id="linkInput" maxlength="100" placeholder="https://" inputmode="url" autocomplete="off">
+            </div>
+
+            <div class="editor-section">
+                <div class="section-title">Status</div>
+                <div class="status-fields">
+                    <input class="field-input status-emoji-input" id="statusEmojiInput" maxlength="4" placeholder="🙂" aria-label="Status emoji" autocomplete="off">
+                    <input class="field-input" id="statusTextInput" maxlength="60" placeholder="What are you up to?" aria-label="Status text" autocomplete="off">
+                </div>
+            </div>
+
+            <div class="editor-section">
+                <div class="section-title">Now listening</div>
+                <label class="field-label" for="nowSongInput">Song</label>
+                <input class="field-input" id="nowSongInput" maxlength="60" autocomplete="off">
+                <label class="field-label" for="nowArtistInput">Artist</label>
+                <input class="field-input" id="nowArtistInput" maxlength="60" autocomplete="off">
+            </div>
+
+            <div class="editor-section">
+                <div class="section-title">Interests</div>
+                <input class="field-input" id="interestsInput" placeholder="music, hiking, film (up to 5, comma separated)" autocomplete="off">
+            </div>
+
+        </div>
+
+        <div class="editor-foot">
+            <button class="custom-button" id="cancelEditor">Cancel</button>
+            <button class="btn btn-solid" id="saveProfile">Save changes</button>
+        </div>
+
+    </aside>
 
     <div class="toast-stack" id="toastStack"></div>
 
