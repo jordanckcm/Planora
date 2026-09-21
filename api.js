@@ -150,7 +150,10 @@ const PlanoraData = (() => {
         try {
             const events = await apiRequest(`/api/events?mode=${encodeURIComponent(mode)}&year=${encodeURIComponent(year)}`);
             if (mode === "local") {
-                try { localStorage.setItem(cacheKey, JSON.stringify(events)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
+                // leave images out of the offline copy — they're big, and
+                // localStorage only holds about 5 MB for the whole site
+                const withoutImages = events.map(e => ({ ...e, image: "" }));
+                try { localStorage.setItem(cacheKey, JSON.stringify(withoutImages)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
             }
             return events;
         } catch (err) {
