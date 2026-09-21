@@ -232,6 +232,17 @@ function formatFullTimestamp(ms) {
     });
 }
 
+/* Comment timestamps ("5m", "2h") are only accurate at the moment they're
+   rendered — left alone they'd silently go stale in a thread that sits
+   open a while. This walks the DOM instead of calling render(), so it
+   can't interrupt someone mid-reply or mid-edit. */
+function refreshRelativeTimes() {
+    document.querySelectorAll(".comment-time[data-timestamp]").forEach(el => {
+        el.textContent = formatRelativeShort(Number(el.dataset.timestamp));
+    });
+}
+setInterval(refreshRelativeTimes, 60000);
+
 
 /* =========================
    DROPDOWN PORTAL
@@ -426,6 +437,7 @@ function formatEventWhen(event, viewerLocal) {
     bindTodayButton();
     bindSearch();
     buildAddEventUI();
+    buildScrollToTopButton();
     bindDropdownDismissal();
 
     // A "Copy link" URL (?event=123&mode=global&year=2026) can set the
@@ -1297,6 +1309,7 @@ async function buildComments(event) {
 
         const time = document.createElement("span");
         time.className = "comment-time";
+        time.dataset.timestamp = comment.created_at;
         time.textContent = formatRelativeShort(comment.created_at);
         time.title = formatFullTimestamp(comment.created_at);
 
@@ -1449,14 +1462,41 @@ async function buildComments(event) {
     const form = document.createElement("div");
     form.className = "comment-form";
 
-    const input = document.createElement("input");
+    const inputRow = document.createElement("div");
+    inputRow.className = "comment-input-row";
+
+    // A textarea instead of a single-line input, so a longer comment can
+    // actually be read back before posting. Grows with the text (up to a
+    // cap) instead of scrolling internally.
+    const input = document.createElement("textarea");
     input.className = "comment-input";
     input.placeholder = "Add a comment...";
     input.maxLength = 240;
+    input.rows = 1;
+
+    const counter = document.createElement("span");
+    counter.className = "comment-counter";
 
     const submit = document.createElement("button");
     submit.className = "comment-submit";
     submit.textContent = "Post";
+    submit.disabled = true;
+
+    const MAX_COMMENT_HEIGHT = 120; // px — after this it scrolls instead of growing
+
+    function autosizeInput() {
+        input.style.height = "auto";
+        const next = Math.min(input.scrollHeight, MAX_COMMENT_HEIGHT);
+        input.style.height = next + "px";
+        input.style.overflowY = input.scrollHeight > MAX_COMMENT_HEIGHT ? "auto" : "hidden";
+    }
+
+    function updateCounter() {
+        const remaining = input.maxLength - input.value.length;
+        counter.textContent = remaining <= 40 ? String(remaining) : "";
+        counter.classList.toggle("low", remaining <= 20);
+        submit.disabled = input.value.trim().length === 0;
+    }
 
     function startReply(comment) {
         replyingTo = comment;
@@ -1475,26 +1515,50 @@ async function buildComments(event) {
     replyCancel.addEventListener("click", (e) => { e.stopPropagation(); cancelReply(); });
 
     async function postComment() {
-        if (!input.value.trim()) return;
+        const text = input.value;
+        if (!text.trim() || submit.disabled) return;
+
         const wasReply = Boolean(replyingTo);
+
+        // guards against a double-post from a fast double-click/double-Enter
+        // while the request is still in flight
+        input.disabled = true;
+        submit.disabled = true;
+        submit.textContent = "Posting…";
+
         try {
-            await PlanoraData.addComment(event.id, input.value, replyingTo ? replyingTo.id : null);
-            input.value = "";
+            await PlanoraData.addComment(event.id, text, replyingTo ? replyingTo.id : null);
             toast(wasReply ? "Reply posted." : "Comment posted.", "success");
             render();
         } catch (err) {
             toast(err.message, "error");
+            input.disabled = false;
+            submit.textContent = "Post";
+            updateCounter();
         }
     }
 
     submit.addEventListener("click", (e) => { e.stopPropagation(); postComment(); });
     input.addEventListener("click", (e) => e.stopPropagation());
+    input.addEventListener("input", () => {
+        autosizeInput();
+        updateCounter();
+    });
     input.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") postComment();
+        // Enter posts; Shift+Enter (or any other modifier) inserts a
+        // normal newline instead, same convention as Discord/Slack.
+        if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            postComment();
+        }
         if (e.key === "Escape" && replyingTo) cancelReply();
     });
 
-    form.appendChild(input);
+    updateCounter();
+
+    inputRow.appendChild(input);
+    inputRow.appendChild(counter);
+    form.appendChild(inputRow);
     form.appendChild(submit);
 
     wrap.appendChild(list);
@@ -1510,6 +1574,34 @@ async function buildComments(event) {
    Hides the add-event button while scrolling down, brings it
    back as soon as the user scrolls up even a little.
 ========================= */
+
+/* Small circular button, bottom-left, mirroring the + button's position
+   on the right. Appears once you've scrolled down a bit, scrolls smoothly
+   back to the top on click. */
+function buildScrollToTopButton() {
+    const button = document.createElement("button");
+    button.className = "scroll-top-button";
+    button.type = "button";
+    button.textContent = "↑";
+    button.setAttribute("aria-label", "Scroll to top");
+    document.body.appendChild(button);
+
+    button.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+
+    let ticking = false;
+    function onScroll() {
+        button.classList.toggle("show", window.scrollY > 500);
+        ticking = false;
+    }
+    window.addEventListener("scroll", () => {
+        if (!ticking) {
+            requestAnimationFrame(onScroll);
+            ticking = true;
+        }
+    }, { passive: true });
+}
 
 function bindScrollHide(button) {
     let lastY = window.scrollY;
@@ -1729,6 +1821,9 @@ function buildAddEventUI() {
     });
 
     document.getElementById("saveEvent").addEventListener("click", async () => {
+        const saveButton = document.getElementById("saveEvent");
+        if (saveButton.disabled) return; // already in flight — ignore a fast double-click
+
         const title = document.getElementById("eventTitle").value.trim();
         const description = document.getElementById("eventDescription").value.trim();
         const date = document.getElementById("eventDate").value;
@@ -1752,6 +1847,10 @@ function buildAddEventUI() {
             return;
         }
 
+        saveButton.disabled = true;
+        const originalLabel = saveButton.textContent;
+        saveButton.textContent = "Creating…";
+
         try {
             await PlanoraData.addEvent({
                 title,
@@ -1770,8 +1869,13 @@ function buildAddEventUI() {
             });
         } catch (err) {
             toast(err.message, "error");
+            saveButton.disabled = false;
+            saveButton.textContent = originalLabel;
             return;
         }
+
+        saveButton.disabled = false;
+        saveButton.textContent = originalLabel;
 
         eventForm.classList.remove("show");
 
