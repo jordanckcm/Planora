@@ -1222,3 +1222,346 @@ body.mode-timeline {
     }
 
 }
+
+/* =========================================================
+   PLANORA — BACKGROUND + TIMELINE REDESIGN
+   Paste at the very bottom of homepage-extra.css.
+   If you already pasted the earlier "timeline-styles.css"
+   block, DELETE that block first — this replaces it.
+========================================================= */
+
+
+/* =========================================================
+   BACKGROUND
+   Two fixed layers behind everything, both non-interactive:
+     ::before  a dot grid that fades out toward the edges,
+               tinted by the current mode
+     ::after   very faint scanlines + a soft vignette, a nod
+               to the VHS font
+   Tweak the alpha values (0.22 / 0.018 / 0.45) to make it
+   stronger or quieter.
+========================================================= */
+
+body {
+    --accent: 72, 156, 72;          /* Local  — green  */
+}
+
+body.mode-local {
+    --accent: 72, 156, 72;
+}
+
+body.mode-global {
+    --accent: 74, 127, 201;         /* Global — blue   */
+}
+
+body.mode-timeline {
+    --accent: 154, 86, 201;         /* Timeline — purple */
+}
+
+body::before,
+body::after {
+    content: "";
+
+    position: fixed;
+    inset: 0;
+
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* dot grid, brightest near the top and fading away below */
+body::before {
+    background-image: radial-gradient(
+        circle,
+        rgba(var(--accent), 0.22) 1px,
+        transparent 1.6px
+    );
+    background-size: 28px 28px;
+
+    -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 25%, #000 0%, transparent 100%);
+    mask-image: radial-gradient(ellipse 80% 70% at 50% 25%, #000 0%, transparent 100%);
+}
+
+/* scanlines + vignette */
+body::after {
+    background:
+        repeating-linear-gradient(
+            to bottom,
+            rgba(255, 255, 255, 0.018) 0,
+            rgba(255, 255, 255, 0.018) 1px,
+            transparent 1px,
+            transparent 3px
+        ),
+        radial-gradient(
+            ellipse at center,
+            transparent 55%,
+            rgba(0, 0, 0, 0.45) 100%
+        );
+}
+
+/* Timeline swaps the dots for vertical guide lines, like the
+   columns of a roadmap, so the tab feels like a different place. */
+body.mode-timeline::before {
+    background-image: repeating-linear-gradient(
+        90deg,
+        rgba(var(--accent), 0.10) 0,
+        rgba(var(--accent), 0.10) 1px,
+        transparent 1px,
+        transparent 96px
+    );
+    background-size: auto;
+
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+    mask-image: linear-gradient(to bottom, #000 0%, transparent 85%);
+}
+
+body.mode-timeline {
+    background:
+        radial-gradient(ellipse 900px 500px at 50% 0%, rgba(154, 86, 201, 0.10), transparent 65%),
+        rgb(19, 19, 19);
+}
+
+
+/* =========================================================
+   TIMELINE TAB (top bar)
+   Dashed outline + a small dot instead of the solid green
+   fill Local and Global use. Goes purple when active.
+========================================================= */
+
+.timeline-button {
+    gap: 8px;
+
+    border: 1px dashed rgba(255, 255, 255, 0.25);
+}
+
+.timeline-button::before {
+    content: "";
+
+    width: 6px;
+    height: 6px;
+
+    border-radius: 50%;
+
+    background: rgba(255, 255, 255, 0.35);
+
+    transition: 0.25s ease;
+}
+
+.timeline-button.mode-active {
+    border: 1px solid rgb(154, 86, 201);
+    background: rgba(154, 86, 201, 0.16);
+    color: #e4d0f7;
+}
+
+.timeline-button.mode-active::before {
+    background: rgb(190, 140, 235);
+    box-shadow: 0 0 8px rgb(190, 140, 235);
+}
+
+.timeline-button.mode-active:hover {
+    background: rgba(154, 86, 201, 0.26);
+}
+
+
+/* =========================================================
+   TIMELINE VIEW
+   A center spine with events alternating left and right,
+   each joined to the spine by a dashed tick. Collapses to a
+   single left-hand spine on narrow screens.
+   Layout is pure CSS — no JS changes needed.
+========================================================= */
+
+.timeline-container {
+    display: none;
+
+    position: relative;
+    z-index: 1;
+
+    width: min(94%, 900px);
+
+    /* extra room so the + button never covers the last entry */
+    margin: 12px auto 110px;
+}
+
+.timeline-container.active {
+    display: block;
+}
+
+.timeline-entry {
+    display: grid;
+    grid-template-columns: 1fr 16px 1fr;
+    column-gap: 26px;
+    align-items: stretch;
+}
+
+/* dot + connecting line, always in the middle column */
+
+.timeline-track {
+    grid-column: 2;
+    grid-row: 1;
+
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+
+    width: 16px;
+}
+
+.timeline-dot {
+    width: 14px;
+    height: 14px;
+
+    margin-top: 18px;
+
+    border-radius: 50%;
+
+    /* JS sets the inline `color` to the event's color */
+    background: currentColor;
+
+    /* page-colored ring so the line looks like it runs behind
+       the dot, plus a glow in the event's own color */
+    box-shadow:
+        0 0 0 4px rgb(19, 19, 19),
+        0 0 14px currentColor;
+
+    flex-shrink: 0;
+}
+
+.timeline-line {
+    flex: 1;
+
+    width: 2px;
+    min-height: 24px;
+
+    margin-top: 4px;
+
+    background: rgba(var(--accent), 0.35);
+}
+
+/* no dangling line after the final event */
+.timeline-entry:last-child .timeline-line {
+    display: none;
+}
+
+
+/* cards: odd ones to the right of the spine, even ones to the left */
+
+.timeline-body {
+    grid-row: 1;
+    grid-column: 3;
+
+    position: relative;
+
+    min-width: 0;
+
+    margin-bottom: 14px;
+    padding: 14px 18px;
+
+    color: white;
+
+    background: rgb(27, 27, 27);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+
+    animation: eventAppear 0.25s ease;
+
+    transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.timeline-entry:nth-child(even) .timeline-body {
+    grid-column: 1;
+    text-align: right;
+}
+
+.timeline-body:hover {
+    background: rgb(32, 32, 32);
+    border-color: rgba(var(--accent), 0.6);
+}
+
+/* dashed tick from the card to the spine */
+
+.timeline-body::before {
+    content: "";
+
+    position: absolute;
+    top: 24px;
+    left: -26px;
+
+    width: 26px;
+    height: 0;
+
+    border-top: 1px dashed rgba(255, 255, 255, 0.22);
+}
+
+.timeline-entry:nth-child(even) .timeline-body::before {
+    left: auto;
+    right: -26px;
+}
+
+.timeline-title {
+    margin-bottom: 4px;
+
+    font-family: "VHS";
+    font-size: 15px;
+
+    word-break: break-word;
+}
+
+/* the date becomes a small outlined pill */
+
+.timeline-date {
+    display: inline-block;
+
+    margin-top: 8px;
+    padding: 3px 10px;
+
+    border: 1px solid rgba(var(--accent), 0.45);
+    border-radius: 20px;
+
+    color: rgb(214, 190, 240);
+
+    font-family: "VHS";
+    font-size: 10px;
+
+    opacity: 1;
+}
+
+
+/* =========================================================
+   TIMELINE — MOBILE
+   Spine moves to the left edge; every card sits on the right.
+========================================================= */
+
+@media (max-width: 700px) {
+
+    .timeline-entry {
+        grid-template-columns: 16px 1fr;
+        column-gap: 14px;
+    }
+
+    .timeline-track {
+        grid-column: 1;
+    }
+
+    .timeline-body,
+    .timeline-entry:nth-child(even) .timeline-body {
+        grid-column: 2;
+
+        padding: 11px 14px;
+
+        text-align: left;
+    }
+
+    .timeline-body::before,
+    .timeline-entry:nth-child(even) .timeline-body::before {
+        left: -14px;
+        right: auto;
+
+        width: 14px;
+    }
+
+    .timeline-title {
+        font-size: 13px;
+    }
+
+}
