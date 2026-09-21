@@ -33,6 +33,7 @@ import time
 import os
 from datetime import timedelta
 from functools import wraps
+from zoneinfo import ZoneInfo, available_timezones
 
 from flask import Flask, request, jsonify, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -62,6 +63,18 @@ MAX_COMMENT = 240
 
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_PATTERN = re.compile(r"^\d{2}:\d{2}$")
+
+# Real IANA zone names ("Asia/Manila", "America/New_York"), loaded once at
+# startup. The frontend sends Intl.DateTimeFormat().resolvedOptions().timeZone,
+# which is always one of these - but never trust the client, so anything
+# that isn't a real zone just gets dropped rather than stored.
+_VALID_TIMEZONES = available_timezones()
+
+
+def clean_timezone(value):
+    if not isinstance(value, str) or value not in _VALID_TIMEZONES:
+        return ""
+    return value
 
 
 @app.errorhandler(404)
@@ -231,6 +244,7 @@ def make_local_copy(source_event, username):
         "end_date": source_event.get("end_date", source_event["date"]),
         "start_time": source_event.get("start_time", ""),
         "end_time": source_event.get("end_time", ""),
+        "timezone": source_event.get("timezone", ""),
         "visibility": "local",
         "color": source_event.get("color", EVENT_COLORS[0]),
         "icon": source_event.get("icon", EVENT_ICONS[0]),
@@ -434,6 +448,7 @@ def get_events():
         event_copy.setdefault("end_date", event_copy["date"])
         event_copy.setdefault("start_time", "")
         event_copy.setdefault("end_time", "")
+        event_copy.setdefault("timezone", "")
         event_copy.setdefault("image", "")
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
@@ -501,6 +516,10 @@ def add_event():
     if image_error:
         return jsonify({"error": image_error}), 400
 
+    # Only meaningful when there's a start_time - an all-day event has no
+    # single instant to convert, so there's nothing for a timezone to do.
+    timezone = clean_timezone(data.get("timezone", "")) if start_time else ""
+
     role = user["role"]
     mine = [e for e in events if e["owner"].lower() == user["username"].lower()]
 
@@ -531,6 +550,7 @@ def add_event():
         "end_date": end_date,
         "start_time": start_time,
         "end_time": end_time,
+        "timezone": timezone,
         "visibility": visibility,
         "color": color,
         "icon": icon,
