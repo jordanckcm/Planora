@@ -643,12 +643,17 @@ def get_events():
 
         if mode == "global":
             adders = []
+            viewer_has_copy = False
             for e in events:
                 if e.get("cloned_from") != event["id"]:
                     continue
-                # the poster's own auto-copy isn't them "going" to it
-                if e["owner"].lower() == event["owner"].lower():
-                    continue
+                if e["owner"].lower() == username.lower():
+                    # the viewer's own copy - proves they already have it,
+                    # whether or not they're also the one who posted it
+                    viewer_has_copy = True
+                    # the poster's own auto-copy isn't them "going" to it
+                    if e["owner"].lower() == event["owner"].lower():
+                        continue
                 adder = find_user(e["owner"])
                 if adder:
                     adders.append({
@@ -658,6 +663,7 @@ def get_events():
                         "addedAt": e.get("created_at"),
                     })
             event_copy["addedBy"] = adders
+            event_copy["addedByMe"] = viewer_has_copy
 
         result.append(event_copy)
 
@@ -823,9 +829,12 @@ def add_to_my_calendar(event_id):
     if source_event["visibility"] != "global":
         return jsonify({"error": "That event isn't posted to Global."}), 403
 
-    if source_event["owner"].lower() == username.lower():
-        return jsonify({"error": "That's already on your calendar."}), 400
-
+    # Posting to Global already drops the owner a copy automatically, so
+    # normally they'd hit the "already added" check right below like
+    # anyone else who's added it. But if they later deleted that copy off
+    # their calendar, they have nothing representing this post anymore -
+    # they should be able to add it back the same way anyone else would,
+    # not be told it's "already there" when it isn't.
     for event in events:
         if event["owner"].lower() == username.lower() and event.get("cloned_from") == event_id:
             return jsonify({"error": "You already added that one."}), 400
