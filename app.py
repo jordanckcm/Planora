@@ -34,6 +34,7 @@ from flask import Flask, request, jsonify, session
 app = Flask(__name__, static_folder=".", static_url_path="")
 
 app.secret_key = os.environ["SECRET_KEY"]
+
 # Images are stored as small base64 data URLs on the event itself.
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024   # reject any request over 2 MB
 MAX_IMAGE_CHARS = 300_000                             # roughly a 220 KB image
@@ -48,6 +49,7 @@ def handle_not_found(e):
 @app.errorhandler(500)
 def handle_server_error(e):
     return jsonify({"error": "Something went wrong on the server. Try again."}), 500
+
 
 @app.errorhandler(413)
 def handle_too_large(e):
@@ -73,6 +75,7 @@ COMMUNITY_LOCAL_LIMIT = 10
 COMMUNITY_PLUS_LOCAL_LIMIT = 25
 COMMUNITY_PLUS_GLOBAL_LIMIT = 1
 
+
 def clean_image(value):
     """Returns (image, error). An empty string means 'no image'."""
     if not value:
@@ -82,6 +85,7 @@ def clean_image(value):
     if not IMAGE_PATTERN.match(value):
         return "", "Only JPEG, PNG or WebP images are allowed."
     return value, None
+
 
 def find_user(username):
     for user in users:
@@ -425,7 +429,7 @@ def add_event():
     if end_date < date:
         return jsonify({"error": "End date can't be before the start date."}), 400
 
-        image, image_error = clean_image(data.get("image", ""))
+    image, image_error = clean_image(data.get("image", ""))
     if image_error:
         return jsonify({"error": image_error}), 400
 
