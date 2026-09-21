@@ -452,6 +452,13 @@ def get_events():
         event_copy.setdefault("image", "")
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
+        # so the card can show the host's face instead of a bare day
+        # number - falls back to their assigned color if they have no photo
+        owner_user = find_user(event["owner"])
+        event_copy["ownerAvatarColor"] = owner_user["avatar_color"] if owner_user else EVENT_COLORS[0]
+        event_copy["ownerAvatarImage"] = owner_user.get("avatar_image", "") if owner_user else ""
+        event_copy["ownerDisplayName"] = owner_user["display_name"] if owner_user else event["owner"]
+
         if mode == "global":
             adders = []
             for e in events:
