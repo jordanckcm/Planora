@@ -1,12 +1,19 @@
 /* =========================================================
    PLANORA — SERVICE WORKER
-   Caches the app shell (HTML/CSS/JS/fonts) so the pages
-   themselves load with no connection at all. Never touches
-   /api/* requests — those are handled (with their own
-   offline fallback) inside api.js.
+   Keeps the app shell (HTML/CSS/JS/fonts) available with no
+   connection at all. Never touches /api/* requests — those
+   are handled (with their own offline fallback) inside api.js.
+
+   How files are served:
+     - pages, CSS and JS: NETWORK FIRST. You always get the
+       newest deploy when you're online; the cached copy is only
+       used when the network fails.
+     - fonts and icons: CACHE FIRST. They never change and are
+       big, so there's no reason to re-download them.
 ========================================================= */
 
-const CACHE_NAME = "planora-shell-v1";
+// Bump this number whenever you want every visitor's old cache thrown away.
+const CACHE_NAME = "planora-shell-v2";
 
 // Best-effort list. Anything that 404s here is just skipped —
 // it won't stop the rest of the shell from being cached, and
@@ -24,6 +31,7 @@ const PRECACHE_URLS = [
     "/homepage.css",
     "/homepage-extra.css",
     "/homepage.js",
+    "/mode-effects.js",
     "/profile.html",
     "/profile.css",
     "/profile.js",
@@ -62,6 +70,14 @@ self.addEventListener("activate", (event) => {
     self.clients.claim();
 });
 
+function saveCopy(request, response) {
+    if (response && response.ok) {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+    }
+    return response;
+}
+
 self.addEventListener("fetch", (event) => {
     const { request } = event;
 
@@ -74,28 +90,24 @@ self.addEventListener("fetch", (event) => {
     if (url.origin !== self.location.origin) return;
     if (url.pathname.startsWith("/api/")) return;
 
-    event.respondWith(
-        caches.match(request).then((cached) => {
-            if (cached) {
-                // serve the cached copy instantly, refresh it
-                // quietly in the background for next time
-                fetch(request)
-                    .then((response) => {
-                        if (response && response.ok) {
-                            caches.open(CACHE_NAME).then((cache) => cache.put(request, response));
-                        }
-                    })
-                    .catch(() => {});
-                return cached;
-            }
+    const isStaticAsset =
+        url.pathname.startsWith("/fonts/") || url.pathname.startsWith("/icons/");
 
-            return fetch(request).then((response) => {
-                if (response && response.ok) {
-                    const clone = response.clone();
-                    caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-                }
-                return response;
-            });
-        })
+    if (isStaticAsset) {
+        // cache first: fonts and icons don't change
+        event.respondWith(
+            caches.match(request).then((cached) => {
+                return cached || fetch(request).then((response) => saveCopy(request, response));
+            })
+        );
+        return;
+    }
+
+    // network first: always the newest deploy when online,
+    // falling back to the saved copy when offline
+    event.respondWith(
+        fetch(request)
+            .then((response) => saveCopy(request, response))
+            .catch(() => caches.match(request))
     );
 });
