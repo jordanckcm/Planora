@@ -10,6 +10,12 @@
    The UI below hides/disables things based on role purely for a
    nicer experience — the server (app.py) is what actually enforces
    permissions and limits, so nothing here is a security boundary.
+
+   EVENT ACTIONS:
+   Every per-event action (Add to calendar / Remove / admin removal)
+   lives in a ⋮ menu in the card's top-right corner — the same portal
+   machinery the comment menus use. Cards with nothing you're allowed
+   to do simply don't get a ⋮.
 ========================================================= */
 
 let currentUser = null;
@@ -96,6 +102,13 @@ function formatEventDate(dateStr) {
     return eventDate.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
+/* "2026-06-14" is parsed as UTC midnight by `new Date(str)`, which lands on
+   the 13th anywhere west of Greenwich. Always go through this so the day,
+   month and sort order all agree on the date the user actually typed. */
+function parseEventDate(dateStr) {
+    return new Date(dateStr + "T00:00:00");
+}
+
 function isRecentlyPosted(event) {
     return Date.now() - event.created_at < 24 * 60 * 60 * 1000;
 }
@@ -124,21 +137,25 @@ function formatFullTimestamp(ms) {
 
 
 /* =========================
-   COMMENT DROPDOWN PORTAL
-   Edit/Delete menus used to be position:absolute inside the
-   month card, which has its own stacking context AND clips
-   overflow — so a menu near the bottom of a long comment list
-   could get visually buried under the NEXT month card, or cut
-   off entirely. Moving the open menu to a fixed-position child
-   of <body> sidesteps both problems: it always paints above
-   everything else and is never clipped by an ancestor.
+   DROPDOWN PORTAL
+   Used by both the comment ⋮ menus and the event ⋮ menus.
+   These used to be position:absolute inside the month card,
+   which has its own stacking context AND clips overflow — so
+   a menu near the bottom of a long list could get visually
+   buried under the NEXT month card, or cut off entirely.
+   Moving the open menu to a fixed-position child of <body>
+   sidesteps both problems: it always paints above everything
+   else and is never clipped by an ancestor. On close it goes
+   back where it came from, so a re-render doesn't strand
+   orphaned menus on <body>.
 ========================= */
 
-function openCommentDropdown(dropdown, trigger) {
-    closeAllCommentDropdowns();
+function openDropdownMenu(dropdown, trigger) {
+    closeAllDropdownMenus();
 
+    dropdown._home = dropdown.parentElement;
     document.body.appendChild(dropdown);
-    dropdown.classList.add("show", "comment-dropdown-portal");
+    dropdown.classList.add("show", "dropdown-portal");
 
     const rect = trigger.getBoundingClientRect();
     dropdown.style.position = "fixed";
@@ -154,36 +171,90 @@ function openCommentDropdown(dropdown, trigger) {
     }
 }
 
-function closeCommentDropdown(dropdown) {
-    dropdown.classList.remove("show", "comment-dropdown-portal");
+function closeDropdownMenu(dropdown) {
+    dropdown.classList.remove("show", "dropdown-portal");
     dropdown.style.position = "";
     dropdown.style.top = "";
     dropdown.style.left = "";
+
+    if (dropdown._home && dropdown._home.isConnected) {
+        dropdown._home.appendChild(dropdown);
+    } else {
+        dropdown.remove();
+    }
+    dropdown._home = null;
 }
 
-function closeAllCommentDropdowns() {
-    document.querySelectorAll(".comment-dropdown.show").forEach(closeCommentDropdown);
+function closeAllDropdownMenus() {
+    document.querySelectorAll(".menu-dropdown.show").forEach(closeDropdownMenu);
 }
 
-/* Bound once at startup — a fresh listener isn't added per comment,
-   so this stays cheap no matter how many times render() rebuilds
-   the comment lists. */
-function bindCommentDropdownDismissal() {
+/* Bound once at startup — a fresh listener isn't added per comment or
+   per card, so this stays cheap no matter how many times render()
+   rebuilds the lists. */
+function bindDropdownDismissal() {
     document.addEventListener("click", (e) => {
-        document.querySelectorAll(".comment-dropdown.show").forEach(dropdown => {
+        document.querySelectorAll(".menu-dropdown.show").forEach(dropdown => {
             if (!dropdown.contains(e.target) && dropdown._trigger !== e.target) {
-                closeCommentDropdown(dropdown);
+                closeDropdownMenu(dropdown);
             }
         });
     });
 
     // scrolling would leave a fixed-position menu pointing at empty
     // space, so just close it rather than trying to track it
-    window.addEventListener("scroll", closeAllCommentDropdowns, true);
+    window.addEventListener("scroll", closeAllDropdownMenus, true);
 
     document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") closeAllCommentDropdowns();
+        if (e.key === "Escape") closeAllDropdownMenus();
     });
+}
+
+/* Builds a ⋮ button + menu from a list of {label, danger, run} items.
+   Returns null when there's nothing the user can do, so the caller can
+   skip the ⋮ entirely rather than show an empty menu. */
+function buildDotsMenu(items, { buttonClass, dropdownClass, ariaLabel }) {
+    if (items.length === 0) return null;
+
+    const wrap = document.createElement("div");
+    wrap.className = buttonClass + "-wrap";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = buttonClass;
+    button.textContent = "⋮";
+    button.setAttribute("aria-label", ariaLabel);
+    button.setAttribute("aria-haspopup", "true");
+
+    const dropdown = document.createElement("div");
+    dropdown.className = `${dropdownClass} menu-dropdown`;
+    dropdown._trigger = button;
+
+    items.forEach(item => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = `${dropdownClass}-item` + (item.danger ? " danger" : "");
+        el.textContent = item.label;
+        el.addEventListener("click", async (e) => {
+            e.stopPropagation();
+            closeDropdownMenu(dropdown);
+            await item.run();
+        });
+        dropdown.appendChild(el);
+    });
+
+    button.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (dropdown.classList.contains("show")) {
+            closeDropdownMenu(dropdown);
+        } else {
+            openDropdownMenu(dropdown, button);
+        }
+    });
+
+    wrap.appendChild(button);
+    wrap.appendChild(dropdown);
+    return wrap;
 }
 
 /* "7:30 PM" from a 24h "19:30" input value. */
@@ -201,8 +272,8 @@ function formatEventWhen(event) {
     let dateLabel;
 
     if (event.end_date && event.end_date !== event.date) {
-        const start = new Date(event.date + "T00:00:00");
-        const end = new Date(event.end_date + "T00:00:00");
+        const start = parseEventDate(event.date);
+        const end = parseEventDate(event.end_date);
         const days = Math.round((end - start) / 86400000) + 1;
         const startLabel = start.toLocaleDateString(undefined, { month: "short", day: "numeric" });
         const endLabel = end.toLocaleDateString(undefined, { month: "short", day: "numeric" });
@@ -241,11 +312,12 @@ function formatEventWhen(event) {
     bindTodayButton();
     bindSearch();
     buildAddEventUI();
-    bindCommentDropdownDismissal();
+    bindDropdownDismissal();
 
     // A "Copy link" URL (?event=123&mode=global&year=2026) can set the
     // mode/year before the first render, then we open + scroll to the
-    // specific card once everything's on the page.
+    // specific card once everything's on the page. The button that made
+    // those links is gone, but old links people already sent still work.
     const deepLinkEventId = applyDeepLinkFromURL();
 
     setActiveModeButton();
@@ -510,8 +582,7 @@ function clearSearchIfActive() {
 
 /* =========================
    SHARED EVENT LINKS
-   "Copy link" on a global event produces a URL like
-   ?event=123&mode=global&year=2026. On load we read that,
+   ?event=123&mode=global&year=2026 — on load we read that,
    switch into the right mode/year, then scroll to and briefly
    highlight the matching card once it's rendered.
 ========================= */
@@ -548,7 +619,7 @@ async function focusEvent(eventId) {
         return;
     }
 
-    openMonth = new Date(target.date).getMonth() + 1;
+    openMonth = parseEventDate(target.date).getMonth() + 1;
     await render();
 
     const card = document.querySelector(`.event[data-event-id="${eventId}"]`);
@@ -588,7 +659,7 @@ monthButtons.forEach(monthEl => {
 
 async function render() {
     yearDisplay.textContent = currentYear;
-    closeAllCommentDropdowns();
+    closeAllDropdownMenus();
 
     // Timeline has no local/global split of its own — it always shows
     // your personal calendar's events, just laid out as a chronological
@@ -634,8 +705,8 @@ async function render() {
         const container = monthEl.parentElement.querySelector(".events-container");
 
         let monthEvents = events
-            .filter(e => new Date(e.date).getMonth() + 1 === monthNumber)
-            .sort((a, b) => new Date(a.date) - new Date(b.date));
+            .filter(e => parseEventDate(e.date).getMonth() + 1 === monthNumber)
+            .sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date));
 
         if (isSearching) {
             monthEvents = monthEvents.filter(e =>
@@ -702,7 +773,7 @@ async function renderMonthEvents(container, monthEvents) {
 ========================= */
 
 function renderTimeline(events, query) {
-    let list = events.slice().sort((a, b) => new Date(a.date) - new Date(b.date));
+    let list = events.slice().sort((a, b) => parseEventDate(a.date) - parseEventDate(b.date));
 
     if (query) {
         list = list.filter(e =>
@@ -773,7 +844,7 @@ function renderTimeline(events, query) {
         body.addEventListener("click", () => {
             mode = "local";
             setActiveModeButton();
-            openMonth = new Date(event.date).getMonth() + 1;
+            openMonth = parseEventDate(event.date).getMonth() + 1;
             render().then(() => {
                 const card = document.querySelector(`.event[data-event-id="${event.id}"]`);
                 if (card) {
@@ -792,13 +863,88 @@ function renderTimeline(events, query) {
     });
 }
 
+
+/* =========================
+   EVENT ACTIONS (⋮ menu)
+   One menu in the card's top-right corner instead of a row of
+   buttons. What's in it depends on the card:
+
+     your own event          → Remove
+     someone's global post   → Add to calendar
+     ...and if you're admin  → Remove (admin)
+
+   Nothing applicable means no ⋮ at all.
+========================= */
+
+function buildEventMenu(event) {
+    const items = [];
+
+    if (mode === "global" && !event.isMine) {
+        items.push({
+            label: "Add to calendar",
+            run: async () => {
+                try {
+                    await PlanoraData.addToMyCalendar(event.id);
+                    toast(`Added "${event.title}" to your calendar.`, "success");
+                    render();
+                } catch (err) {
+                    toast(err.message, "error");
+                }
+            }
+        });
+    }
+
+    // Deleting your own event: everyone can do this, any role, any mode.
+    if (event.isMine) {
+        items.push({
+            label: "Remove",
+            danger: true,
+            run: async () => {
+                try {
+                    await PlanoraData.deleteEvent(event.id);
+                    toast("Removed from your calendar.");
+                    render();
+                } catch (err) {
+                    toast(err.message, "error");
+                }
+            }
+        });
+    }
+
+    // Admins can also remove events posted by other people in Global.
+    if (mode === "global" && !event.isMine && currentUser.role === "admin") {
+        items.push({
+            label: "Remove (admin)",
+            danger: true,
+            run: async () => {
+                try {
+                    await PlanoraData.adminDeleteEvent(event.id);
+                    toast("Removed by admin.");
+                    render();
+                } catch (err) {
+                    toast(err.message, "error");
+                }
+            }
+        });
+    }
+
+    return buildDotsMenu(items, {
+        buttonClass: "event-menu-button",
+        dropdownClass: "event-dropdown",
+        ariaLabel: "Event options"
+    });
+}
+
 async function buildEventCard(event) {
-    const day = new Date(event.date).getDate();
+    const day = parseEventDate(event.date).getDate();
 
     const card = document.createElement("div");
     card.className = "event";
     card.dataset.eventId = event.id;
     if (isRecentlyPosted(event)) card.classList.add("event-new");
+
+    const menu = buildEventMenu(event);
+    if (menu) card.appendChild(menu);
 
     const cover = document.createElement("div");
     cover.className = "event-cover";
@@ -869,6 +1015,11 @@ async function buildEventCard(event) {
             const dot = document.createElement("div");
             dot.className = "event-going-avatar";
             dot.style.background = person.avatarColor;
+            if (person.avatarImage) {
+                dot.style.backgroundImage = `url("${person.avatarImage}")`;
+                dot.style.backgroundSize = "cover";
+                dot.style.backgroundPosition = "center";
+            }
             dot.title = person.addedAt
                 ? `@${person.username} · added ${formatFullTimestamp(person.addedAt)}`
                 : "@" + person.username;
@@ -886,111 +1037,6 @@ async function buildEventCard(event) {
 
     main.appendChild(dayEl);
     main.appendChild(info);
-
-    const actions = document.createElement("div");
-    actions.className = "event-actions";
-
-    // Deleting your own event: everyone can do this, any role, any mode.
-    if (event.isMine) {
-        const removeBtn = document.createElement("button");
-        removeBtn.className = "event-action-btn danger";
-        removeBtn.textContent = "Remove";
-        removeBtn.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            try {
-                await PlanoraData.deleteEvent(event.id);
-                toast("Removed from your calendar.");
-                render();
-            } catch (err) {
-                toast(err.message, "error");
-            }
-        });
-        actions.appendChild(removeBtn);
-
-        // Quick one-click copy of your own event onto another date —
-        // lands in Local so it never fights the Global post cap.
-        const duplicateBtn = document.createElement("button");
-        duplicateBtn.className = "event-action-btn";
-        duplicateBtn.textContent = "Duplicate";
-        duplicateBtn.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            try {
-                await PlanoraData.addEvent({
-                    title: `${event.title} (copy)`,
-                    description: event.description || "",
-                    date: event.date,
-                    endDate: event.end_date || event.date,
-                    startTime: event.start_time || "",
-                    endTime: event.end_time || "",
-                    visibility: "local",
-                    icon: event.icon || EVENT_ICONS[0],
-                    color: event.color || EVENT_COLORS[0],
-                    image: event.image || ""
-                });
-                toast(`Duplicated "${event.title}" to your calendar.`, "success");
-                render();
-            } catch (err) {
-                toast(err.message, "error");
-            }
-        });
-        actions.appendChild(duplicateBtn);
-    }
-
-    // Admins can also remove events posted by other people in Global.
-    if (mode === "global" && !event.isMine && currentUser.role === "admin") {
-        const adminRemoveBtn = document.createElement("button");
-        adminRemoveBtn.className = "event-action-btn danger";
-        adminRemoveBtn.textContent = "Remove (admin)";
-        adminRemoveBtn.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            try {
-                await PlanoraData.adminDeleteEvent(event.id);
-                toast("Removed by admin.");
-                render();
-            } catch (err) {
-                toast(err.message, "error");
-            }
-        });
-        actions.appendChild(adminRemoveBtn);
-    }
-
-    if (mode === "global" && !event.isMine) {
-        const addBtn = document.createElement("button");
-        addBtn.className = "event-action-btn";
-        addBtn.textContent = "Add to my calendar";
-        addBtn.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            try {
-                await PlanoraData.addToMyCalendar(event.id);
-                toast(`Added "${event.title}" to your calendar.`, "success");
-                addBtn.textContent = "Added ✓";
-                addBtn.classList.add("added");
-                addBtn.disabled = true;
-            } catch (err) {
-                toast(err.message, "error");
-            }
-        });
-        actions.appendChild(addBtn);
-    }
-
-    if (mode === "global") {
-        const copyLinkBtn = document.createElement("button");
-        copyLinkBtn.className = "event-action-btn";
-        copyLinkBtn.textContent = "Copy link";
-        copyLinkBtn.addEventListener("click", async (e) => {
-            e.stopPropagation();
-            const url = `${location.origin}${location.pathname}?event=${event.id}&mode=global&year=${currentYear}`;
-            try {
-                await navigator.clipboard.writeText(url);
-                toast("Link copied.", "success");
-            } catch (err) {
-                toast("Couldn't copy the link.", "error");
-            }
-        });
-        actions.appendChild(copyLinkBtn);
-    }
-
-    main.appendChild(actions);
     card.appendChild(main);
 
     if (mode === "global") {
@@ -1119,38 +1165,13 @@ async function buildComments(event) {
                 setTimeout(() => document.addEventListener("click", cancelOnOutsideClick), 0);
             }
 
-            if (canEdit || canDelete) {
-                const menuWrap = document.createElement("div");
-                menuWrap.className = "comment-menu";
-
-                const menuButton = document.createElement("button");
-                menuButton.className = "comment-menu-button";
-                menuButton.textContent = "⋮";
-                menuButton.setAttribute("aria-label", "Comment options");
-                menuButton.setAttribute("aria-haspopup", "true");
-
-                const dropdown = document.createElement("div");
-                dropdown.className = "comment-dropdown";
-                dropdown._trigger = menuButton;
-
-                if (canEdit) {
-                    const editItem = document.createElement("button");
-                    editItem.className = "comment-dropdown-item";
-                    editItem.textContent = "Edit";
-                    editItem.addEventListener("click", (e) => {
-                        e.stopPropagation();
-                        closeCommentDropdown(dropdown);
-                        enterEditMode();
-                    });
-                    dropdown.appendChild(editItem);
-                }
-
-                if (canDelete) {
-                    const deleteItem = document.createElement("button");
-                    deleteItem.className = "comment-dropdown-item danger";
-                    deleteItem.textContent = "Delete";
-                    deleteItem.addEventListener("click", async (e) => {
-                        e.stopPropagation();
+            const items = [];
+            if (canEdit) items.push({ label: "Edit", run: () => enterEditMode() });
+            if (canDelete) {
+                items.push({
+                    label: "Delete",
+                    danger: true,
+                    run: async () => {
                         try {
                             await PlanoraData.deleteComment(event.id, comment.id);
                             toast("Comment deleted.");
@@ -1158,23 +1179,16 @@ async function buildComments(event) {
                         } catch (err) {
                             toast(err.message, "error");
                         }
-                    });
-                    dropdown.appendChild(deleteItem);
-                }
-
-                menuButton.addEventListener("click", (e) => {
-                    e.stopPropagation();
-                    if (dropdown.classList.contains("show")) {
-                        closeCommentDropdown(dropdown);
-                    } else {
-                        openCommentDropdown(dropdown, menuButton);
                     }
                 });
-
-                menuWrap.appendChild(menuButton);
-                menuWrap.appendChild(dropdown);
-                c.appendChild(menuWrap);
             }
+
+            const menu = buildDotsMenu(items, {
+                buttonClass: "comment-menu-button",
+                dropdownClass: "comment-dropdown",
+                ariaLabel: "Comment options"
+            });
+            if (menu) c.appendChild(menu);
 
             c.appendChild(body);
             list.appendChild(c);
@@ -1448,8 +1462,8 @@ function buildAddEventUI() {
 
         eventForm.classList.remove("show");
 
-        currentYear = new Date(date).getFullYear();
-        openMonth = new Date(date).getMonth() + 1;
+        currentYear = parseEventDate(date).getFullYear();
+        openMonth = parseEventDate(date).getMonth() + 1;
         mode = "local";
         setActiveModeButton();
 
