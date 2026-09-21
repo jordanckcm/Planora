@@ -73,6 +73,76 @@ function toast(message, type = "") {
     setTimeout(() => el.remove(), 3200);
 }
 
+/* A themed "are you sure?" dialog for anything destructive - removing an
+   event or a comment. Resolves true/false; never throws. Cancel is the
+   default focus, since the safe choice should be the easy one to land
+   on with a stray Enter press. */
+function confirmAction({ title, message, confirmLabel = "Delete", cancelLabel = "Cancel" }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.className = "confirm-overlay";
+
+        const box = document.createElement("div");
+        box.className = "confirm-box";
+        box.setAttribute("role", "alertdialog");
+        box.setAttribute("aria-modal", "true");
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "confirm-title";
+        titleEl.textContent = title;
+
+        const messageEl = document.createElement("p");
+        messageEl.className = "confirm-message";
+        messageEl.textContent = message;
+
+        const buttons = document.createElement("div");
+        buttons.className = "confirm-buttons";
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "confirm-cancel";
+        cancelBtn.textContent = cancelLabel;
+
+        const confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.className = "confirm-confirm";
+        confirmBtn.textContent = confirmLabel;
+
+        buttons.appendChild(cancelBtn);
+        buttons.appendChild(confirmBtn);
+        box.appendChild(titleEl);
+        box.appendChild(messageEl);
+        box.appendChild(buttons);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        function close(result) {
+            overlay.classList.remove("show");
+            document.removeEventListener("keydown", onKeydown);
+            setTimeout(() => overlay.remove(), 180);
+            resolve(result);
+        }
+
+        function onKeydown(e) {
+            if (e.key === "Escape") close(false);
+        }
+
+        cancelBtn.addEventListener("click", () => close(false));
+        confirmBtn.addEventListener("click", () => close(true));
+        overlay.addEventListener("click", (e) => {
+            if (e.target === overlay) close(false);
+        });
+        document.addEventListener("keydown", onKeydown);
+
+        // one frame so the transition actually plays instead of
+        // snapping straight to "show"
+        requestAnimationFrame(() => {
+            overlay.classList.add("show");
+            cancelBtn.focus();
+        });
+    });
+}
+
 /* Where someone's profile lives. Always encode the username. */
 function profileUrl(username) {
     return "profile.html?u=" + encodeURIComponent(username);
@@ -1011,7 +1081,11 @@ function renderTimeline(events, query) {
 function buildEventMenu(event) {
     const items = [];
 
-    if (mode === "global" && !event.isMine) {
+    // Add to calendar: offered whenever the viewer doesn't currently have
+    // a copy of this Global post - including its own poster, if they'd
+    // deleted their auto-added copy off their calendar earlier. Not
+    // "!event.isMine" anymore - addedByMe is what actually tracks that.
+    if (mode === "global" && !event.addedByMe) {
         items.push({
             label: "Add to calendar",
             run: async () => {
@@ -1051,11 +1125,23 @@ function buildEventMenu(event) {
     }
 
     // Deleting your own event: everyone can do this, any role, any mode.
+    // Always confirmed first - this can't be undone, and a Global post
+    // takes everyone else's copies of it down too.
     if (event.isMine) {
+        const isGlobalPost = event.visibility === "global";
         items.push({
             label: "Remove",
             danger: true,
             run: async () => {
+                const confirmed = await confirmAction({
+                    title: isGlobalPost ? "Remove this Global post?" : "Remove this event?",
+                    message: isGlobalPost
+                        ? `"${event.title}" will come down from Global for everyone, along with anyone else's copy of it. You can repost it later, but this specific post can't be brought back.`
+                        : `"${event.title}" will be removed from your calendar. This can't be undone.`,
+                    confirmLabel: "Remove"
+                });
+                if (!confirmed) return;
+
                 try {
                     await PlanoraData.deleteEvent(event.id);
                     toast("Removed from your calendar.");
@@ -1073,6 +1159,13 @@ function buildEventMenu(event) {
             label: "Remove (admin)",
             danger: true,
             run: async () => {
+                const confirmed = await confirmAction({
+                    title: "Remove this post?",
+                    message: `"${event.title}" will come down from Global for everyone, along with anyone else's copy of it. This can't be undone.`,
+                    confirmLabel: "Remove"
+                });
+                if (!confirmed) return;
+
                 try {
                     await PlanoraData.adminDeleteEvent(event.id);
                     toast("Removed by admin.");
@@ -1414,6 +1507,19 @@ async function buildComments(event) {
                 label: "Delete",
                 danger: true,
                 run: async () => {
+                    const replyCount = isReply
+                        ? 0
+                        : comments.filter(r => r.parent_id === comment.id).length;
+
+                    const confirmed = await confirmAction({
+                        title: isReply ? "Delete this reply?" : "Delete this comment?",
+                        message: replyCount > 0
+                            ? `This will also delete ${replyCount === 1 ? "its 1 reply" : `its ${replyCount} replies`}. This can't be undone.`
+                            : "This can't be undone.",
+                        confirmLabel: "Delete"
+                    });
+                    if (!confirmed) return;
+
                     try {
                         await PlanoraData.deleteComment(event.id, comment.id);
                         toast(isReply ? "Reply deleted." : "Comment deleted.");
