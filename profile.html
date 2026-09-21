@@ -6,6 +6,7 @@
     <title>Planora</title>
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="profile.css">
+    <link rel="stylesheet" href="planora-ui.css">
 </head>
 <body>
 
@@ -40,8 +41,13 @@
 
         <div class="profile-card">
 
-            <div class="card-title">Avatar color</div>
-            <div class="color-row" id="colorRow"></div>
+            <div class="card-title">Profile picture</div>
+            <div class="image-picker">
+                <label class="image-pick-button" for="avatarImageInput">Choose photo</label>
+                <input type="file" id="avatarImageInput" accept="image/*" hidden>
+                <button type="button" class="image-remove" id="removeAvatarImage" style="display:none;">Remove</button>
+                <div class="image-preview avatar-preview" id="avatarImagePreview"></div>
+            </div>
 
             <label class="field-label" for="displayNameInput">Display name</label>
             <input class="field-input" id="displayNameInput" maxlength="40">
