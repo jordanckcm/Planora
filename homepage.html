@@ -43,12 +43,7 @@
             Timeline
         </button>
 
-        <button class="custom-button today-button" id="todayButton">
-            Today
-        </button>
-
     </div>
-
 
     <!-- YEAR -->
     <div class="year-selector">
@@ -65,6 +60,16 @@
             →
         </button>
 
+    </div>
+
+    <!-- Was a 5th button crammed into .topbar (profile, Local, Global,
+         Timeline, Today) — on narrow screens that row ran wider than the
+         viewport and became horizontally drag-scrollable. Docked here
+         instead, in normal flow, so it can't cause that again. -->
+    <div class="today-row">
+        <button class="today-pill" id="todayButton">
+            Today
+        </button>
     </div>
 
     <div class="role-badge" id="roleBadge"></div>
