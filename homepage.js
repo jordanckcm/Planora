@@ -41,38 +41,8 @@ let selectedEventIcon = EVENT_ICONS[0];
 let selectedEventImage = "";
 
 
-/* Shrinks a picked image to at most 900px wide and returns a JPEG data URL
-   (usually 60-150 KB), so uploads stay small and fast. */
-function resizeImage(file, maxWidth = 900, quality = 0.75) {
-    return new Promise((resolve, reject) => {
-        if (!file.type.startsWith("image/")) {
-            reject(new Error("That file isn't an image."));
-            return;
-        }
-
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error("Couldn't read that file."));
-        reader.onload = () => {
-            const img = new Image();
-            img.onerror = () => reject(new Error("Couldn't open that image."));
-            img.onload = () => {
-                const scale = Math.min(1, maxWidth / img.width);
-                const canvas = document.createElement("canvas");
-                canvas.width = Math.round(img.width * scale);
-                canvas.height = Math.round(img.height * scale);
-
-                const ctx = canvas.getContext("2d");
-                ctx.fillStyle = "#131313"; // transparent PNGs land on the page color
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-                resolve(canvas.toDataURL("image/jpeg", quality));
-            };
-            img.src = reader.result;
-        };
-        reader.readAsDataURL(file);
-    });
-}
+/* image resizing for the event-cover picker lives in api.js now, shared
+   with the profile-picture picker — see Planora.resizeImage */
 
 
 function toast(message, type = "") {
@@ -413,6 +383,12 @@ function formatEventWhen(event, viewerLocal) {
 
     document.querySelector(".profile").style.background =
         `linear-gradient(135deg, ${currentUser.avatarColor}, #111)`;
+    if (currentUser.avatarImage) {
+        document.querySelector(".profile").style.backgroundImage =
+            `url("${currentUser.avatarImage}")`;
+        document.querySelector(".profile").style.backgroundSize = "cover";
+        document.querySelector(".profile").style.backgroundPosition = "center";
+    }
 
     buildProfileMenu();
     showRoleBadge();
@@ -1493,7 +1469,7 @@ function buildAddEventUI() {
         const file = imageInput.files[0];
         if (!file) return;
         try {
-            setEventImage(await resizeImage(file));
+            setEventImage(await Planora.resizeImage(file));
         } catch (err) {
             toast(err.message, "error");
         }
