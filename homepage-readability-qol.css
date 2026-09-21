@@ -345,3 +345,112 @@ textarea.comment-input {
         transition: opacity 0.2s ease;
     }
 }
+
+
+/* =========================================================
+   CONFIRM DIALOG
+   Add on to the bottom of homepage-extra.css, same as the rest
+   of this file. A themed "are you sure?" prompt used before any
+   destructive action — removing an event, a comment, a reply.
+========================================================= */
+
+.confirm-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 400; /* above the event-form's 300 */
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(6px);
+
+    opacity: 0;
+    pointer-events: none;
+
+    transition: opacity 0.18s ease;
+}
+
+.confirm-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.confirm-box {
+    width: min(90%, 360px);
+
+    padding: 22px;
+
+    background: rgb(27, 27, 27);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 14px;
+
+    box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
+
+    transform: translateY(10px) scale(0.98);
+    transition: transform 0.18s ease;
+}
+
+.confirm-overlay.show .confirm-box {
+    transform: none;
+}
+
+.confirm-title {
+    margin-bottom: 8px;
+
+    font-family: "Gotham";
+    font-size: 15px;
+    color: white;
+}
+
+.confirm-message {
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.confirm-buttons {
+    display: flex;
+    gap: 10px;
+
+    margin-top: 20px;
+}
+
+.confirm-buttons button {
+    flex: 1;
+    height: 38px;
+
+    border: none;
+    border-radius: 8px;
+
+    font-size: 12px;
+    cursor: pointer;
+
+    transition: filter 0.15s ease;
+}
+
+.confirm-cancel {
+    background: rgb(45, 45, 45);
+    color: white;
+}
+
+.confirm-cancel:hover {
+    filter: brightness(1.15);
+}
+
+.confirm-confirm {
+    background: rgb(182, 69, 63);
+    color: white;
+}
+
+.confirm-confirm:hover {
+    filter: brightness(1.12);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .confirm-overlay,
+    .confirm-box {
+        transition: none;
+    }
+}
