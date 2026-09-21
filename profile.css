@@ -38,7 +38,13 @@
     font-display: swap;
 }
 
+/* Same fallback stack Discord/Instagram use for their own webfont —
+   keeps this page matching the homepage's readability pass instead
+   of falling back to the browser's unstyled default font. */
 body {
+    font-family: "gg sans", "Inter", -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", Roboto, Helvetica, Arial, sans-serif,
+                 "Apple Color Emoji", "Segoe UI Emoji";
     padding-bottom: 60px;
 }
 
