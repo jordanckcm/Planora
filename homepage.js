@@ -1688,8 +1688,17 @@ function buildScrollToTopButton() {
     const button = document.createElement("button");
     button.className = "scroll-top-button";
     button.type = "button";
-    button.textContent = "↑";
     button.setAttribute("aria-label", "Scroll to top");
+    // an SVG chevron instead of a text glyph — renders crisp and identical
+    // across every browser/OS, instead of depending on how each one draws
+    // the "↑" character in whatever font happens to be active
+    button.innerHTML = `
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+             stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 15l6-6 6 6"/>
+        </svg>
+    `;
     document.body.appendChild(button);
 
     button.addEventListener("click", () => {
@@ -1756,8 +1765,15 @@ function buildAddEventUI() {
         <div class="event-form-box">
             <div class="form-title">Create event</div>
 
-            <div class="event-preview-label">Preview — how this will look once posted</div>
-            <div class="event-preview" id="eventPreview"></div>
+            <button type="button" class="preview-toggle-button" id="previewToggleButton" aria-expanded="false" aria-controls="eventPreview">
+                <svg class="preview-toggle-icon" viewBox="0 0 24 24" width="13" height="13" fill="none"
+                     stroke="currentColor" stroke-width="2.5"
+                     stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6"/>
+                </svg>
+                Preview event banner
+            </button>
+            <div class="event-preview" id="eventPreview" hidden></div>
 
             <div class="event-primary-row">
                 <div class="event-primary-field">
@@ -1827,6 +1843,16 @@ function buildAddEventUI() {
     // it's what the actual card will look like, image and all, just not
     // posted yet. Rebuilt from scratch on every relevant input.
     const previewContainer = eventForm.querySelector("#eventPreview");
+    const previewToggle = eventForm.querySelector("#previewToggleButton");
+    let previewOpen = false;
+
+    previewToggle.addEventListener("click", () => {
+        previewOpen = !previewOpen;
+        previewContainer.hidden = !previewOpen;
+        previewToggle.classList.toggle("open", previewOpen);
+        previewToggle.setAttribute("aria-expanded", String(previewOpen));
+        if (previewOpen) updateEventPreview(); // catch up on anything typed while it was closed
+    });
 
     function previewDateLabel() {
         const date = document.getElementById("eventDate").value;
@@ -1935,6 +1961,7 @@ function buildAddEventUI() {
     }
 
     function updateEventPreview() {
+        if (!previewOpen) return;
         previewContainer.replaceChildren(buildPreviewCard());
     }
 
@@ -2044,6 +2071,11 @@ function buildAddEventUI() {
         selectedEventColor = EVENT_COLORS[0];
         iconRow.querySelectorAll(".event-icon-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
         colorRow.querySelectorAll(".event-color-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
+
+        previewOpen = false;
+        previewContainer.hidden = true;
+        previewToggle.classList.remove("open");
+        previewToggle.setAttribute("aria-expanded", "false");
 
         updateEventPreview();
     });
