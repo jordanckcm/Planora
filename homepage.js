@@ -1756,17 +1756,8 @@ function buildAddEventUI() {
         <div class="event-form-box">
             <div class="form-title">Create event</div>
 
-            <div class="event-preview" id="eventPreview">
-                <div class="preview-cover" id="previewCover"></div>
-                <div class="preview-info">
-                    <div class="preview-title-row">
-                        <span class="preview-title" id="previewTitle">Your event</span>
-                        <span class="preview-vis-badge" id="previewVisBadge"></span>
-                    </div>
-                    <div class="preview-date" id="previewDate">Pick a date</div>
-                    <div class="preview-desc" id="previewDesc"></div>
-                </div>
-            </div>
+            <div class="event-preview-label">Preview — how this will look once posted</div>
+            <div class="event-preview" id="eventPreview"></div>
 
             <div class="event-primary-row">
                 <div class="event-primary-field">
@@ -1831,15 +1822,11 @@ function buildAddEventUI() {
     document.body.appendChild(eventForm);
 
     // === LIVE PREVIEW ===
-    // Mirrors buildEventCard's cover/date formatting at a smaller scale,
-    // updated on every relevant input instead of waiting for a save.
-    const previewCover = eventForm.querySelector("#previewCover");
-    const previewTitle = eventForm.querySelector("#previewTitle");
-    const previewVisBadge = eventForm.querySelector("#previewVisBadge");
-    const previewDate = eventForm.querySelector("#previewDate");
-    const previewDesc = eventForm.querySelector("#previewDesc");
-
-    const PREVIEW_VIS_LABEL = { private: "", public: "PUBLIC", global: "GLOBAL" };
+    // Builds the exact same markup/classes buildEventCard() uses for a
+    // real card — so this isn't a summary that approximates the result,
+    // it's what the actual card will look like, image and all, just not
+    // posted yet. Rebuilt from scratch on every relevant input.
+    const previewContainer = eventForm.querySelector("#eventPreview");
 
     function previewDateLabel() {
         const date = document.getElementById("eventDate").value;
@@ -1868,32 +1855,87 @@ function buildAddEventUI() {
         return label;
     }
 
-    function updateEventPreview() {
+    function buildPreviewCard() {
         const title = document.getElementById("eventTitle").value.trim();
         const description = document.getElementById("eventDescription").value.trim();
+        const hasDate = Boolean(document.getElementById("eventDate").value);
 
-        previewTitle.textContent = title || "Your event";
-        previewTitle.classList.toggle("placeholder", !title);
+        // same top-level class as a real card, plus a marker class this
+        // file uses to dial back a couple of things (no "new" glow, a
+        // dashed border so it doesn't get mistaken for a card that's
+        // actually been posted)
+        const card = document.createElement("div");
+        card.className = "event event-preview-card";
 
-        previewDate.textContent = previewDateLabel();
-        previewDate.classList.toggle("placeholder", !document.getElementById("eventDate").value);
+        const ownerLabel = document.createElement("div");
+        ownerLabel.className = "event-owner-label";
+        ownerLabel.textContent = "You";
+        card.appendChild(ownerLabel);
 
-        previewDesc.textContent = description;
-        previewDesc.style.display = description ? "" : "none";
-
-        previewVisBadge.textContent = PREVIEW_VIS_LABEL[newEventVisibility] || "";
-        previewVisBadge.style.display = PREVIEW_VIS_LABEL[newEventVisibility] ? "" : "none";
-
-        previewCover.style.backgroundColor = `${selectedEventColor}26`;
+        const cover = document.createElement("div");
+        cover.className = "event-cover";
+        cover.style.backgroundColor = `${selectedEventColor}26`; // same ~15% tint real cards use
+        cover.textContent = selectedEventIcon;
         if (selectedEventImage) {
-            previewCover.classList.add("has-image");
-            previewCover.style.setProperty("--cover-image", `url("${selectedEventImage}")`);
-            previewCover.textContent = "";
-        } else {
-            previewCover.classList.remove("has-image");
-            previewCover.style.removeProperty("--cover-image");
-            previewCover.textContent = selectedEventIcon;
+            cover.classList.add("has-image");
+            cover.style.setProperty("--cover-image", `url("${selectedEventImage}")`);
         }
+        card.appendChild(cover);
+
+        const main = document.createElement("div");
+        main.className = "event-main";
+
+        const avatar = document.createElement("div");
+        avatar.className = "event-avatar";
+        const initial = (currentUser.displayName || currentUser.username || "?").charAt(0).toUpperCase();
+        if (currentUser.avatarImage) {
+            avatar.style.background = `center / cover no-repeat url("${currentUser.avatarImage}")`;
+        } else {
+            avatar.style.background = `linear-gradient(135deg, ${currentUser.avatarColor}, #1b1b1b)`;
+            avatar.textContent = initial;
+        }
+
+        const info = document.createElement("div");
+        info.className = "event-info";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "event-title-row";
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "event-title" + (title ? "" : " placeholder");
+        titleEl.textContent = title || "Your event name";
+        titleRow.appendChild(titleEl);
+
+        if (newEventVisibility === "public" || newEventVisibility === "global") {
+            const badge = document.createElement("span");
+            badge.className = "event-visibility-badge";
+            badge.textContent = newEventVisibility.toUpperCase();
+            titleRow.appendChild(badge);
+        }
+
+        info.appendChild(titleRow);
+
+        if (description) {
+            const descEl = document.createElement("div");
+            descEl.className = "event-description";
+            descEl.textContent = description;
+            info.appendChild(descEl);
+        }
+
+        const dateEl = document.createElement("div");
+        dateEl.className = "event-date" + (hasDate ? "" : " placeholder");
+        dateEl.textContent = previewDateLabel();
+        info.appendChild(dateEl);
+
+        main.appendChild(avatar);
+        main.appendChild(info);
+        card.appendChild(main);
+
+        return card;
+    }
+
+    function updateEventPreview() {
+        previewContainer.replaceChildren(buildPreviewCard());
     }
 
     const iconRow = eventForm.querySelector("#eventIconRow");
