@@ -46,6 +46,13 @@
     padding: 60px 12px 24px;
 
     overflow-y: auto;
+
+    /* FIX: the sidebar had no background of its own, so it sat directly
+       on .settings-overlay's dark scrim. That's fine in dark mode (text
+       here is light), but in light mode --text/--text-dim resolve to
+       near-black — dark text on a dark scrim, nearly invisible. */
+    background: var(--panel);
+    border-right: 1px solid var(--border);
 }
 
 .settings-sidebar-title {
@@ -79,13 +86,17 @@
 }
 
 .settings-nav-item:hover {
-    background: rgba(255, 255, 255, 0.06);
+    /* FIX: was a hardcoded white-based highlight (rgba(255,255,255,0.06)),
+       invisible-ish against a light panel. color-mix against --text means
+       the highlight is always readable against whatever --panel resolves
+       to, in either theme. */
+    background: color-mix(in srgb, var(--text) 6%, transparent);
     color: var(--text);
 }
 
 .settings-nav-item.active {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    color: var(--text); /* FIX: was hardcoded white */
 }
 
 .settings-nav-item.danger {
@@ -292,7 +303,7 @@
 
 .settings-theme-toggle button.active {
     border-color: var(--accent, #c9a227);
-    color: white;
+    color: var(--text); /* FIX: was hardcoded white */
     background: color-mix(in srgb, var(--accent, #c9a227) 18%, var(--bg-input));
 }
 
