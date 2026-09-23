@@ -20,6 +20,10 @@
                     "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
+body {
+    font-family: var(--font-discord);
+}
+
 .event-title,
 .timeline-title {
     font-family: var(--font-discord);
@@ -34,10 +38,6 @@
     line-height: 1.375;      /* Discord's message line-height */
     letter-spacing: 0;
 }
-
-/* Want the whole app in it, not just titles/descriptions? Uncomment:
-body { font-family: var(--font-discord); }
-*/
 
 
 /* =========================
