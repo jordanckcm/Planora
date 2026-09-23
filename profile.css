@@ -8,10 +8,20 @@
    The accent color is set per-profile on .profile-shell as --accent.
 ========================================================= */
 
-/* Clean, readable system font stack — no decorative webfonts. */
+/* Discord's own font stack: "gg sans" first (renders if the visitor
+   happens to have it — Discord's desktop/web app installs it locally),
+   falling through to the same chain Discord's CSS falls back to when
+   it isn't present, so this still reads as "Discord" even without the
+   font file itself. */
+:root {
+    --font-primary: "gg sans", "gg sans Variable", "Noto Sans", "Helvetica Neue",
+                     Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    --font-display: "gg sans", "gg sans Variable", "Noto Sans", "Helvetica Neue",
+                     Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
 body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
-                 Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+    font-family: var(--font-primary);
     padding-bottom: 60px;
 }
 
@@ -51,6 +61,7 @@ body {
     background: transparent;
     color: white;
 
+    font-weight: 500;
     font-size: 11px;
 
     cursor: pointer;
@@ -76,6 +87,7 @@ body {
     background: transparent;
     color: white;
 
+    font-weight: 500;
     font-size: 10px;
 
     cursor: pointer;
@@ -175,8 +187,10 @@ body {
 .profile-name {
     margin: 0;
 
+    font-family: var(--font-display);
     font-size: 22px;
     font-weight: 600;
+    letter-spacing: -0.2px;
     overflow-wrap: anywhere;
 }
 
@@ -1639,4 +1653,40 @@ textarea.comment-input:focus {
     .confirm-box {
         transition: none;
     }
+}
+
+
+/* =========================================================
+   DISCORD-STYLE TYPE ACCENTS
+   Discord tightens tracking a hair on anything acting as a
+   heading (bold, slightly negative letter-spacing) while
+   leaving body text and timestamps alone. Applied on top of
+   the weight: 600 already set on these selectors above.
+========================================================= */
+
+.profile-name,
+.role-chip,
+.editor-title,
+.section-title,
+.empty-title,
+.preview-name,
+.confirm-title,
+.post-title,
+.tile-title,
+.np-song,
+.comment-author,
+.post-author {
+    font-family: var(--font-display);
+    letter-spacing: -0.1px;
+}
+
+/* buttons and tabs read as UI chrome, not headings — Discord gives
+   these medium weight rather than the bold used on names/titles */
+.custom-button,
+.back-button,
+.comment-submit,
+.comment-edit-save,
+.comment-edit-cancel,
+.image-pick-button {
+    font-weight: 500;
 }
