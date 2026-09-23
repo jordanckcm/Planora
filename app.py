@@ -40,10 +40,23 @@ PROFILES
     gets their private events back. You usually get there by clicking
     someone's name on a comment.
 
+DISCOVERY
+    GET /api/users is a separate, flatter endpoint: it lists everyone on
+    Planora (optionally filtered by a text search or a single interest
+    tag), for the directory page. It's how "browse people" and clicking
+    an interest chip both work.
+
 REPLIES
     Comments can have replies (parentId). Replies are one level deep:
     replying to a reply attaches it to the same top-level comment and
     remembers who you were answering (reply_to).
+
+PREFERENCES
+    Each account also carries a couple of small client-preference
+    fields - theme_preference ("system" | "light" | "dark") and
+    reduce_motion (bool). These aren't used for anything server-side;
+    they're just stored so a person's theme/motion choice follows them
+    to a new device, the same way Discord's account-level settings do.
 """
 
 import re
@@ -90,6 +103,10 @@ MAX_NOW_PLAYING = 60
 MAX_LINK = 100
 MAX_INTERESTS = 5
 MAX_INTEREST_LENGTH = 20
+
+# how many rows the directory hands back at once - no real pagination yet,
+# just a defensive cap so a search with no filters can't return everything
+MAX_DIRECTORY_RESULTS = 100
 
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_PATTERN = re.compile(r"^\d{2}:\d{2}$")
@@ -139,6 +156,7 @@ EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "🌙", "
 DEFAULT_ACCENT = AVATAR_COLORS[0]
 
 VALID_ROLES = ("community", "community_plus", "admin")
+VALID_THEMES = ("system", "light", "dark")
 
 COMMUNITY_LOCAL_LIMIT = 10
 COMMUNITY_PLUS_LOCAL_LIMIT = 25
@@ -250,6 +268,10 @@ def user_public_info(user):
         "nowSong": user.get("now_song", ""),
         "nowArtist": user.get("now_artist", ""),
         "interests": user.get("interests", []),
+        # client preferences - follow the account across devices, same
+        # idea as Discord's account-level appearance settings
+        "themePreference": user.get("theme_preference", "system"),
+        "reduceMotion": bool(user.get("reduce_motion", False)),
     }
 
 
@@ -413,6 +435,8 @@ def add_demo_data():
             "avatar_image": "",
             "created_at": now_in_ms(),
             "role": demo["role"],
+            "theme_preference": "system",
+            "reduce_motion": False,
         })
 
 
@@ -459,6 +483,8 @@ def signup():
         "avatar_image": "",
         "created_at": now_in_ms(),
         "role": "community",
+        "theme_preference": "system",
+        "reduce_motion": False,
     }
     users.append(new_user)
 
@@ -580,6 +606,17 @@ def update_me():
             return jsonify({"error": "Pick a valid accent color."}), 400
         updates["accent"] = data["accent"].lower()
 
+    # appearance preferences - "system" follows the OS/browser, "light"/
+    # "dark" pin it. Stored per-account so it's the same on every device,
+    # not just the one you set it on.
+    if "theme" in data:
+        if data["theme"] not in VALID_THEMES:
+            return jsonify({"error": "Invalid theme."}), 400
+        updates["theme_preference"] = data["theme"]
+
+    if "reduceMotion" in data:
+        updates["reduce_motion"] = bool(data["reduceMotion"])
+
     plain_fields = {
         "pronouns": ("pronouns", MAX_PRONOUNS),
         "location": ("location", MAX_LOCATION),
@@ -611,6 +648,68 @@ def update_me():
 
     user.update(updates)
     return jsonify(user_public_info(user))
+
+
+@app.route("/api/me", methods=["DELETE"])
+def delete_me():
+    """
+    Self-service account deletion. Same cascade as an admin removing
+    someone (admin_delete_event below) - your events go, along with
+    everyone's copies of any Global posts you made and the comments on
+    them, then your own comments and any now-orphaned replies to them -
+    but with no role check, since deleting your own account is always
+    allowed regardless of role. Ends the session on the way out.
+    """
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    username = user["username"]
+    users.remove(user)
+
+    theirs = [e for e in events if e["owner"].lower() == username.lower()]
+    events[:] = [e for e in events if e["owner"].lower() != username.lower()]
+    for event in theirs:
+        cascade_delete_event(event)
+
+    comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
+    prune_orphan_replies()
+
+    session.pop("username", None)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/users", methods=["GET"])
+def list_users():
+    """
+    The discovery directory: everyone on Planora, optionally narrowed by
+    a text search (matches username or display name) and/or a single
+    interest tag (exact match, case-insensitive). Powers directory.html,
+    including the "click an interest chip on a profile" path, which
+    links here with ?interest=<tag>.
+
+    Distinct from GET /api/users/<username> below - that one is a single
+    person's full profile (with their public events); this one is a
+    flat, lightweight list for browsing.
+    """
+    viewer = get_logged_in_user()
+    if not viewer:
+        return jsonify({"error": "Not signed in."}), 401
+
+    query = clean_text(request.args.get("q", ""), 40).lower()
+    interest = clean_text(request.args.get("interest", ""), MAX_INTEREST_LENGTH).lower()
+
+    results = []
+    for user in users:
+        if query and query not in user["username"].lower() and query not in user["display_name"].lower():
+            continue
+        if interest and interest not in [tag.lower() for tag in user.get("interests", [])]:
+            continue
+        results.append(user_public_info(user))
+        if len(results) >= MAX_DIRECTORY_RESULTS:
+            break
+
+    return jsonify(results)
 
 
 @app.route("/api/users/<username>", methods=["GET"])
