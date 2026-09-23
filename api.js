@@ -12,6 +12,41 @@ if ("serviceWorker" in navigator) {
     });
 }
 
+
+/* =========================
+   THEME / MOTION BOOTSTRAP
+   Applied as early as possible (see the inline <script> in each page's
+   <head>, which does this same read-and-apply before any CSS paints) and
+   again here, in case a page didn't get the inline snippet. Re-applied
+   for real once getCurrentUser() below returns the server's copy, so a
+   preference changed on another device still wins once the network
+   catches up — the localStorage copy is just a same-tab head start.
+========================= */
+
+function applyThemePreference(pref) {
+    const root = document.documentElement;
+    if (pref === "light" || pref === "dark") {
+        root.setAttribute("data-theme", pref);
+    } else {
+        root.removeAttribute("data-theme"); // "system" — follow prefers-color-scheme
+    }
+}
+
+function applyReduceMotion(on) {
+    document.documentElement.toggleAttribute("data-reduce-motion", Boolean(on));
+}
+
+(function bootstrapThemeFromCache() {
+    try {
+        const cached = JSON.parse(localStorage.getItem("planora_cached_me") || "null");
+        if (cached) {
+            applyThemePreference(cached.themePreference || "system");
+            applyReduceMotion(cached.reduceMotion);
+        }
+    } catch (e) { /* no cache yet, or it's corrupt — fine, defaults apply */ }
+})();
+
+
 async function apiRequest(url, options = {}) {
     let response;
     try {
@@ -101,6 +136,14 @@ const Planora = (() => {
             // PlanoraData.getEvents below.
             const { avatarImage, bannerImage, ...cacheable } = user;
             try { localStorage.setItem("planora_cached_me", JSON.stringify(cacheable)); } catch (e) { /* storage full/unavailable — safe to ignore */ }
+
+            // reconcile the instant, cache-based guess from bootstrapThemeFromCache
+            // above with whatever the server actually has on file — matters
+            // the first time a browser sees this account, and any time the
+            // preference was changed from a different device
+            applyThemePreference(user.themePreference || "system");
+            applyReduceMotion(user.reduceMotion);
+
             return user;
         } catch (err) {
             // Only fall back to the cached identity when we couldn't reach
@@ -131,10 +174,39 @@ const Planora = (() => {
         return apiRequest("/api/me", { method: "PUT", body: updates });
     }
 
+    // Thin wrapper around the same PUT /api/me endpoint, used by
+    // settings.js for the appearance panel (theme / reduce motion) so
+    // that file doesn't need to know the endpoint shape itself.
+    async function updateAccountPreferences({ theme, reduceMotion } = {}) {
+        const payload = {};
+        if (theme !== undefined) payload.theme = theme;
+        if (reduceMotion !== undefined) payload.reduceMotion = reduceMotion;
+        return apiRequest("/api/me", { method: "PUT", body: payload });
+    }
+
+    // Self-service account deletion — settings.js's danger zone.
+    async function deleteAccount() {
+        const result = await apiRequest("/api/me", { method: "DELETE" });
+        localStorage.removeItem("planora_started");
+        localStorage.removeItem("planora_cached_me");
+        return result;
+    }
+
     /* Someone's public profile: their details, stats and public events.
        Yours also includes your private events. Used by profile.js. */
     async function getProfile(username) {
         return apiRequest(`/api/users/${encodeURIComponent(username)}`);
+    }
+
+    /* The discovery directory — everyone on Planora, optionally narrowed
+       by a text search and/or a single interest tag. Used by
+       directory.js, and by the "click an interest chip" link on a
+       profile (which just points here with ?interest=<tag>). */
+    async function searchUsers({ q = "", interest = "" } = {}) {
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (interest) params.set("interest", interest);
+        return apiRequest(`/api/users?${params.toString()}`);
     }
 
     // Same char-count limit the server enforces (app.py's MAX_IMAGE_CHARS)
@@ -227,9 +299,14 @@ const Planora = (() => {
         getCurrentUser,
         requireAuth,
         updateProfile,
+        updateAccountPreferences,
+        deleteAccount,
         getProfile,
+        searchUsers,
         resizeImage,
-        canUseGif
+        canUseGif,
+        applyThemePreference,
+        applyReduceMotion
     };
 
 })();
