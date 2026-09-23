@@ -114,6 +114,21 @@ select {
     background: rgba(255, 255, 255, 0.08);
 }
 
+/* FIX: .custom-button and .image-pick-button both hardcode `color: white`,
+   which is correct on the topbar (always dark, on purpose) but breaks
+   wherever the same classes get reused on a surface that follows the
+   theme — the editor drawer's "Cancel" button and its "Change" image
+   buttons. Scoped to .editor so the topbar itself is untouched. */
+.editor .custom-button,
+.editor .image-pick-button {
+    color: var(--text);
+}
+
+.editor .custom-button:hover,
+.editor .image-pick-button:hover {
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+}
+
 
 /* ---------- shell ---------- */
 
@@ -1000,7 +1015,7 @@ select {
 
     font-size: 15px;
     font-weight: 600;
-    color: white;
+    color: var(--text); /* FIX: was hardcoded white — invisible on a light .confirm-box */
 }
 
 .confirm-message {
@@ -1198,7 +1213,7 @@ select {
     border-radius: 6px;
 
     background: transparent;
-    color: white;
+    color: var(--text); /* FIX: was hardcoded white — invisible on a light var(--panel) dropdown */
 
     font-size: 12px;
     text-align: left;
@@ -1280,7 +1295,7 @@ select {
 
     font-size: 13px;
     font-weight: 600;
-    color: white;
+    color: var(--text); /* FIX: was hardcoded white — invisible on a light var(--panel) modal */
     text-decoration: none;
 }
 
@@ -1523,7 +1538,7 @@ select {
 .comment-author {
     font-size: 12.5px;
     font-weight: 600;
-    color: white;
+    color: var(--text); /* FIX: was hardcoded white — invisible on a light var(--panel) modal */
     margin-right: 8px;
     text-decoration: none;
 }
@@ -1604,7 +1619,7 @@ select {
     border-radius: 15px;
 
     background: var(--bg-input-alt, rgb(15, 15, 15));
-    color: white;
+    color: var(--text); /* FIX: was hardcoded white — --bg-input-alt goes light in light mode */
     font-size: 12px;
 
     outline: none;
