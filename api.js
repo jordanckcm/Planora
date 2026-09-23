@@ -137,14 +137,52 @@ const Planora = (() => {
         return apiRequest(`/api/users/${encodeURIComponent(username)}`);
     }
 
-    /* Shared by the profile-picture picker (profile.js) and the event-cover
-       picker (homepage.js): shrinks a chosen image to at most `maxWidth`
-       and returns a JPEG data URL, so uploads stay small and fast no
-       matter what the source photo's original size was. */
-    function resizeImage(file, maxWidth = 900, quality = 0.75) {
+    // Same char-count limit the server enforces (app.py's MAX_IMAGE_CHARS)
+    // on the base64 string it receives - checked here too so a GIF that's
+    // too big fails fast instead of round-tripping to the server first.
+    const MAX_IMAGE_DATA_CHARS = 300000;
+
+    /* Shared by the profile-picture/banner pickers (profile.js) and the
+       event-cover picker (homepage.js): turns a chosen file into a data
+       URL ready to send to the server.
+
+       Static images (JPEG/PNG/WebP) are shrunk to at most `maxWidth` and
+       recompressed as JPEG, so uploads stay small and fast regardless of
+       the source photo's size.
+
+       A GIF is handled differently: running it through the <canvas> pipe
+       above would flatten it to its first frame and throw away the
+       animation, so when `allowGif` is true a GIF is read through as-is
+       instead - full quality, no resizing, since there's no safe way to
+       downscale an animated GIF client-side without breaking it. If it's
+       over the server's size limit, this rejects with a clear message
+       rather than silently truncating it. When `allowGif` is false (the
+       caller decides this from the signed-in user's role), a GIF is
+       rejected outright with the same message the server would give, so
+       the person finds out before waiting on an upload that's just going
+       to bounce. */
+    function resizeImage(file, { allowGif = false, maxWidth = 900, quality = 0.75 } = {}) {
         return new Promise((resolve, reject) => {
             if (!file.type.startsWith("image/")) {
                 reject(new Error("That file isn't an image."));
+                return;
+            }
+
+            if (file.type === "image/gif") {
+                if (!allowGif) {
+                    reject(new Error("GIFs need a Community+ or Admin account."));
+                    return;
+                }
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error("Couldn't read that file."));
+                reader.onload = () => {
+                    if (reader.result.length > MAX_IMAGE_DATA_CHARS) {
+                        reject(new Error("That GIF is too big. Try a smaller one (under ~220KB)."));
+                        return;
+                    }
+                    resolve(reader.result);
+                };
+                reader.readAsDataURL(file);
                 return;
             }
 
@@ -172,6 +210,10 @@ const Planora = (() => {
         });
     }
 
+    function canUseGif(user) {
+        return Boolean(user) && (user.role === "community_plus" || user.role === "admin");
+    }
+
     return {
         escapeHTML,
         passwordStrength,
@@ -182,7 +224,8 @@ const Planora = (() => {
         requireAuth,
         updateProfile,
         getProfile,
-        resizeImage
+        resizeImage,
+        canUseGif
     };
 
 })();
@@ -225,6 +268,13 @@ const PlanoraData = (() => {
 
     async function addEvent(event) {
         return apiRequest("/api/events", { method: "POST", body: event });
+    }
+
+    // Edits an event's content (title, description, date/time, image,
+    // icon, color). Only works on an event you own and didn't just add
+    // from someone else's Global post - see the server's own docstring.
+    async function editEvent(eventId, event) {
+        return apiRequest(`/api/events/${eventId}`, { method: "PUT", body: event });
     }
 
     // Flip one of your own calendar events between "private" and "public".
@@ -273,6 +323,7 @@ const PlanoraData = (() => {
     return {
         getEvents,
         addEvent,
+        editEvent,
         setEventVisibility,
         addToMyCalendar,
         deleteEvent,
