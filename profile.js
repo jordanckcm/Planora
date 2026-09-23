@@ -196,12 +196,14 @@ function render() {
     $("joinedView").textContent = "Joined " +
         new Date(p.createdAt).toLocaleDateString(undefined, { month: "short", year: "numeric" });
 
-    // interests
+    // interests — each one links into the Discover directory, pre-filtered
+    // to that tag, same idea as tapping a hashtag
     const chips = $("interestChips");
     chips.textContent = "";
     (p.interests || []).forEach((tag) => {
-        const el = document.createElement("span");
+        const el = document.createElement("a");
         el.className = "chip";
+        el.href = "directory.html?interest=" + encodeURIComponent(tag);
         el.textContent = tag;
         chips.appendChild(el);
     });
@@ -1072,6 +1074,14 @@ function bindPostModal() {
 function bindStaticActions() {
     $("backButton").addEventListener("click", () => {
         window.location.href = "homepage.html";
+    });
+
+    $("discoverButton").addEventListener("click", () => {
+        window.location.href = "directory.html";
+    });
+
+    $("settingsButton").addEventListener("click", () => {
+        Planora.Settings.open(viewer);
     });
 
     $("logoutButton").addEventListener("click", async () => {
