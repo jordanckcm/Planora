@@ -9,9 +9,28 @@
     <link rel="icon" type="image/png"
           href="{{ url_for('static', filename='images/planora logo.png') }}">
 
+    <!-- Applied before any CSS paints, from whatever's cached from the
+         last /api/me response, so the page doesn't flash the wrong
+         theme while api.js's own network-backed bootstrap catches up. -->
+    <script>
+        (function () {
+            try {
+                var cached = JSON.parse(localStorage.getItem("planora_cached_me") || "null");
+                if (cached && (cached.themePreference === "light" || cached.themePreference === "dark")) {
+                    document.documentElement.setAttribute("data-theme", cached.themePreference);
+                }
+                if (cached && cached.reduceMotion) {
+                    document.documentElement.setAttribute("data-reduce-motion", "");
+                }
+            } catch (e) { /* no cache yet — defaults apply */ }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="homepage.css">
     <link rel="stylesheet" href="homepage-extra.css">
     <link rel="stylesheet" href="planora-ui.css">
+    <link rel="stylesheet" href="settings.css">
 </head>
 
 <body>
@@ -25,6 +44,8 @@
 
             <div class="profile-dropdown" id="profileDropdown">
                 <button class="profile-dropdown-item" id="viewProfileItem">View profile</button>
+                <button class="profile-dropdown-item" id="discoverItem">Discover</button>
+                <button class="profile-dropdown-item" id="settingsItem">Settings</button>
                 <div class="profile-dropdown-divider"></div>
                 <button class="profile-dropdown-item danger" id="logoutItem">Log out</button>
             </div>
@@ -240,6 +261,7 @@
 
     <!-- JAVASCRIPT -->
     <script src="api.js"></script>
+    <script src="settings.js"></script>
     <script src="homepage.js"></script>
     <script src="mode-effects.js"></script>
 
