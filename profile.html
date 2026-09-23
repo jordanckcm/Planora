@@ -174,6 +174,11 @@
          comment composer stays pinned to the bottom of the modal
          (outside the scrolling area) so it's never something you
          have to scroll down to reach.
+
+         If you own the event, a ⋮ menu (top-left, next to close)
+         lets you edit it in place — same PUT /api/events/<id> the
+         homepage's own Edit uses, so it's the same record and shows
+         up updated on the homepage too, not a separate copy.
     ========================== -->
     <div class="post-overlay" id="postOverlay" hidden></div>
 
@@ -181,6 +186,13 @@
         <div class="post-modal-inner">
 
             <button class="post-close" id="postClose" aria-label="Close">×</button>
+
+            <div class="post-menu-wrap" id="postMenuWrap" style="display:none;">
+                <button class="post-menu-button" id="postMenuButton" aria-label="Post options" aria-haspopup="true" aria-expanded="false">⋮</button>
+                <div class="post-menu-dropdown" id="postMenuDropdown">
+                    <button type="button" class="post-menu-item" id="postEditItem">Edit event</button>
+                </div>
+            </div>
 
             <div class="post-banner" id="postBanner"></div>
 
@@ -198,6 +210,64 @@
 
                 <div class="post-title" id="postTitle"></div>
                 <p class="post-caption" id="postCaption"></p>
+
+                <!-- EDIT PANEL — hidden unless you own the post and pressed
+                     Edit from the ⋮ menu. Swaps in for the title/caption. -->
+                <div class="post-edit-form" id="postEditForm" hidden>
+
+                    <label class="field-label" for="postEditTitle">Event name</label>
+                    <input class="field-input" id="postEditTitle" maxlength="80" placeholder="What's happening?">
+
+                    <label class="field-label" for="postEditDescription">Description <span class="optional-tag">optional</span></label>
+                    <textarea class="field-input post-edit-textarea" id="postEditDescription" maxlength="400" placeholder="Add some details..."></textarea>
+
+                    <div class="post-edit-row">
+                        <div class="post-edit-field">
+                            <label class="field-label" for="postEditDate">Date</label>
+                            <input type="date" class="field-input" id="postEditDate">
+                        </div>
+                        <div class="post-edit-field">
+                            <label class="field-label" for="postEditEndDate">Ends <span class="optional-tag">optional</span></label>
+                            <input type="date" class="field-input" id="postEditEndDate">
+                        </div>
+                    </div>
+
+                    <div class="post-edit-row">
+                        <div class="post-edit-field">
+                            <label class="field-label" for="postEditStartTime">Start time <span class="optional-tag">optional</span></label>
+                            <input type="time" class="field-input" id="postEditStartTime">
+                        </div>
+                        <div class="post-edit-field">
+                            <label class="field-label" for="postEditEndTime">End time <span class="optional-tag">optional</span></label>
+                            <input type="time" class="field-input" id="postEditEndTime">
+                        </div>
+                    </div>
+
+                    <label class="field-label">Cover image <span class="optional-tag">optional</span> <span class="optional-tag" id="postEditGifAllowedTag" style="display:none;">GIF ok</span></label>
+                    <div class="image-picker">
+                        <label class="image-pick-button" for="postEditImageInput">Choose image</label>
+                        <input type="file" id="postEditImageInput" accept="image/*" hidden>
+                        <button type="button" class="image-remove" id="postEditRemoveImage" style="display:none;">Remove</button>
+                    </div>
+                    <div class="image-reposition" id="postEditImageReposition" style="display:none;">
+                        <div class="image-reposition-frame banner-shape" id="postEditImageFrame">
+                            <div class="image-reposition-photo" id="postEditImagePhoto"></div>
+                            <div class="image-reposition-crosshair" id="postEditImageCrosshair"></div>
+                        </div>
+                        <div class="image-reposition-hint">Drag to choose what shows</div>
+                    </div>
+
+                    <label class="field-label">Icon</label>
+                    <div class="event-icon-row" id="postEditIconRow"></div>
+
+                    <label class="field-label">Color</label>
+                    <div class="event-color-row" id="postEditColorRow"></div>
+
+                    <div class="post-edit-buttons">
+                        <button type="button" class="custom-button" id="postEditCancel">Cancel</button>
+                        <button type="button" class="btn btn-solid" id="postEditSave">Save changes</button>
+                    </div>
+                </div>
 
                 <div class="post-comments">
                     <div class="comment-list" id="postCommentList"></div>
