@@ -16,7 +16,7 @@ const ACCENT_PALETTE = [
 ];
 
 const DEFAULT_ACCENT = "#c9a227";
-const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/;
+const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 let viewer = null;      // who is signed in
@@ -34,6 +34,7 @@ const $ = (id) => document.getElementById(id);
     if (!viewer) return;
 
     bindStaticActions();
+    bindPostModal();
     await loadProfile();
 })();
 
@@ -94,24 +95,43 @@ function initialOf(name, username) {
     return (name || username || "?").charAt(0).toUpperCase();
 }
 
+const DEFAULT_POSITION = { x: 50, y: 50 };
+
+function safePosition(pos) {
+    if (!pos || typeof pos.x !== "number" || typeof pos.y !== "number") return DEFAULT_POSITION;
+    return {
+        x: Math.min(100, Math.max(0, pos.x)),
+        y: Math.min(100, Math.max(0, pos.y))
+    };
+}
+
 /* Paints an avatar element: the photo if there is one, otherwise the
    color + first letter. Used by the hero and by the editor preview so
-   the two can never disagree. */
-function paintAvatar(el, image, color, initial) {
+   the two can never disagree. `position` is the focal point chosen in
+   the reposition control - {x, y} percentages, defaulting to center. */
+function paintAvatar(el, image, color, initial, position) {
     const img = safeImage(image);
     el.textContent = "";
 
     if (img) {
-        el.style.background = `center / cover no-repeat url("${img}")`;
+        const pos = safePosition(position);
+        el.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${img}")`;
     } else {
         el.style.background = `linear-gradient(135deg, ${safeColor(color)}, #1b1b1b)`;
         el.textContent = initial;
     }
 }
 
-function paintBanner(el, image) {
+function paintBanner(el, image, position) {
     const img = safeImage(image);
-    el.style.backgroundImage = img ? `url("${img}")` : "";
+    if (img) {
+        const pos = safePosition(position);
+        el.style.backgroundImage = `url("${img}")`;
+        el.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+    } else {
+        el.style.backgroundImage = "";
+        el.style.backgroundPosition = "";
+    }
 }
 
 function formatEventDate(event) {
@@ -145,10 +165,14 @@ function render() {
     const shell = $("profileShell");
 
     shell.style.setProperty("--accent", safeColor(p.accent));
+    // the post modal and confirm dialog render as siblings of .profile-shell
+    // (appended near the end of <body>), so they need the accent set here
+    // too - otherwise they'd fall back to nothing rather than inheriting it
+    document.documentElement.style.setProperty("--accent", safeColor(p.accent));
     document.title = `${p.displayName} · Planora`;
 
-    paintBanner($("heroBanner"), p.bannerImage);
-    paintAvatar($("avatarBig"), p.avatarImage, p.avatarColor, initialOf(p.displayName, p.username));
+    paintBanner($("heroBanner"), p.bannerImage, p.bannerPosition);
+    paintAvatar($("avatarBig"), p.avatarImage, p.avatarColor, initialOf(p.displayName, p.username), p.avatarPosition);
 
     $("displayNameView").textContent = p.displayName;
     $("usernameView").textContent = "@" + p.username;
@@ -279,13 +303,17 @@ function emptyState(isPublic) {
 function eventTile(event, showLock) {
     const tile = document.createElement("article");
     tile.className = "event-tile";
+    tile.setAttribute("role", "button");
+    tile.setAttribute("tabindex", "0");
 
     const cover = document.createElement("div");
     cover.className = "tile-cover";
 
     const img = safeImage(event.image);
     if (img) {
+        const pos = safePosition(event.image_position);
         cover.style.backgroundImage = `url("${img}")`;
+        cover.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
     } else {
         cover.style.background = `linear-gradient(135deg, ${safeColor(event.color)}, #1b1b1b)`;
         cover.textContent = event.icon;
@@ -296,6 +324,29 @@ function eventTile(event, showLock) {
         lock.className = "tile-lock";
         lock.textContent = "Private";
         cover.appendChild(lock);
+    }
+
+    // Quick add-to-calendar, right on the tile - only for someone else's
+    // public event you haven't already added. Your own tiles and ones
+    // you've already added don't get this.
+    if (!showLock && !profile.isSelf && !event.addedByMe) {
+        const addBtn = document.createElement("button");
+        addBtn.type = "button";
+        addBtn.className = "tile-add-button";
+        addBtn.textContent = "+";
+        addBtn.setAttribute("aria-label", "Add to your calendar");
+        addBtn.title = "Add to your calendar";
+        addBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            quickAddToCalendar(event, addBtn);
+        });
+        cover.appendChild(addBtn);
+    } else if (!showLock && !profile.isSelf && event.addedByMe) {
+        const addedMark = document.createElement("span");
+        addedMark.className = "tile-added-mark";
+        addedMark.textContent = "✓";
+        addedMark.title = "Already on your calendar";
+        cover.appendChild(addedMark);
     }
 
     const body = document.createElement("div");
@@ -319,7 +370,488 @@ function eventTile(event, showLock) {
     }
 
     tile.append(cover, body);
+
+    // Private events on your own profile aren't posts to open (no public
+    // comment thread makes sense for something only you can see) - the
+    // tile just shows, it doesn't open anything.
+    if (!showLock) {
+        tile.addEventListener("click", () => openPost(event));
+        tile.addEventListener("keydown", (e) => {
+            if (e.key === "Enter") openPost(event);
+        });
+    } else {
+        tile.classList.add("not-clickable");
+    }
+
     return tile;
+}
+
+async function quickAddToCalendar(event, button) {
+    button.disabled = true;
+    try {
+        await api(`/api/events/${event.id}/add`, { method: "POST" });
+        event.addedByMe = true;
+        toast(`Added "${event.title}" to your calendar.`, "success");
+        renderEvents();
+    } catch (err) {
+        toast(err.message, "error");
+        button.disabled = false;
+    }
+}
+
+
+/* =========================================================
+   POST VIEW (Instagram-style)
+   Opens from a public event tile: the event's banner across the
+   top, then its full comment thread below - same comment/reply
+   system the homepage's Global feed uses, talking to the same
+   endpoints, just laid out as a single post instead of a card in
+   a list.
+========================================================= */
+
+let currentPostEvent = null;
+let postReplyingTo = null;
+let postComments = [];
+
+function formatRelativeShort(ms) {
+    const diffSeconds = Math.round((Date.now() - ms) / 1000);
+    if (diffSeconds < 60) return "just now";
+    if (diffSeconds < 3600) return `${Math.floor(diffSeconds / 60)}m`;
+    if (diffSeconds < 86400) return `${Math.floor(diffSeconds / 3600)}h`;
+    if (diffSeconds < 7 * 86400) return `${Math.floor(diffSeconds / 86400)}d`;
+    return new Date(ms).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function formatFullTimestamp(ms) {
+    return new Date(ms).toLocaleString(undefined, {
+        month: "short", day: "numeric", year: "numeric",
+        hour: "numeric", minute: "2-digit"
+    });
+}
+
+function profileHref(username) {
+    return "profile.html?u=" + encodeURIComponent(username);
+}
+
+/* A themed "are you sure?" dialog, same pattern as the homepage's -
+   used before deleting a comment or a reply. Resolves true/false. */
+function confirmAction({ title, message, confirmLabel = "Delete" }) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement("div");
+        overlay.className = "confirm-overlay";
+
+        const box = document.createElement("div");
+        box.className = "confirm-box";
+        box.setAttribute("role", "alertdialog");
+        box.setAttribute("aria-modal", "true");
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "confirm-title";
+        titleEl.textContent = title;
+
+        const messageEl = document.createElement("p");
+        messageEl.className = "confirm-message";
+        messageEl.textContent = message;
+
+        const buttons = document.createElement("div");
+        buttons.className = "confirm-buttons";
+
+        const cancelBtn = document.createElement("button");
+        cancelBtn.type = "button";
+        cancelBtn.className = "confirm-cancel";
+        cancelBtn.textContent = "Cancel";
+
+        const confirmBtn = document.createElement("button");
+        confirmBtn.type = "button";
+        confirmBtn.className = "confirm-confirm";
+        confirmBtn.textContent = confirmLabel;
+
+        buttons.append(cancelBtn, confirmBtn);
+        box.append(titleEl, messageEl, buttons);
+        overlay.appendChild(box);
+        document.body.appendChild(overlay);
+
+        function close(result) {
+            overlay.classList.remove("show");
+            document.removeEventListener("keydown", onKeydown);
+            setTimeout(() => overlay.remove(), 180);
+            resolve(result);
+        }
+        function onKeydown(e) { if (e.key === "Escape") close(false); }
+
+        cancelBtn.addEventListener("click", () => close(false));
+        confirmBtn.addEventListener("click", () => close(true));
+        overlay.addEventListener("click", (e) => { if (e.target === overlay) close(false); });
+        document.addEventListener("keydown", onKeydown);
+
+        requestAnimationFrame(() => {
+            overlay.classList.add("show");
+            cancelBtn.focus();
+        });
+    });
+}
+
+async function openPost(event) {
+    currentPostEvent = event;
+    postReplyingTo = null;
+
+    const pos = safePosition(event.image_position);
+    const banner = $("postBanner");
+    if (safeImage(event.image)) {
+        banner.style.backgroundImage = `url("${safeImage(event.image)}")`;
+        banner.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+        banner.classList.remove("no-image");
+        banner.textContent = "";
+    } else {
+        banner.style.backgroundImage = "";
+        banner.classList.add("no-image");
+        banner.style.background = `linear-gradient(135deg, ${safeColor(event.color)}, #1b1b1b)`;
+        banner.textContent = event.icon || "";
+    }
+
+    paintAvatar($("postAvatar"), profile.avatarImage, profile.avatarColor, initialOf(profile.displayName, profile.username), profile.avatarPosition);
+    $("postAuthor").textContent = profile.displayName;
+    $("postAuthor").href = profileHref(profile.username);
+    $("postDate").textContent = formatEventDate(event);
+    $("postTitle").textContent = event.title;
+
+    const caption = $("postCaption");
+    caption.textContent = event.description || "";
+    caption.hidden = !event.description;
+
+    const addButton = $("postAddButton");
+    const addedTag = $("postAddedTag");
+    if (!profile.isSelf && !event.addedByMe) {
+        addButton.style.display = "";
+        addedTag.style.display = "none";
+        addButton.disabled = false;
+        addButton.textContent = "Add to calendar";
+    } else if (!profile.isSelf && event.addedByMe) {
+        addButton.style.display = "none";
+        addedTag.style.display = "";
+    } else {
+        addButton.style.display = "none";
+        addedTag.style.display = "none";
+    }
+
+    resetPostComposer();
+
+    $("postOverlay").hidden = false;
+    $("postModal").classList.add("open");
+    $("postModal").setAttribute("aria-hidden", "false");
+    document.body.style.overflow = "hidden";
+
+    $("postCommentList").innerHTML = "";
+    await loadPostComments();
+}
+
+function closePost() {
+    $("postModal").classList.remove("open");
+    $("postModal").setAttribute("aria-hidden", "true");
+    $("postOverlay").hidden = true;
+    document.body.style.overflow = "";
+    currentPostEvent = null;
+}
+
+async function loadPostComments() {
+    if (!currentPostEvent) return;
+    try {
+        postComments = await api(`/api/events/${currentPostEvent.id}/comments`);
+    } catch (err) {
+        postComments = [];
+    }
+    renderPostComments();
+}
+
+function renderPostComments() {
+    const list = $("postCommentList");
+    list.innerHTML = "";
+
+    if (postComments.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "comment-empty";
+        empty.textContent = "No comments yet — say something.";
+        list.appendChild(empty);
+        return;
+    }
+
+    const knownIds = new Set(postComments.map(c => c.id));
+    const topLevel = postComments.filter(c => !c.parent_id || !knownIds.has(c.parent_id));
+
+    topLevel.forEach(top => {
+        list.appendChild(postCommentRow(top, false));
+        postComments
+            .filter(r => r.parent_id === top.id)
+            .forEach(reply => list.appendChild(postCommentRow(reply, true)));
+    });
+}
+
+function postCommentRow(comment, isReply) {
+    const row = document.createElement("div");
+    row.className = "comment" + (isReply ? " comment-reply" : "");
+
+    const isAuthor = viewer.username.toLowerCase() === comment.author.toLowerCase();
+    const canModerate = viewer.role === "admin" || viewer.username.toLowerCase() === profile.username.toLowerCase();
+    const canEdit = isAuthor;
+    const canDelete = isAuthor || canModerate;
+
+    const displayName = comment.authorDisplayName || comment.author;
+
+    const avatar = document.createElement("a");
+    avatar.className = "comment-avatar";
+    avatar.href = profileHref(comment.author);
+    avatar.title = displayName;
+    if (safeImage(comment.authorAvatarImage)) {
+        avatar.style.background = `center / cover no-repeat url("${comment.authorAvatarImage}")`;
+    } else {
+        avatar.style.background = `linear-gradient(135deg, ${safeColor(comment.authorAvatarColor)}, #1b1b1b)`;
+        avatar.textContent = displayName.charAt(0).toUpperCase();
+    }
+
+    const author = document.createElement("a");
+    author.className = "comment-author";
+    author.href = profileHref(comment.author);
+    author.textContent = "@" + comment.author;
+
+    const time = document.createElement("span");
+    time.className = "comment-time";
+    time.dataset.timestamp = comment.created_at;
+    time.textContent = formatRelativeShort(comment.created_at);
+    time.title = formatFullTimestamp(comment.created_at);
+
+    const text = document.createElement("span");
+    text.className = "comment-text";
+    if (comment.reply_to) {
+        const mention = document.createElement("a");
+        mention.className = "comment-mention";
+        mention.href = profileHref(comment.reply_to);
+        mention.textContent = "@" + comment.reply_to;
+        text.appendChild(mention);
+        text.appendChild(document.createTextNode(" "));
+    }
+    text.appendChild(document.createTextNode(comment.text));
+
+    const body = document.createElement("span");
+    body.className = "comment-body";
+    body.append(author, time, text);
+
+    if (comment.edited) {
+        const edited = document.createElement("span");
+        edited.className = "comment-edited";
+        edited.textContent = "(edited)";
+        body.appendChild(edited);
+    }
+
+    const actions = document.createElement("span");
+    actions.className = "comment-actions";
+
+    const replyBtn = document.createElement("button");
+    replyBtn.type = "button";
+    replyBtn.className = "comment-reply-button";
+    replyBtn.textContent = "Reply";
+    replyBtn.addEventListener("click", () => startPostReply(comment));
+    actions.appendChild(replyBtn);
+
+    if (canEdit) {
+        const editBtn = document.createElement("button");
+        editBtn.type = "button";
+        editBtn.className = "comment-reply-button";
+        editBtn.textContent = "Edit";
+        editBtn.addEventListener("click", () => enterPostCommentEdit(comment, row, body));
+        actions.appendChild(editBtn);
+    }
+
+    if (canDelete) {
+        const deleteBtn = document.createElement("button");
+        deleteBtn.type = "button";
+        deleteBtn.className = "comment-reply-button danger";
+        deleteBtn.textContent = "Delete";
+        deleteBtn.addEventListener("click", async () => {
+            const replyCount = isReply ? 0 : postComments.filter(r => r.parent_id === comment.id).length;
+            const confirmed = await confirmAction({
+                title: isReply ? "Delete this reply?" : "Delete this comment?",
+                message: replyCount > 0
+                    ? `This will also delete ${replyCount === 1 ? "its 1 reply" : `its ${replyCount} replies`}. This can't be undone.`
+                    : "This can't be undone.",
+                confirmLabel: "Delete"
+            });
+            if (!confirmed) return;
+            try {
+                await api(`/api/events/${currentPostEvent.id}/comments/${comment.id}`, { method: "DELETE" });
+                toast(isReply ? "Reply deleted." : "Comment deleted.");
+                await loadPostComments();
+            } catch (err) {
+                toast(err.message, "error");
+            }
+        });
+        actions.appendChild(deleteBtn);
+    }
+
+    body.appendChild(actions);
+    row.append(avatar, body);
+    return row;
+}
+
+function enterPostCommentEdit(comment, row, body) {
+    const editInput = document.createElement("input");
+    editInput.className = "comment-edit-input";
+    editInput.value = comment.text;
+    editInput.maxLength = 240;
+
+    const saveBtn = document.createElement("button");
+    saveBtn.className = "comment-edit-save";
+    saveBtn.textContent = "Save";
+
+    const cancelBtn = document.createElement("button");
+    cancelBtn.className = "comment-edit-cancel";
+    cancelBtn.textContent = "Cancel";
+
+    const editRow = document.createElement("div");
+    editRow.className = "comment-edit-row";
+    editRow.append(editInput, saveBtn, cancelBtn);
+
+    body.replaceWith(editRow);
+    editInput.focus();
+    editInput.setSelectionRange(editInput.value.length, editInput.value.length);
+
+    async function save() {
+        if (!editInput.value.trim()) return;
+        try {
+            await api(`/api/events/${currentPostEvent.id}/comments/${comment.id}`, {
+                method: "PUT",
+                body: JSON.stringify({ text: editInput.value })
+            });
+            toast("Comment updated.");
+            await loadPostComments();
+        } catch (err) {
+            toast(err.message, "error");
+        }
+    }
+
+    saveBtn.addEventListener("click", save);
+    cancelBtn.addEventListener("click", () => renderPostComments());
+    editInput.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") renderPostComments();
+    });
+}
+
+function startPostReply(comment) {
+    postReplyingTo = comment;
+    $("postReplyLabel").textContent = `Replying to @${comment.author}`;
+    $("postReplyBanner").classList.add("show");
+    $("postCommentInput").placeholder = `Reply to @${comment.author}...`;
+    $("postCommentInput").focus();
+}
+
+function cancelPostReply() {
+    postReplyingTo = null;
+    $("postReplyBanner").classList.remove("show");
+    $("postCommentInput").placeholder = "Add a comment...";
+}
+
+function resetPostComposer() {
+    postReplyingTo = null;
+    $("postReplyBanner").classList.remove("show");
+    const input = $("postCommentInput");
+    input.value = "";
+    input.style.height = "auto";
+    input.placeholder = "Add a comment...";
+    input.disabled = false;
+    updatePostCommentCounter();
+}
+
+function updatePostCommentCounter() {
+    const input = $("postCommentInput");
+    const counter = $("postCommentCounter");
+    const submit = $("postCommentSubmit");
+    const remaining = input.maxLength - input.value.length;
+    counter.textContent = remaining <= 40 ? String(remaining) : "";
+    counter.classList.toggle("low", remaining <= 20);
+    submit.disabled = input.value.trim().length === 0;
+}
+
+function autosizePostInput() {
+    const input = $("postCommentInput");
+    input.style.height = "auto";
+    const next = Math.min(input.scrollHeight, 120);
+    input.style.height = next + "px";
+    input.style.overflowY = input.scrollHeight > 120 ? "auto" : "hidden";
+}
+
+async function submitPostComment() {
+    const input = $("postCommentInput");
+    const submit = $("postCommentSubmit");
+    const text = input.value;
+    if (!text.trim() || submit.disabled) return;
+
+    const wasReply = Boolean(postReplyingTo);
+    input.disabled = true;
+    submit.disabled = true;
+    submit.textContent = "Posting…";
+
+    try {
+        await api(`/api/events/${currentPostEvent.id}/comments`, {
+            method: "POST",
+            body: JSON.stringify({ text, parentId: postReplyingTo ? postReplyingTo.id : null })
+        });
+        toast(wasReply ? "Reply posted." : "Comment posted.", "success");
+        resetPostComposer();
+        submit.textContent = "Post";
+        await loadPostComments();
+    } catch (err) {
+        toast(err.message, "error");
+        input.disabled = false;
+        submit.textContent = "Post";
+        updatePostCommentCounter();
+    }
+}
+
+function bindPostModal() {
+    $("postClose").addEventListener("click", closePost);
+    $("postOverlay").addEventListener("click", closePost);
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && $("postModal").classList.contains("open")) closePost();
+    });
+
+    $("postReplyCancel").addEventListener("click", cancelPostReply);
+
+    const input = $("postCommentInput");
+    input.addEventListener("input", () => {
+        autosizePostInput();
+        updatePostCommentCounter();
+    });
+    input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+            e.preventDefault();
+            submitPostComment();
+        }
+        if (e.key === "Escape" && postReplyingTo) cancelPostReply();
+    });
+    $("postCommentSubmit").addEventListener("click", submitPostComment);
+
+    $("postAddButton").addEventListener("click", async () => {
+        const button = $("postAddButton");
+        button.disabled = true;
+        try {
+            await api(`/api/events/${currentPostEvent.id}/add`, { method: "POST" });
+            currentPostEvent.addedByMe = true;
+            button.style.display = "none";
+            $("postAddedTag").style.display = "";
+            toast(`Added "${currentPostEvent.title}" to your calendar.`, "success");
+            renderEvents();
+        } catch (err) {
+            toast(err.message, "error");
+            button.disabled = false;
+        }
+    });
+
+    // refresh comment timestamps periodically, same idea as the homepage
+    setInterval(() => {
+        document.querySelectorAll("#postCommentList .comment-time[data-timestamp]").forEach(el => {
+            el.textContent = formatRelativeShort(Number(el.dataset.timestamp));
+        });
+    }, 60000);
 }
 
 
@@ -371,7 +903,9 @@ function openEditor() {
         interests: (p.interests || []).join(", "),
         accent: safeColor(p.accent),
         avatarImage: p.avatarImage || "",
-        bannerImage: p.bannerImage || ""
+        avatarPosition: safePosition(p.avatarPosition),
+        bannerImage: p.bannerImage || "",
+        bannerPosition: safePosition(p.bannerPosition)
     };
 
     $("displayNameInput").value = draft.displayName;
@@ -384,6 +918,11 @@ function openEditor() {
     $("nowSongInput").value = draft.nowSong;
     $("nowArtistInput").value = draft.nowArtist;
     $("interestsInput").value = draft.interests;
+
+    $("gifAllowedTag").style.display = Planora.canUseGif(viewer) ? "" : "none";
+
+    updateAvatarRepositionVisual();
+    updateBannerRepositionVisual();
 
     buildSwatches();
     updateEditorPreview();
@@ -441,8 +980,8 @@ function updateEditorPreview() {
     const name = draft.displayName.trim() || profile.username;
 
     $("previewCard").style.setProperty("--accent", draft.accent);
-    paintBanner($("previewBanner"), draft.bannerImage);
-    paintAvatar($("previewAvatar"), draft.avatarImage, profile.avatarColor, initialOf(name, profile.username));
+    paintBanner($("previewBanner"), draft.bannerImage, draft.bannerPosition);
+    paintAvatar($("previewAvatar"), draft.avatarImage, profile.avatarColor, initialOf(name, profile.username), draft.avatarPosition);
 
     $("previewName").textContent = name;
     $("previewHandle").textContent = "@" + profile.username + (draft.pronouns.trim() ? "  ·  " + draft.pronouns.trim() : "");
@@ -472,14 +1011,16 @@ function bindEditorInputs() {
 
     $("customAccent").addEventListener("input", (event) => setAccent(event.target.value));
 
-    // avatar photo (same resizer the old page used)
+    // avatar photo
     const avatarInput = $("avatarImageInput");
     avatarInput.addEventListener("change", async () => {
         const file = avatarInput.files[0];
         if (!file) return;
 
         try {
-            draft.avatarImage = await Planora.resizeImage(file);
+            draft.avatarImage = await Planora.resizeImage(file, { allowGif: Planora.canUseGif(viewer) });
+            draft.avatarPosition = { x: 50, y: 50 };
+            updateAvatarRepositionVisual();
             updateEditorPreview();
         } catch (err) {
             toast(err.message, "error");
@@ -489,6 +1030,8 @@ function bindEditorInputs() {
 
     $("removeAvatarImage").addEventListener("click", () => {
         draft.avatarImage = "";
+        draft.avatarPosition = { x: 50, y: 50 };
+        updateAvatarRepositionVisual();
         updateEditorPreview();
     });
 
@@ -499,7 +1042,9 @@ function bindEditorInputs() {
         if (!file) return;
 
         try {
-            draft.bannerImage = await resizeBanner(file);
+            draft.bannerImage = await resizeBanner(file, Planora.canUseGif(viewer));
+            draft.bannerPosition = { x: 50, y: 50 };
+            updateBannerRepositionVisual();
             updateEditorPreview();
         } catch (err) {
             toast(err.message, "error");
@@ -509,18 +1054,117 @@ function bindEditorInputs() {
 
     $("removeBannerImage").addEventListener("click", () => {
         draft.bannerImage = "";
+        draft.bannerPosition = { x: 50, y: 50 };
+        updateBannerRepositionVisual();
         updateEditorPreview();
     });
+
+    bindRepositionDrag($("avatarFrame"), () => draft.avatarImage, (pos) => {
+        draft.avatarPosition = pos;
+        updateAvatarRepositionVisual();
+    }, updateEditorPreview);
+
+    bindRepositionDrag($("bannerFrame"), () => draft.bannerImage, (pos) => {
+        draft.bannerPosition = pos;
+        updateBannerRepositionVisual();
+    }, updateEditorPreview);
 
     $("saveProfile").addEventListener("click", saveProfile);
 }
 
+/* Shared by the avatar and banner drag frames (and by the create/edit
+   event form's own cover-image frame, conceptually - this is the profile
+   page's copy of the same idea). Pointer Events cover mouse and touch in
+   one path. `onMove` fires continuously while dragging for live visual
+   feedback; `onEnd` fires once when the drag finishes. */
+function bindRepositionDrag(frame, hasImage, onMove, onEnd) {
+    let dragging = false;
+
+    function positionFromPointer(e) {
+        const rect = frame.getBoundingClientRect();
+        const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+        const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+        return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+    }
+
+    frame.addEventListener("pointerdown", (e) => {
+        if (!hasImage()) return;
+        dragging = true;
+        frame.setPointerCapture(e.pointerId);
+        onMove(positionFromPointer(e));
+    });
+    frame.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        onMove(positionFromPointer(e));
+    });
+    function end() {
+        if (!dragging) return;
+        dragging = false;
+        onEnd();
+    }
+    frame.addEventListener("pointerup", end);
+    frame.addEventListener("pointercancel", end);
+}
+
+function updateAvatarRepositionVisual() {
+    const wrap = $("avatarReposition");
+    const photo = $("avatarPhoto");
+    const crosshair = $("avatarCrosshair");
+    const img = safeImage(draft.avatarImage);
+
+    wrap.style.display = img ? "block" : "none";
+    if (!img) return;
+
+    const pos = safePosition(draft.avatarPosition);
+    photo.style.backgroundImage = `url("${img}")`;
+    photo.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+    crosshair.style.left = `${pos.x}%`;
+    crosshair.style.top = `${pos.y}%`;
+}
+
+function updateBannerRepositionVisual() {
+    const wrap = $("bannerReposition");
+    const photo = $("bannerPhoto");
+    const crosshair = $("bannerCrosshair");
+    const img = safeImage(draft.bannerImage);
+
+    wrap.style.display = img ? "block" : "none";
+    if (!img) return;
+
+    const pos = safePosition(draft.bannerPosition);
+    photo.style.backgroundImage = `url("${img}")`;
+    photo.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+    crosshair.style.left = `${pos.x}%`;
+    crosshair.style.top = `${pos.y}%`;
+}
+
 /* Crops to a wide 3:1 strip and shrinks it, so it fits under the
-   server's image size limit no matter what got picked. */
-function resizeBanner(file) {
+   server's image size limit no matter what got picked. A GIF skips this
+   entirely when allowed - resizing it through <canvas> would flatten it
+   to a single frame and throw away the animation, so an allowed GIF is
+   read through as-is instead (still subject to the server's size limit). */
+function resizeBanner(file, allowGif) {
     return new Promise((resolve, reject) => {
         if (!file.type.startsWith("image/")) {
             reject(new Error("Pick an image file."));
+            return;
+        }
+
+        if (file.type === "image/gif") {
+            if (!allowGif) {
+                reject(new Error("GIFs need a Community+ or Admin account."));
+                return;
+            }
+            const reader = new FileReader();
+            reader.onerror = () => reject(new Error("Couldn't read that file."));
+            reader.onload = () => {
+                if (reader.result.length > 300000) {
+                    reject(new Error("That GIF is too big. Try a smaller one (under ~220KB)."));
+                    return;
+                }
+                resolve(reader.result);
+            };
+            reader.readAsDataURL(file);
             return;
         }
 
@@ -596,7 +1240,9 @@ async function saveProfile() {
                 interests: parseInterests(draft.interests),
                 accent: draft.accent,
                 avatarImage: draft.avatarImage,
-                bannerImage: draft.bannerImage
+                avatarPosition: draft.avatarPosition,
+                bannerImage: draft.bannerImage,
+                bannerPosition: draft.bannerPosition
             })
         });
 
