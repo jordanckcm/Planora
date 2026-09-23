@@ -8,43 +8,10 @@
    The accent color is set per-profile on .profile-shell as --accent.
 ========================================================= */
 
-@font-face {
-    font-family: "Gotham";
-    src: url(fonts/Gotham.ttf);
-    font-display: swap;
-}
-
-@font-face {
-    font-family: "VHS";
-    src: url(fonts/vhs-gothic.ttf);
-    font-display: swap;
-}
-
-@font-face {
-    font-family: "Stronger";
-    src: url(fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf);
-    font-display: swap;
-}
-
-@font-face {
-    font-family: "StarShield";
-    src: url(fonts/StarShieldV2-9M52K.ttf);
-    font-display: swap;
-}
-
-@font-face {
-    font-family: "Gothikka";
-    src: url(fonts/Gothikka.ttf);
-    font-display: swap;
-}
-
-/* Same fallback stack Discord/Instagram use for their own webfont —
-   keeps this page matching the homepage's readability pass instead
-   of falling back to the browser's unstyled default font. */
+/* Clean, readable system font stack — no decorative webfonts. */
 body {
-    font-family: "gg sans", "Inter", -apple-system, BlinkMacSystemFont,
-                 "Segoe UI", Roboto, Helvetica, Arial, sans-serif,
-                 "Apple Color Emoji", "Segoe UI Emoji";
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto,
+                 Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
     padding-bottom: 60px;
 }
 
@@ -181,8 +148,8 @@ body {
     border: 5px solid var(--panel);
     outline: 1px solid var(--border-strong);
 
-    font-family: "Gotham";
     font-size: 34px;
+    font-weight: 600;
     color: white;
 
     background-size: cover;
@@ -208,9 +175,8 @@ body {
 .profile-name {
     margin: 0;
 
-    font-family: "Gotham";
     font-size: 22px;
-    font-weight: normal;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
@@ -312,47 +278,6 @@ body {
 
 
 /* =========================
-   STATS
-========================= */
-
-.stat-row {
-    display: flex;
-
-    margin-bottom: 16px;
-
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
-}
-
-.stat {
-    flex: 1;
-
-    padding: 16px 8px;
-
-    text-align: center;
-
-    background: var(--panel-soft);
-}
-
-.stat + .stat {
-    border-left: 1px solid var(--border);
-}
-
-.stat-value {
-    font-family: "StarShield";
-    font-size: 30px;
-    color: var(--accent);
-}
-
-.stat-label {
-    margin-top: 2px;
-    font-size: 9.5px;
-    color: var(--text-faint);
-}
-
-
-/* =========================
    NOW LISTENING
 ========================= */
 
@@ -400,8 +325,8 @@ body {
 .np-song {
     margin-top: 3px;
 
-    font-family: "Gotham";
     font-size: 14px;
+    font-weight: 600;
 
     white-space: nowrap;
     overflow: hidden;
@@ -453,48 +378,18 @@ body {
    EVENTS (Instagram-style grid)
 ========================= */
 
-.tab-row {
-    display: flex;
-    gap: 6px;
+.events-heading {
+    margin-bottom: 4px;
 
-    margin-bottom: 10px;
-    padding: 4px;
-
-    background: var(--panel-soft);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-}
-
-.tab {
-    flex: 1;
-    height: 34px;
-
-    border: none;
-    border-radius: var(--radius-pill);
-
-    background: transparent;
-    color: var(--text-dim);
-
-    font-family: "Gotham";
-    font-size: 11px;
-
-    cursor: pointer;
-    transition: 0.2s ease;
-}
-
-.tab:hover {
-    color: white;
-}
-
-.tab.active {
-    background: var(--accent);
-    color: #111;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
 }
 
 .tab-note {
     min-height: 14px;
     margin: 0 0 12px;
-    padding: 0 6px;
+    padding: 0 2px;
 
     font-size: 11px;
     color: var(--text-faint);
@@ -551,8 +446,8 @@ body {
 }
 
 .tile-title {
-    font-family: "Gotham";
     font-size: 12px;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
@@ -594,8 +489,8 @@ body {
 .empty-title {
     margin-bottom: 6px;
 
-    font-family: "Gotham";
     font-size: 14px;
+    font-weight: 600;
     color: var(--text);
 }
 
@@ -658,8 +553,8 @@ body {
 }
 
 .editor-title {
-    font-family: "Gotham";
     font-size: 14px;
+    font-weight: 600;
 }
 
 .editor-close {
@@ -744,8 +639,8 @@ body {
     border-radius: 50%;
     border: 4px solid var(--panel);
 
-    font-family: "Gotham";
     font-size: 22px;
+    font-weight: 600;
     color: white;
 
     background-size: cover;
@@ -755,8 +650,8 @@ body {
 .preview-name {
     margin-top: 8px;
 
-    font-family: "Gotham";
     font-size: 15px;
+    font-weight: 600;
     overflow-wrap: anywhere;
 }
 
@@ -787,8 +682,8 @@ body {
 .section-title {
     margin-bottom: 12px;
 
-    font-family: "Gotham";
     font-size: 12px;
+    font-weight: 600;
 }
 
 .editor .field-label {
@@ -1171,8 +1066,8 @@ body {
 .confirm-title {
     margin-bottom: 8px;
 
-    font-family: "Gotham";
     font-size: 15px;
+    font-weight: 600;
     color: white;
 }
 
@@ -1354,8 +1249,8 @@ body {
     align-items: center;
     justify-content: center;
 
-    font-family: "Gotham";
     font-size: 13px;
+    font-weight: 600;
     color: white;
 }
 
@@ -1402,8 +1297,8 @@ body {
 }
 
 .post-title {
-    font-family: "Gotham";
     font-size: 15px;
+    font-weight: 600;
     margin-bottom: 6px;
 }
 
@@ -1484,8 +1379,8 @@ body {
     background-size: cover;
     background-position: center;
 
-    font-family: "Gotham";
     font-size: 12px;
+    font-weight: 600;
     color: white;
     text-decoration: none;
 }
