@@ -129,7 +129,7 @@
             </div>
 
             <div class="editor-section">
-                <div class="section-title">Images</div>
+                <div class="section-title">Images <span class="optional-tag" id="gifAllowedTag" style="display:none;">GIF ok</span></div>
 
                 <div class="image-row">
                     <div>
@@ -142,6 +142,13 @@
                         <button type="button" class="image-remove" id="removeAvatarImage" style="display:none;">Remove</button>
                     </div>
                 </div>
+                <div class="image-reposition" id="avatarReposition" style="display:none;">
+                    <div class="image-reposition-frame avatar-shape" id="avatarFrame">
+                        <div class="image-reposition-photo" id="avatarPhoto"></div>
+                        <div class="image-reposition-crosshair" id="avatarCrosshair"></div>
+                    </div>
+                    <div class="image-reposition-hint">Drag to reposition</div>
+                </div>
 
                 <div class="image-row">
                     <div>
@@ -153,6 +160,13 @@
                         <input type="file" id="bannerImageInput" accept="image/*" hidden>
                         <button type="button" class="image-remove" id="removeBannerImage" style="display:none;">Remove</button>
                     </div>
+                </div>
+                <div class="image-reposition" id="bannerReposition" style="display:none;">
+                    <div class="image-reposition-frame banner-shape" id="bannerFrame">
+                        <div class="image-reposition-photo" id="bannerPhoto"></div>
+                        <div class="image-reposition-crosshair" id="bannerCrosshair"></div>
+                    </div>
+                    <div class="image-reposition-hint">Drag to reposition</div>
                 </div>
             </div>
 
@@ -215,6 +229,57 @@
     </aside>
 
     <div class="toast-stack" id="toastStack"></div>
+
+
+    <!-- =========================
+         EVENT POST VIEW (Instagram-style)
+         Opens when you click a public event tile: the event's banner
+         on top, then its full comment thread below.
+    ========================== -->
+    <div class="post-overlay" id="postOverlay" hidden></div>
+
+    <div class="post-modal" id="postModal" aria-hidden="true" aria-label="Event post">
+        <div class="post-modal-inner">
+
+            <button class="post-close" id="postClose" aria-label="Close">×</button>
+
+            <div class="post-banner" id="postBanner"></div>
+
+            <div class="post-scroll">
+
+                <div class="post-header">
+                    <div class="post-avatar" id="postAvatar"></div>
+                    <div class="post-header-text">
+                        <a class="post-author" id="postAuthor"></a>
+                        <div class="post-date" id="postDate"></div>
+                    </div>
+                    <button class="btn btn-solid post-add-button" id="postAddButton" style="display:none;">Add to calendar</button>
+                    <span class="post-added-tag" id="postAddedTag" style="display:none;">On your calendar</span>
+                </div>
+
+                <div class="post-title" id="postTitle"></div>
+                <p class="post-caption" id="postCaption"></p>
+
+                <div class="post-comments">
+                    <div class="comment-list" id="postCommentList"></div>
+
+                    <div class="reply-banner" id="postReplyBanner">
+                        <span class="reply-banner-label" id="postReplyLabel"></span>
+                        <button type="button" class="reply-banner-cancel" id="postReplyCancel" aria-label="Cancel reply">×</button>
+                    </div>
+
+                    <div class="comment-form">
+                        <div class="comment-input-row">
+                            <textarea class="comment-input" id="postCommentInput" placeholder="Add a comment..." maxlength="240" rows="1"></textarea>
+                            <span class="comment-counter" id="postCommentCounter"></span>
+                        </div>
+                        <button class="comment-submit" id="postCommentSubmit" disabled>Post</button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
 
     <script src="api.js"></script>
     <script src="profile.js"></script>
