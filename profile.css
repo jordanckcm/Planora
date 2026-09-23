@@ -267,6 +267,15 @@ select {
 
     font-size: 11px;
     color: var(--text-dim);
+    text-decoration: none;
+
+    cursor: pointer;
+    transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
 }
 
 
@@ -423,7 +432,7 @@ select {
 
     width: min(440px, 100%);
 
-    background: #191919;
+    background: var(--bg-surface, #191919);
     border-left: 1px solid var(--border);
 
     transform: translateX(100%);
@@ -598,7 +607,7 @@ select {
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
 
-    background: rgb(19, 19, 19);
+    background: var(--bg-input, rgb(19, 19, 19));
     color: var(--text);
 
     font-size: 14px;
@@ -1594,7 +1603,7 @@ select {
     border: 1px solid var(--border-strong);
     border-radius: 15px;
 
-    background: rgb(15, 15, 15);
+    background: var(--bg-input-alt, rgb(15, 15, 15));
     color: white;
     font-size: 12px;
 
@@ -1700,7 +1709,7 @@ textarea.comment-input {
     border: 1px solid var(--border);
     border-radius: 20px;
 
-    background: rgb(19, 19, 19);
+    background: var(--bg-input, rgb(19, 19, 19));
     color: var(--text);
 
     resize: none;
