@@ -4,15 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile · Planora</title>
+
+    <!-- Applied before any CSS paints, from whatever's cached from the
+         last /api/me response, so the page doesn't flash the wrong
+         theme while api.js's own network-backed bootstrap catches up. -->
+    <script>
+        (function () {
+            try {
+                var cached = JSON.parse(localStorage.getItem("planora_cached_me") || "null");
+                if (cached && (cached.themePreference === "light" || cached.themePreference === "dark")) {
+                    document.documentElement.setAttribute("data-theme", cached.themePreference);
+                }
+                if (cached && cached.reduceMotion) {
+                    document.documentElement.setAttribute("data-reduce-motion", "");
+                }
+            } catch (e) { /* no cache yet — defaults apply */ }
+        })();
+    </script>
+
     <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="profile.css">
     <link rel="stylesheet" href="planora-ui.css">
+    <link rel="stylesheet" href="settings.css">
 </head>
 <body>
 
     <div class="topbar">
         <button class="back-button" id="backButton">← Calendar</button>
         <div class="topbar-spacer"></div>
+        <button class="custom-button" id="discoverButton">Discover</button>
+        <button class="custom-button" id="settingsButton">Settings</button>
         <button class="custom-button logout-button" id="logoutButton">Log out</button>
     </div>
 
@@ -50,6 +72,9 @@
                         <span class="meta-item" id="joinedView"></span>
                     </div>
 
+                    <!-- Each chip is clickable — it's a shortcut into the
+                         Discover directory, pre-filtered to that interest,
+                         same idea as tapping a hashtag. -->
                     <div class="chip-row" id="interestChips"></div>
                 </div>
             </section>
@@ -295,6 +320,7 @@
     </div>
 
     <script src="api.js"></script>
+    <script src="settings.js"></script>
     <script src="profile.js"></script>
 
 </body>
