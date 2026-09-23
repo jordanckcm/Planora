@@ -1,11 +1,13 @@
 /* =========================================================
-   PLANORA — PROFILE
-   Layout borrows from three places:
-     Discord   - banner + overlapping avatar, status pill, accent color,
-                 slide-in editor with a live preview
-     Instagram - stats row and a grid of posts (your public events)
-     Spotify   - the "Now listening" card with the moving bars
-   The accent color is set per-profile on .profile-shell as --accent.
+   PLANORA — PROFILE PAGE
+
+   One page, two modes:
+     profile.html            -> your own profile (with the editor)
+     profile.html?u=someone  -> someone else's profile (read only)
+
+   You usually land on someone else's by clicking their name on a comment.
+   Public events show for everyone; Edit button only exists on your own
+   profile, and the server enforces that too.
 ========================================================= */
 
 /* Discord's own font stack: "gg sans" first (renders if the visitor
@@ -29,9 +31,10 @@ body {
    built-in UA stylesheets set button/input/textarea/select to the OS's
    system font instead of inheriting from the page. Without this, every
    button and text field (the comment composer, the profile editor's
-   fields, the Post/Save/Cancel buttons) renders in a different typeface
-   than the rest of the page even though --font-primary is declared
-   above. This opts every form control back into the page's font. */
+   fields, the Post/Save/Cancel buttons, the post-edit panel's fields)
+   renders in a different typeface than the rest of the page even though
+   --font-primary is declared above. This opts every form control back
+   into the page's font. */
 button,
 input,
 textarea,
@@ -646,6 +649,55 @@ select {
     flex-shrink: 0;
 }
 
+.image-pick-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    height: 30px;
+    padding: 0 12px;
+
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-pill);
+
+    background: transparent;
+    color: white;
+
+    font-size: 10.5px;
+    font-weight: 500;
+
+    cursor: pointer;
+}
+
+.image-pick-button:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.image-remove {
+    height: 30px;
+    padding: 0 12px;
+
+    border: 1px solid transparent;
+    border-radius: var(--radius-pill);
+
+    background: transparent;
+    color: #e08b86;
+
+    font-size: 10.5px;
+    cursor: pointer;
+}
+
+.image-remove:hover {
+    background: rgba(224, 139, 134, 0.1);
+}
+
+.image-picker {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+}
+
 .swatch-row {
     display: flex;
     flex-wrap: wrap;
@@ -722,11 +774,11 @@ select {
 
 
 /* =========================================================
-   IMAGE REPOSITIONING (avatar + banner)
+   IMAGE REPOSITIONING (avatar + banner + post edit)
    Drag anywhere on the frame to set the focal point; a small
    crosshair marks exactly where it's set to. avatarFrame is
-   round to match the real avatar shape; bannerFrame is wide to
-   match the real banner strip.
+   round to match the real avatar shape; bannerFrame/banner-shape
+   is wide to match the real banner/cover strip.
 ========================================================= */
 
 .optional-tag {
@@ -886,13 +938,17 @@ select {
 /* =========================================================
    CONFIRM DIALOG
    Same "are you sure?" pattern used before deleting a comment
-   or reply in the post view.
+   or reply in the post view. Sits above EVERYTHING, including
+   the post modal (z-index 510) — otherwise, opened from inside
+   an open post, it rendered invisibly behind it and only ever
+   appeared once the post was closed (by which point the event
+   id backing the delete action was already gone).
 ========================================================= */
 
 .confirm-overlay {
     position: fixed;
     inset: 0;
-    z-index: 400;
+    z-index: 600;
 
     display: flex;
     align-items: center;
@@ -1071,6 +1127,80 @@ select {
     background: rgba(0, 0, 0, 0.7);
 }
 
+/* ---------- post ⋮ menu (owner only — edit the event in place) ---------- */
+
+.post-menu-wrap {
+    position: absolute;
+    top: 10px;
+    right: 52px;
+    z-index: 2;
+}
+
+.post-menu-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 32px;
+    height: 32px;
+
+    border: none;
+    border-radius: 50%;
+
+    background: rgba(0, 0, 0, 0.5);
+    color: white;
+
+    font-size: 18px;
+    line-height: 1;
+
+    cursor: pointer;
+}
+
+.post-menu-button:hover {
+    background: rgba(0, 0, 0, 0.7);
+}
+
+.post-menu-dropdown {
+    position: absolute;
+    top: 38px;
+    right: 0;
+
+    display: none;
+    flex-direction: column;
+
+    min-width: 150px;
+    padding: 6px;
+
+    background: var(--panel);
+    border: 1px solid var(--border-strong);
+    border-radius: 10px;
+
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+
+.post-menu-dropdown.show {
+    display: flex;
+}
+
+.post-menu-item {
+    padding: 9px 10px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: transparent;
+    color: white;
+
+    font-size: 12px;
+    text-align: left;
+
+    cursor: pointer;
+}
+
+.post-menu-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
 .post-banner {
     width: 100%;
     aspect-ratio: 1 / 1;
@@ -1186,6 +1316,114 @@ select {
     margin-bottom: 16px;
     white-space: pre-wrap;
     overflow-wrap: anywhere;
+}
+
+
+/* ---------- post edit panel ---------- */
+
+.post-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+
+    border-bottom: 1px solid var(--border);
+}
+
+.post-edit-form .field-label {
+    display: flex;
+    justify-content: space-between;
+
+    margin: 12px 0 6px;
+
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.post-edit-form .field-label:first-of-type {
+    margin-top: 0;
+}
+
+.post-edit-textarea {
+    height: auto;
+    min-height: 70px;
+    padding-top: 12px;
+    resize: vertical;
+}
+
+.post-edit-row {
+    display: flex;
+    gap: 10px;
+}
+
+.post-edit-field {
+    flex: 1;
+    min-width: 0;
+}
+
+.event-icon-row,
+.event-color-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+.event-icon-dot {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 34px;
+    height: 34px;
+
+    border: 1px solid var(--border);
+    border-radius: 10px;
+
+    background: rgb(19, 19, 19);
+
+    font-size: 16px;
+    cursor: pointer;
+
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.event-icon-dot:hover {
+    transform: scale(1.06);
+}
+
+.event-icon-dot.selected {
+    border-color: var(--accent);
+}
+
+.event-color-dot {
+    width: 26px;
+    height: 26px;
+
+    border-radius: 50%;
+    border: 2px solid transparent;
+
+    cursor: pointer;
+
+    transition: transform 0.15s ease;
+}
+
+.event-color-dot:hover {
+    transform: scale(1.1);
+}
+
+.event-color-dot.selected {
+    border-color: white;
+}
+
+.post-edit-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+
+    margin-top: 16px;
 }
 
 
