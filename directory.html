@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover · Planora</title>
+
+    <!-- Applied before any CSS paints, from whatever's cached from the
+         last /api/me response, so the page doesn't flash the wrong
+         theme while api.js's own network-backed bootstrap catches up. -->
+    <script>
+        (function () {
+            try {
+                var cached = JSON.parse(localStorage.getItem("planora_cached_me") || "null");
+                if (cached && (cached.themePreference === "light" || cached.themePreference === "dark")) {
+                    document.documentElement.setAttribute("data-theme", cached.themePreference);
+                }
+                if (cached && cached.reduceMotion) {
+                    document.documentElement.setAttribute("data-reduce-motion", "");
+                }
+            } catch (e) { /* no cache yet — defaults apply */ }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="base.css">
+    <link rel="stylesheet" href="theme.css">
+    <link rel="stylesheet" href="planora-ui.css">
+    <link rel="stylesheet" href="settings.css">
+    <link rel="stylesheet" href="directory.css">
+</head>
+<body>
+
+    <div class="topbar">
+        <button class="back-button" id="backButton">← Calendar</button>
+        <div class="topbar-spacer"></div>
+        <button class="custom-button" id="settingsButton">Settings</button>
+        <button class="custom-button logout-button" id="logoutButton">Log out</button>
+    </div>
+
+    <main class="directory-shell">
+
+        <div class="directory-heading">
+            <h1>Discover</h1>
+            <p>Browse people on Planora, or search by name or interest.</p>
+        </div>
+
+        <div class="directory-controls">
+            <div class="search-bar">
+                <input type="text" id="directorySearch" class="search-input" placeholder="Search by name or username…" autocomplete="off" maxlength="40">
+                <button type="button" id="clearDirectorySearch" class="clear-search" aria-label="Clear search" style="display:none;">×</button>
+            </div>
+
+            <div class="active-filter" id="activeInterestFilter" hidden>
+                <span>Interest:</span>
+                <span class="active-filter-chip" id="activeInterestLabel"></span>
+                <button type="button" id="clearInterestFilter" aria-label="Clear interest filter">×</button>
+            </div>
+        </div>
+
+        <div class="directory-grid" id="directoryGrid"></div>
+
+    </main>
+
+    <div class="toast-stack" id="toastStack"></div>
+
+    <script src="api.js"></script>
+    <script src="settings.js"></script>
+    <script src="directory.js"></script>
+
+</body>
+</html>
