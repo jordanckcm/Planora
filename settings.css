@@ -1,0 +1,355 @@
+/* =========================================================
+   PLANORA — SETTINGS
+   The Discord-style "User Settings" overlay: a full-screen scrim
+   with a narrow category sidebar on the left and the active
+   section's content on the right. Built and injected by settings.js
+   on demand (once per page load, then just shown/hidden), so this
+   stylesheet only needs loading — nothing here needs markup already
+   in the page.
+========================================================= */
+
+.settings-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 700; /* above the post modal (510) and its confirm dialog (600) */
+
+    display: flex;
+    align-items: stretch;
+    justify-content: center;
+
+    background: rgba(10, 10, 10, 0.92);
+
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+
+.settings-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.settings-shell {
+    display: flex;
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.settings-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+
+    width: 220px;
+    flex-shrink: 0;
+    padding: 60px 12px 24px;
+
+    overflow-y: auto;
+}
+
+.settings-sidebar-title {
+    padding: 0 10px;
+    margin-bottom: 10px;
+
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+}
+
+.settings-nav-item {
+    display: block;
+    width: 100%;
+
+    padding: 9px 10px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: transparent;
+    color: var(--text-dim);
+
+    font-size: 13px;
+    font-weight: 500;
+    text-align: left;
+
+    cursor: pointer;
+}
+
+.settings-nav-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text);
+}
+
+.settings-nav-item.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+}
+
+.settings-nav-item.danger {
+    color: #e08b86;
+}
+
+.settings-nav-item.danger:hover {
+    background: rgba(224, 139, 134, 0.12);
+    color: #e08b86;
+}
+
+.settings-sidebar-divider {
+    height: 1px;
+    margin: 10px 8px;
+    background: var(--border);
+}
+
+.settings-content {
+    position: relative;
+
+    flex: 1;
+    min-width: 0;
+
+    padding: 60px 40px 40px;
+    overflow-y: auto;
+
+    background: var(--panel);
+    border-left: 1px solid var(--border);
+}
+
+.settings-close {
+    position: fixed;
+    top: 20px;
+    right: max(20px, calc((100vw - 900px) / 2 + 20px));
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 36px;
+    height: 36px;
+
+    border: 2px solid var(--text-faint);
+    border-radius: 50%;
+
+    background: transparent;
+    color: var(--text-faint);
+
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.settings-close:hover {
+    border-color: var(--text);
+    color: var(--text);
+}
+
+.settings-pane-title {
+    margin-bottom: 22px;
+
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--text);
+}
+
+.settings-account-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+
+    padding: 16px;
+    margin-bottom: 22px;
+
+    background: var(--bg-input);
+    border-radius: 10px;
+}
+
+.settings-account-avatar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+
+    width: 52px;
+    height: 52px;
+
+    border-radius: 50%;
+
+    font-size: 20px;
+    font-weight: 600;
+    color: white;
+
+    background-size: cover;
+    background-position: center;
+}
+
+.settings-account-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.settings-account-handle {
+    margin-top: 2px;
+    font-size: 12px;
+    color: var(--text-faint);
+}
+
+.settings-row {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+}
+
+.settings-row-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+}
+
+.settings-row-hint {
+    margin-top: 6px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+.settings-switch-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+
+    padding: 16px 0;
+    border-top: 1px solid var(--border);
+}
+
+.settings-switch {
+    position: relative;
+    flex-shrink: 0;
+
+    width: 42px;
+    height: 24px;
+
+    border: none;
+    border-radius: 20px;
+
+    background: var(--border-strong);
+    cursor: pointer;
+
+    transition: background 0.15s ease;
+}
+
+.settings-switch::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    left: 3px;
+
+    width: 18px;
+    height: 18px;
+
+    border-radius: 50%;
+    background: white;
+
+    transition: transform 0.15s ease;
+}
+
+.settings-switch[aria-checked="true"] {
+    background: var(--accent, #c9a227);
+}
+
+.settings-switch[aria-checked="true"]::after {
+    transform: translateX(18px);
+}
+
+.settings-theme-toggle {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+}
+
+.settings-theme-toggle button {
+    flex: 1;
+
+    padding: 10px 0;
+
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+
+    background: var(--bg-input);
+    color: var(--text-dim);
+
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.settings-theme-toggle button:hover {
+    color: var(--text);
+}
+
+.settings-theme-toggle button.active {
+    border-color: var(--accent, #c9a227);
+    color: white;
+    background: color-mix(in srgb, var(--accent, #c9a227) 18%, var(--bg-input));
+}
+
+.settings-danger-zone {
+    margin-top: 26px;
+    padding: 16px;
+
+    border: 1px solid rgba(224, 139, 134, 0.35);
+    border-radius: 10px;
+
+    background: rgba(224, 139, 134, 0.06);
+}
+
+.settings-danger-button {
+    margin-top: 12px;
+    height: 34px;
+    padding: 0 16px;
+
+    border: none;
+    border-radius: 6px;
+
+    background: rgb(182, 69, 63);
+    color: white;
+
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.settings-danger-button:hover {
+    filter: brightness(1.1);
+}
+
+.settings-danger-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+@media (max-width: 720px) {
+    .settings-sidebar {
+        width: 160px;
+        padding: 50px 8px 16px;
+    }
+
+    .settings-content {
+        padding: 50px 20px 30px;
+    }
+
+    .settings-close {
+        right: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .settings-overlay,
+    .settings-switch,
+    .settings-switch::after {
+        transition: none;
+    }
+}
