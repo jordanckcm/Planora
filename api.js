@@ -93,7 +93,7 @@ const Planora = (() => {
     async function getCurrentUser() {
         try {
             const user = await apiRequest("/api/me");
-            // avatarImage and bannerImage can each be ~200KB; the offline
+            // avatarImage and bannerImage can each be ~1MB; the offline
             // identity cache doesn't need them (nothing reads them from the
             // cached copy but the name/role/etc used for the "you're
             // offline" experience), and keeping them out leaves headroom in
@@ -140,7 +140,11 @@ const Planora = (() => {
     // Same char-count limit the server enforces (app.py's MAX_IMAGE_CHARS)
     // on the base64 string it receives - checked here too so a GIF that's
     // too big fails fast instead of round-tripping to the server first.
-    const MAX_IMAGE_DATA_CHARS = 300000;
+    // IMPORTANT: this must stay in sync with MAX_IMAGE_CHARS in app.py,
+    // and with the matching check in profile.js's resizeBanner() — all
+    // three should agree, or a file can pass one check and get rejected
+    // by another later in the flow.
+    const MAX_IMAGE_DATA_CHARS = 1400000;
 
     /* Shared by the profile-picture/banner pickers (profile.js) and the
        event-cover picker (homepage.js): turns a chosen file into a data
@@ -177,7 +181,7 @@ const Planora = (() => {
                 reader.onerror = () => reject(new Error("Couldn't read that file."));
                 reader.onload = () => {
                     if (reader.result.length > MAX_IMAGE_DATA_CHARS) {
-                        reject(new Error("That GIF is too big. Try a smaller one (under ~220KB)."));
+                        reject(new Error("That GIF is too big. Try a smaller one (under ~1MB)."));
                         return;
                     }
                     resolve(reader.result);
