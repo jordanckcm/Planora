@@ -49,6 +49,17 @@ const EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "�
 let selectedEventColor = EVENT_COLORS[0];
 let selectedEventIcon = EVENT_ICONS[0];
 let selectedEventImage = "";
+let selectedImagePosition = { x: 50, y: 50 };
+
+// null when the + form is creating a new event; an event id when it's
+// editing an existing one instead (see openEventForm in buildAddEventUI)
+let editingEventId = null;
+
+// buildAddEventUI defines the real openEventForm closure once at startup;
+// buildEventMenu (a separate top-level function, built fresh per card)
+// calls it through this reference rather than needing its own copy of
+// the form-building logic.
+let openEventFormRef = null;
 
 // "private" | "public" | "global" — what the + form will send
 let newEventVisibility = "private";
@@ -1021,6 +1032,8 @@ function renderTimeline(events, query) {
         if (event.image) {
             body.classList.add("has-image");
             body.style.setProperty("--tl-image", `url("${event.image}")`);
+            const tlPos = event.image_position || { x: 50, y: 50 };
+            body.style.setProperty("--tl-position", `${tlPos.x}% ${tlPos.y}%`);
         }
 
         const titleEl = document.createElement("div");
@@ -1080,6 +1093,22 @@ function renderTimeline(events, query) {
 
 function buildEventMenu(event) {
     const items = [];
+
+    // Editing content (title/description/date/time/image/icon/color) - any
+    // event you own that isn't a copy you added from someone else's Global
+    // post. Works in both Local and Global mode, since you can own a post
+    // showing in either. Visibility itself isn't changed here.
+    const isEditable = event.isMine
+        && (event.cloned_from === null || event.cloned_from === undefined);
+
+    if (isEditable) {
+        items.push({
+            label: "Edit",
+            run: () => {
+                if (openEventFormRef) openEventFormRef(event);
+            }
+        });
+    }
 
     // Add to calendar: offered whenever the viewer doesn't currently have
     // a copy of this Global post - including its own poster, if they'd
@@ -1215,6 +1244,8 @@ async function buildEventCard(event) {
     if (event.image) {
         cover.classList.add("has-image");
         cover.style.setProperty("--cover-image", `url("${event.image}")`);
+        const pos = event.image_position || { x: 50, y: 50 };
+        cover.style.setProperty("--cover-position", `${pos.x}% ${pos.y}%`);
     }
     card.appendChild(cover);
 
@@ -1259,6 +1290,14 @@ async function buildEventCard(event) {
         newBadge.className = "event-new-badge";
         newBadge.textContent = "NEW";
         titleRow.appendChild(newBadge);
+    }
+
+    if (event.edited) {
+        const editedBadge = document.createElement("span");
+        editedBadge.className = "event-edited-badge";
+        editedBadge.textContent = "EDITED";
+        editedBadge.title = event.edited_at ? `Edited ${formatFullTimestamp(event.edited_at)}` : "Edited";
+        titleRow.appendChild(editedBadge);
     }
 
     // Public events on your own calendar get a small marker so you can
@@ -1789,15 +1828,17 @@ function buildAddEventUI() {
             <div class="field-label">Description <span class="optional-tag">optional</span></div>
             <textarea id="eventDescription" placeholder="Add some details..." maxlength="400"></textarea>
 
-            <div class="field-label">Who can see this?</div>
-            <div class="visibility-toggle" id="visibilityToggle" role="radiogroup" aria-label="Who can see this event">
-                <button type="button" class="vis-option active" data-visibility="private" role="radio" aria-checked="true">Private</button>
-                <button type="button" class="vis-option" data-visibility="public" role="radio" aria-checked="false">Public</button>
-                <button type="button" class="vis-option" data-visibility="global" role="radio" aria-checked="false">Global</button>
-            </div>
-            <div class="vis-hint" id="visibilityHint">${VISIBILITY_HINTS.private}</div>
-            <div class="visibility-locked-hint" id="visibilityLockedHint" style="display:none;">
-                Global posting needs Community+ or Admin. Ask an admin to upgrade your account.
+            <div id="visibilitySection">
+                <div class="field-label">Who can see this?</div>
+                <div class="visibility-toggle" id="visibilityToggle" role="radiogroup" aria-label="Who can see this event">
+                    <button type="button" class="vis-option active" data-visibility="private" role="radio" aria-checked="true">Private</button>
+                    <button type="button" class="vis-option" data-visibility="public" role="radio" aria-checked="false">Public</button>
+                    <button type="button" class="vis-option" data-visibility="global" role="radio" aria-checked="false">Global</button>
+                </div>
+                <div class="vis-hint" id="visibilityHint">${VISIBILITY_HINTS.private}</div>
+                <div class="visibility-locked-hint" id="visibilityLockedHint" style="display:none;">
+                    Global posting needs Community+ or Admin. Ask an admin to upgrade your account.
+                </div>
             </div>
 
             <details class="event-more">
@@ -1813,12 +1854,18 @@ function buildAddEventUI() {
                         <input type="time" id="eventEndTime">
                     </div>
 
-                    <div class="field-label">Cover image (optional)</div>
+                    <div class="field-label">Cover image (optional) <span class="optional-tag" id="gifAllowedTag" style="display:none;">GIF ok</span></div>
                     <div class="image-picker">
                         <label class="image-pick-button" for="eventImage">Choose image</label>
                         <input type="file" id="eventImage" accept="image/*" hidden>
                         <button type="button" class="image-remove" id="removeEventImage" style="display:none;">Remove</button>
-                        <div class="image-preview" id="imagePreview"></div>
+                    </div>
+                    <div class="image-reposition" id="eventImageReposition" style="display:none;">
+                        <div class="image-reposition-frame" id="eventImageFrame">
+                            <div class="image-reposition-photo" id="eventImagePhoto"></div>
+                            <div class="image-reposition-crosshair" id="eventImageCrosshair"></div>
+                        </div>
+                        <div class="image-reposition-hint">Drag to choose what shows</div>
                     </div>
 
                     <div class="field-label">Icon</div>
@@ -1905,6 +1952,7 @@ function buildAddEventUI() {
         if (selectedEventImage) {
             cover.classList.add("has-image");
             cover.style.setProperty("--cover-image", `url("${selectedEventImage}")`);
+            cover.style.setProperty("--cover-position", `${selectedImagePosition.x}% ${selectedImagePosition.y}%`);
         }
         card.appendChild(cover);
 
@@ -1971,6 +2019,7 @@ function buildAddEventUI() {
         btn.type = "button";
         btn.className = "event-icon-dot" + (icon === selectedEventIcon ? " selected" : "");
         btn.textContent = icon;
+        btn.dataset.icon = icon;
         btn.addEventListener("click", () => {
             selectedEventIcon = icon;
             iconRow.querySelectorAll(".event-icon-dot").forEach(el => el.classList.remove("selected"));
@@ -1986,6 +2035,7 @@ function buildAddEventUI() {
         dot.type = "button";
         dot.className = "event-color-dot" + (color === selectedEventColor ? " selected" : "");
         dot.style.background = color;
+        dot.dataset.color = color;
         dot.addEventListener("click", () => {
             selectedEventColor = color;
             colorRow.querySelectorAll(".event-color-dot").forEach(el => el.classList.remove("selected"));
@@ -1995,14 +2045,40 @@ function buildAddEventUI() {
         colorRow.appendChild(dot);
     });
 
+    /* === COVER IMAGE + DRAG-TO-REPOSITION ===
+       selectedImagePosition is a focal point as {x, y} percentages (same
+       shape the server stores/returns) - where in the image the "camera"
+       is centered. Dragging on the frame updates it live; the same value
+       gets sent to the server and used to paint both the live preview and
+       the real card once posted. */
     const imageInput = eventForm.querySelector("#eventImage");
-    const imagePreview = eventForm.querySelector("#imagePreview");
     const removeImageBtn = eventForm.querySelector("#removeEventImage");
+    const gifAllowedTag = eventForm.querySelector("#gifAllowedTag");
+    const repositionWrap = eventForm.querySelector("#eventImageReposition");
+    const repositionFrame = eventForm.querySelector("#eventImageFrame");
+    const repositionPhoto = eventForm.querySelector("#eventImagePhoto");
+    const repositionCrosshair = eventForm.querySelector("#eventImageCrosshair");
 
-    function setEventImage(dataUrl) {
+    function applyImagePositionVisual() {
+        const pos = `${selectedImagePosition.x}% ${selectedImagePosition.y}%`;
+        repositionPhoto.style.backgroundPosition = pos;
+        repositionCrosshair.style.left = `${selectedImagePosition.x}%`;
+        repositionCrosshair.style.top = `${selectedImagePosition.y}%`;
+    }
+
+    function setEventImage(dataUrl, position) {
         selectedEventImage = dataUrl;
-        imagePreview.style.backgroundImage = dataUrl ? `url("${dataUrl}")` : "";
-        imagePreview.classList.toggle("show", Boolean(dataUrl));
+        selectedImagePosition = position || { x: 50, y: 50 };
+
+        if (dataUrl) {
+            repositionPhoto.style.backgroundImage = `url("${dataUrl}")`;
+            repositionWrap.style.display = "block";
+            applyImagePositionVisual();
+        } else {
+            repositionPhoto.style.backgroundImage = "";
+            repositionWrap.style.display = "none";
+        }
+
         removeImageBtn.style.display = dataUrl ? "inline-flex" : "none";
         imageInput.value = ""; // lets you pick the same file twice in a row
         updateEventPreview();
@@ -2012,13 +2088,52 @@ function buildAddEventUI() {
         const file = imageInput.files[0];
         if (!file) return;
         try {
-            setEventImage(await Planora.resizeImage(file));
+            const dataUrl = await Planora.resizeImage(file, { allowGif: Planora.canUseGif(currentUser) });
+            setEventImage(dataUrl, { x: 50, y: 50 });
         } catch (err) {
             toast(err.message, "error");
         }
     });
 
     removeImageBtn.addEventListener("click", () => setEventImage(""));
+
+    // Community+/admin only: show that GIFs are on the table, so it isn't
+    // a guess-and-check whether picking one will work
+    if (Planora.canUseGif(currentUser)) {
+        gifAllowedTag.style.display = "";
+    }
+
+    // drag-to-reposition — Pointer Events cover mouse and touch in one path
+    let draggingImage = false;
+
+    function positionFromPointer(e) {
+        const rect = repositionFrame.getBoundingClientRect();
+        const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+        const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+        return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+    }
+
+    repositionFrame.addEventListener("pointerdown", (e) => {
+        if (!selectedEventImage) return;
+        draggingImage = true;
+        repositionFrame.setPointerCapture(e.pointerId);
+        selectedImagePosition = positionFromPointer(e);
+        applyImagePositionVisual();
+    });
+
+    repositionFrame.addEventListener("pointermove", (e) => {
+        if (!draggingImage) return;
+        selectedImagePosition = positionFromPointer(e);
+        applyImagePositionVisual();
+    });
+
+    function endImageDrag() {
+        if (!draggingImage) return;
+        draggingImage = false;
+        updateEventPreview();
+    }
+    repositionFrame.addEventListener("pointerup", endImageDrag);
+    repositionFrame.addEventListener("pointercancel", endImageDrag);
 
     // Private / Public / Global switch
     const visibilityHint = eventForm.querySelector("#visibilityHint");
@@ -2055,22 +2170,67 @@ function buildAddEventUI() {
             field.addEventListener("change", updateEventPreview);
         });
 
-    addButton.addEventListener("click", () => {
-        eventForm.classList.add("show");
-        document.getElementById("eventTitle").value = "";
-        document.getElementById("eventDescription").value = "";
-        document.getElementById("eventDate").value = "";
-        document.getElementById("eventEndDate").value = "";
-        document.getElementById("eventStartTime").value = "";
-        document.getElementById("eventEndTime").value = "";
-        setNewEventVisibility("private");
-        eventForm.querySelector(".event-more").open = false;
-        setEventImage("");
+    const visibilitySection = eventForm.querySelector("#visibilitySection");
+    const formTitleEl = eventForm.querySelector(".form-title");
+    const saveButton = document.getElementById("saveEvent");
 
-        selectedEventIcon = EVENT_ICONS[0];
-        selectedEventColor = EVENT_COLORS[0];
-        iconRow.querySelectorAll(".event-icon-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
-        colorRow.querySelectorAll(".event-color-dot").forEach((el, i) => el.classList.toggle("selected", i === 0));
+    function selectIconDot(icon) {
+        iconRow.querySelectorAll(".event-icon-dot").forEach(el => el.classList.toggle("selected", el.dataset.icon === icon));
+    }
+
+    function selectColorDot(color) {
+        colorRow.querySelectorAll(".event-color-dot").forEach(el => el.classList.toggle("selected", el.dataset.color === color));
+    }
+
+    // The single shared entry point for opening the form, for both
+    // "+" (existingEvent is null) and the ⋮ menu's "Edit" (existingEvent
+    // is the event being edited). buildEventMenu calls this through
+    // openEventFormRef, since it's a separate top-level function.
+    function openEventForm(existingEvent) {
+        editingEventId = existingEvent ? existingEvent.id : null;
+        const isEditing = Boolean(existingEvent);
+
+        eventForm.classList.add("show");
+        formTitleEl.textContent = isEditing ? "Edit event" : "Create event";
+        saveButton.textContent = isEditing ? "Save changes" : "Create";
+
+        document.getElementById("eventTitle").value = existingEvent ? existingEvent.title : "";
+        document.getElementById("eventDescription").value = existingEvent ? existingEvent.description : "";
+        document.getElementById("eventDate").value = existingEvent ? existingEvent.date : "";
+        document.getElementById("eventEndDate").value =
+            existingEvent && existingEvent.end_date && existingEvent.end_date !== existingEvent.date
+                ? existingEvent.end_date : "";
+        document.getElementById("eventStartTime").value = existingEvent ? (existingEvent.start_time || "") : "";
+        document.getElementById("eventEndTime").value = existingEvent ? (existingEvent.end_time || "") : "";
+
+        // reveal "More options" automatically if there's already something
+        // in there worth seeing, instead of hiding an existing time/image
+        // behind a collapsed summary
+        eventForm.querySelector(".event-more").open = Boolean(
+            existingEvent && (existingEvent.start_time || existingEvent.image)
+        );
+
+        selectedEventIcon = existingEvent && existingEvent.icon ? existingEvent.icon : EVENT_ICONS[0];
+        selectedEventColor = existingEvent && existingEvent.color ? existingEvent.color : EVENT_COLORS[0];
+        selectIconDot(selectedEventIcon);
+        selectColorDot(selectedEventColor);
+
+        setEventImage(
+            existingEvent ? (existingEvent.image || "") : "",
+            existingEvent && existingEvent.image_position ? { ...existingEvent.image_position } : { x: 50, y: 50 }
+        );
+
+        // Visibility isn't editable from here - it has its own ⋮ menu
+        // action (Make public/private) and Global can't be un-posted this
+        // way at all. Still set it (just for the preview's badge) so an
+        // edit's preview doesn't show a stale PUBLIC/GLOBAL tag from
+        // whatever was last selected when creating something else.
+        visibilitySection.style.display = isEditing ? "none" : "";
+        if (isEditing) {
+            newEventVisibility = existingEvent.visibility === "local" ? "private" : existingEvent.visibility;
+        } else {
+            setNewEventVisibility("private");
+        }
 
         previewOpen = false;
         previewContainer.hidden = true;
@@ -2078,7 +2238,10 @@ function buildAddEventUI() {
         previewToggle.setAttribute("aria-expanded", "false");
 
         updateEventPreview();
-    });
+    }
+    openEventFormRef = openEventForm;
+
+    addButton.addEventListener("click", () => openEventForm(null));
 
     document.getElementById("cancelEvent").addEventListener("click", () => {
         eventForm.classList.remove("show");
@@ -2090,12 +2253,11 @@ function buildAddEventUI() {
     eventForm.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !["TEXTAREA", "BUTTON", "SUMMARY"].includes(e.target.tagName)) {
             e.preventDefault();
-            document.getElementById("saveEvent").click();
+            saveButton.click();
         }
     });
 
-    document.getElementById("saveEvent").addEventListener("click", async () => {
-        const saveButton = document.getElementById("saveEvent");
+    saveButton.addEventListener("click", async () => {
         if (saveButton.disabled) return; // already in flight — ignore a fast double-click
 
         const title = document.getElementById("eventTitle").value.trim();
@@ -2104,12 +2266,6 @@ function buildAddEventUI() {
         const endDate = document.getElementById("eventEndDate").value;
         const startTime = document.getElementById("eventStartTime").value;
         const endTime = document.getElementById("eventEndTime").value;
-
-        // a Community account can't have Global selected (the button is
-        // hidden), but never trust that here - fall back to Private
-        const visibility = (newEventVisibility === "global" && currentUser.role === "community")
-            ? "private"
-            : newEventVisibility;
 
         if (!title || !date) {
             toast("Add a name and date first.", "error");
@@ -2121,26 +2277,42 @@ function buildAddEventUI() {
             return;
         }
 
+        const isEditing = editingEventId !== null;
+
+        const payload = {
+            title,
+            description,
+            date,
+            endDate,
+            startTime,
+            endTime,
+            // only matters when there's a clock time to convert; the
+            // server drops it for all-day events regardless
+            timezone: startTime ? VIEWER_TZ : "",
+            icon: selectedEventIcon,
+            color: selectedEventColor,
+            image: selectedEventImage,
+            imagePosition: selectedImagePosition
+        };
+
+        if (!isEditing) {
+            // a Community account can't have Global selected (the button
+            // is hidden), but never trust that here - fall back to Private
+            payload.visibility = (newEventVisibility === "global" && currentUser.role === "community")
+                ? "private"
+                : newEventVisibility;
+        }
+
         saveButton.disabled = true;
         const originalLabel = saveButton.textContent;
-        saveButton.textContent = "Creating…";
+        saveButton.textContent = isEditing ? "Saving…" : "Creating…";
 
         try {
-            await PlanoraData.addEvent({
-                title,
-                description,
-                date,
-                endDate,
-                startTime,
-                endTime,
-                // only matters when there's a clock time to convert; the
-                // server drops it for all-day events regardless
-                timezone: startTime ? VIEWER_TZ : "",
-                visibility,
-                icon: selectedEventIcon,
-                color: selectedEventColor,
-                image: selectedEventImage
-            });
+            if (isEditing) {
+                await PlanoraData.editEvent(editingEventId, payload);
+            } else {
+                await PlanoraData.addEvent(payload);
+            }
         } catch (err) {
             toast(err.message, "error");
             saveButton.disabled = false;
@@ -2153,18 +2325,23 @@ function buildAddEventUI() {
 
         eventForm.classList.remove("show");
 
-        currentYear = parseEventDate(date).getFullYear();
-        openMonth = parseEventDate(date).getMonth() + 1;
-        mode = "local";
-        setActiveModeButton();
-
-        if (visibility === "global") {
-            toast("Posted to Global and your calendar.", "success");
-        } else if (visibility === "public") {
-            toast("Added to your calendar and your profile.", "success");
+        if (isEditing) {
+            toast("Event updated.", "success");
         } else {
-            toast("Added to your calendar.", "success");
+            currentYear = parseEventDate(date).getFullYear();
+            openMonth = parseEventDate(date).getMonth() + 1;
+            mode = "local";
+            setActiveModeButton();
+
+            if (payload.visibility === "global") {
+                toast("Posted to Global and your calendar.", "success");
+            } else if (payload.visibility === "public") {
+                toast("Added to your calendar and your profile.", "success");
+            } else {
+                toast("Added to your calendar.", "success");
+            }
         }
+
         render();
     });
 }
