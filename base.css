@@ -159,7 +159,16 @@ button {
 
 .btn-solid {
     background: var(--text);
-    color: #0c0c0c;
+
+    /* FIX: this pill's background is deliberately the inverse of body
+       text (white in dark mode, near-black in light mode, since --text
+       flips via theme.css). The button's own text color was hardcoded
+       to #0c0c0c — correct against a white background, but the SAME
+       near-black on the near-black background light mode produces.
+       var(--panel) flips the opposite way --text does (white in light
+       mode, dark in dark mode), so it always contrasts against
+       whatever var(--text) resolves the background to. */
+    color: var(--panel);
     border-color: var(--text);
 }
 
