@@ -176,41 +176,16 @@ function render() {
     $("displayNameView").textContent = p.displayName;
     $("usernameView").textContent = "@" + p.username;
 
-    const pronouns = $("pronounsView");
-    pronouns.textContent = p.pronouns;
-    pronouns.hidden = !p.pronouns;
-
     const chip = $("roleChip");
     chip.textContent = roleLabel(p.role);
     chip.hidden = !roleLabel(p.role);
 
     $("editProfileButton").hidden = !p.isSelf;
 
-    // status
-    const hasStatus = Boolean(p.statusEmoji || p.statusText);
-    $("statusPill").hidden = !hasStatus;
-    $("statusEmoji").textContent = p.statusEmoji;
-    $("statusEmoji").hidden = !p.statusEmoji;
-    $("statusText").textContent = p.statusText;
-
     // bio
     const bio = $("bioView");
     bio.textContent = p.bio;
     bio.hidden = !p.bio;
-
-    // location / link / joined
-    const location = $("locationView");
-    location.textContent = p.location ? "📍 " + p.location : "";
-    location.hidden = !p.location;
-
-    const link = $("linkView");
-    if (/^https?:\/\//i.test(p.link || "")) {
-        link.href = p.link;
-        link.textContent = p.link.replace(/^https?:\/\//i, "").replace(/\/$/, "");
-        link.hidden = false;
-    } else {
-        link.hidden = true;
-    }
 
     $("joinedView").textContent = "Joined " +
         new Date(p.createdAt).toLocaleDateString(undefined, { month: "short", year: "numeric" });
@@ -224,12 +199,6 @@ function render() {
         el.textContent = tag;
         chips.appendChild(el);
     });
-
-    // now listening
-    const hasSong = Boolean(p.nowSong);
-    $("nowPlaying").hidden = !hasSong;
-    $("npSong").textContent = p.nowSong;
-    $("npArtist").textContent = p.nowArtist;
 
     $("tabNote").textContent = p.isSelf
         ? "Anyone who visits your profile can see these."
@@ -844,14 +813,7 @@ function openEditor() {
 
     draft = {
         displayName: p.displayName,
-        pronouns: p.pronouns,
         bio: p.bio,
-        location: p.location,
-        link: p.link,
-        statusEmoji: p.statusEmoji,
-        statusText: p.statusText,
-        nowSong: p.nowSong,
-        nowArtist: p.nowArtist,
         interests: (p.interests || []).join(", "),
         accent: safeColor(p.accent),
         avatarImage: p.avatarImage || "",
@@ -861,14 +823,7 @@ function openEditor() {
     };
 
     $("displayNameInput").value = draft.displayName;
-    $("pronounsInput").value = draft.pronouns;
     $("bioInput").value = draft.bio;
-    $("locationInput").value = draft.location;
-    $("linkInput").value = draft.link;
-    $("statusEmojiInput").value = draft.statusEmoji;
-    $("statusTextInput").value = draft.statusText;
-    $("nowSongInput").value = draft.nowSong;
-    $("nowArtistInput").value = draft.nowArtist;
     $("interestsInput").value = draft.interests;
 
     $("gifAllowedTag").style.display = Planora.canUseGif(viewer) ? "" : "none";
@@ -917,14 +872,7 @@ function setAccent(color) {
 
 function readInputsIntoDraft() {
     draft.displayName = $("displayNameInput").value;
-    draft.pronouns = $("pronounsInput").value;
     draft.bio = $("bioInput").value;
-    draft.location = $("locationInput").value;
-    draft.link = $("linkInput").value;
-    draft.statusEmoji = $("statusEmojiInput").value;
-    draft.statusText = $("statusTextInput").value;
-    draft.nowSong = $("nowSongInput").value;
-    draft.nowArtist = $("nowArtistInput").value;
     draft.interests = $("interestsInput").value;
 }
 
@@ -936,8 +884,7 @@ function updateEditorPreview() {
     paintAvatar($("previewAvatar"), draft.avatarImage, profile.avatarColor, initialOf(name, profile.username), draft.avatarPosition);
 
     $("previewName").textContent = name;
-    $("previewHandle").textContent = "@" + profile.username + (draft.pronouns.trim() ? "  ·  " + draft.pronouns.trim() : "");
-    $("previewStatus").textContent = `${draft.statusEmoji.trim()} ${draft.statusText.trim()}`.trim();
+    $("previewHandle").textContent = "@" + profile.username;
 
     $("bioCount").textContent = `${draft.bio.length}/200`;
 
@@ -952,8 +899,7 @@ function updateEditorPreview() {
 
 function bindEditorInputs() {
     [
-        "displayNameInput", "pronounsInput", "bioInput", "locationInput", "linkInput",
-        "statusEmojiInput", "statusTextInput", "nowSongInput", "nowArtistInput", "interestsInput"
+        "displayNameInput", "bioInput", "interestsInput"
     ].forEach((id) => {
         $(id).addEventListener("input", () => {
             readInputsIntoDraft();
@@ -1170,9 +1116,6 @@ async function saveProfile() {
         return;
     }
 
-    let link = draft.link.trim();
-    if (link && !/^https?:\/\//i.test(link)) link = "https://" + link;
-
     const saveButton = $("saveProfile");
     saveButton.disabled = true;
 
@@ -1181,14 +1124,7 @@ async function saveProfile() {
             method: "PUT",
             body: JSON.stringify({
                 displayName,
-                pronouns: draft.pronouns.trim(),
                 bio: draft.bio.trim(),
-                location: draft.location.trim(),
-                link,
-                statusEmoji: draft.statusEmoji.trim(),
-                statusText: draft.statusText.trim(),
-                nowSong: draft.nowSong.trim(),
-                nowArtist: draft.nowArtist.trim(),
                 interests: parseInterests(draft.interests),
                 accent: draft.accent,
                 avatarImage: draft.avatarImage,
