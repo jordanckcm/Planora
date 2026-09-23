@@ -1056,8 +1056,8 @@ function resizeBanner(file, allowGif) {
             const reader = new FileReader();
             reader.onerror = () => reject(new Error("Couldn't read that file."));
             reader.onload = () => {
-                if (reader.result.length > 300000) {
-                    reject(new Error("That GIF is too big. Try a smaller one (under ~220KB)."));
+                if (reader.result.length > 1400000) {
+                    reject(new Error("That GIF is too big. Try a smaller one (under ~1MB)."));
                     return;
                 }
                 resolve(reader.result);
