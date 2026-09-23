@@ -67,8 +67,10 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 # Images are stored as small base64 data URLs on the event itself.
-app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024   # reject any request over 2 MB
-MAX_IMAGE_CHARS = 300_000                             # roughly a 220 KB image
+# saveProfile() can send an avatarImage AND a bannerImage in the same PUT,
+# so this needs headroom for two images at once, not just one.
+app.config["MAX_CONTENT_LENGTH"] = 3 * 1024 * 1024   # reject any request over 3 MB
+MAX_IMAGE_CHARS = 1_400_000                           # roughly a 1 MB image
 IMAGE_PATTERN = re.compile(r"^data:image/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$")
 
 # Match the maxlength values the frontend forms use, so someone hand-rolling
