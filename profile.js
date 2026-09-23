@@ -15,6 +15,12 @@ const ACCENT_PALETTE = [
     "#e05d8f", "#2fb8b0", "#7a8cff", "#8fbf3f", "#e0c341", "#9aa0a6"
 ];
 
+// Same palette buildAddEventUI in homepage.js uses for event covers —
+// kept in sync so an event edited from here looks identical to one
+// edited from the homepage's own form.
+const EVENT_COLORS = ["#c9a227", "#489c48", "#b6453f", "#4a7fc9", "#9a56c9", "#c96f2e"];
+const EVENT_ICONS = ["🎉", "🎮", "🎵", "🍕", "🏀", "🎨", "📚", "🌙", "🔥", "🎬"];
+
 const DEFAULT_ACCENT = "#c9a227";
 const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/;
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
@@ -458,6 +464,11 @@ async function openPost(event) {
         addedTag.style.display = "none";
     }
 
+    // the ⋮ menu (Edit event) only makes sense on your own post
+    $("postMenuWrap").style.display = profile.isSelf ? "" : "none";
+    $("postMenuDropdown").classList.remove("show");
+    exitPostEditMode();
+
     resetPostComposer();
 
     $("postOverlay").hidden = false;
@@ -474,6 +485,8 @@ function closePost() {
     $("postModal").setAttribute("aria-hidden", "true");
     $("postOverlay").hidden = true;
     document.body.style.overflow = "";
+    $("postMenuDropdown").classList.remove("show");
+    exitPostEditMode();
     currentPostEvent = null;
 }
 
@@ -591,6 +604,13 @@ function postCommentRow(comment, isReply) {
         deleteBtn.className = "comment-reply-button danger";
         deleteBtn.textContent = "Delete";
         deleteBtn.addEventListener("click", async () => {
+            // Captured up front, before the confirm dialog is awaited.
+            // Previously this read currentPostEvent.id AFTER the await —
+            // fine while the post stayed open, but the confirm dialog used
+            // to render underneath the open post (z-index) so it was only
+            // ever visible once the post had already been closed, which
+            // nulls out currentPostEvent and made the delete error out.
+            const eventId = currentPostEvent.id;
             const replyCount = isReply ? 0 : postComments.filter(r => r.parent_id === comment.id).length;
             const confirmed = await confirmAction({
                 title: isReply ? "Delete this reply?" : "Delete this comment?",
@@ -601,7 +621,7 @@ function postCommentRow(comment, isReply) {
             });
             if (!confirmed) return;
             try {
-                await api(`/api/events/${currentPostEvent.id}/comments/${comment.id}`, { method: "DELETE" });
+                await api(`/api/events/${eventId}/comments/${comment.id}`, { method: "DELETE" });
                 toast(isReply ? "Reply deleted." : "Comment deleted.");
                 await loadPostComments();
             } catch (err) {
@@ -731,6 +751,256 @@ async function submitPostComment() {
     }
 }
 
+
+/* =========================================================
+   POST EDIT PANEL (owner only)
+   Lets whoever posted the event edit it right from the post view
+   instead of having to go find it in the homepage's own month grid
+   first. This calls the exact same PUT /api/events/<id> endpoint
+   homepage.js's "Edit" menu item uses, so it's editing the ONE
+   underlying record — the homepage will show the change next time
+   it renders that event, no separate sync step needed.
+========================================================= */
+
+let postEditing = false;
+let postEditImage = "";
+let postEditImagePosition = { x: 50, y: 50 };
+let postEditIcon = EVENT_ICONS[0];
+let postEditColor = EVENT_COLORS[0];
+let postEditIconRowBuilt = false;
+
+function buildPostEditIconColorRows() {
+    if (postEditIconRowBuilt) return;
+    postEditIconRowBuilt = true;
+
+    const iconRow = $("postEditIconRow");
+    EVENT_ICONS.forEach(icon => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "event-icon-dot";
+        btn.textContent = icon;
+        btn.dataset.icon = icon;
+        btn.addEventListener("click", () => {
+            postEditIcon = icon;
+            iconRow.querySelectorAll(".event-icon-dot").forEach(el => el.classList.remove("selected"));
+            btn.classList.add("selected");
+        });
+        iconRow.appendChild(btn);
+    });
+
+    const colorRow = $("postEditColorRow");
+    EVENT_COLORS.forEach(color => {
+        const dot = document.createElement("button");
+        dot.type = "button";
+        dot.className = "event-color-dot";
+        dot.style.background = color;
+        dot.dataset.color = color;
+        dot.addEventListener("click", () => {
+            postEditColor = color;
+            colorRow.querySelectorAll(".event-color-dot").forEach(el => el.classList.remove("selected"));
+            dot.classList.add("selected");
+        });
+        colorRow.appendChild(dot);
+    });
+}
+
+function selectPostEditIcon(icon) {
+    $("postEditIconRow").querySelectorAll(".event-icon-dot")
+        .forEach(el => el.classList.toggle("selected", el.dataset.icon === icon));
+}
+
+function selectPostEditColor(color) {
+    $("postEditColorRow").querySelectorAll(".event-color-dot")
+        .forEach(el => el.classList.toggle("selected", el.dataset.color === color));
+}
+
+function applyPostEditImageVisual() {
+    const wrap = $("postEditImageReposition");
+    const photo = $("postEditImagePhoto");
+    const crosshair = $("postEditImageCrosshair");
+    const img = safeImage(postEditImage);
+
+    wrap.style.display = img ? "block" : "none";
+    $("postEditRemoveImage").style.display = img ? "inline-flex" : "none";
+    if (!img) return;
+
+    photo.style.backgroundImage = `url("${img}")`;
+    photo.style.backgroundPosition = `${postEditImagePosition.x}% ${postEditImagePosition.y}%`;
+    crosshair.style.left = `${postEditImagePosition.x}%`;
+    crosshair.style.top = `${postEditImagePosition.y}%`;
+}
+
+function setPostEditImage(dataUrl, position) {
+    postEditImage = dataUrl || "";
+    postEditImagePosition = position || { x: 50, y: 50 };
+    applyPostEditImageVisual();
+}
+
+function enterPostEditMode() {
+    if (!currentPostEvent || !profile.isSelf) return;
+
+    buildPostEditIconColorRows();
+
+    postEditing = true;
+    $("postTitle").hidden = true;
+    $("postCaption").hidden = true;
+
+    $("postEditTitle").value = currentPostEvent.title;
+    $("postEditDescription").value = currentPostEvent.description || "";
+    $("postEditDate").value = currentPostEvent.date;
+    $("postEditEndDate").value =
+        currentPostEvent.end_date && currentPostEvent.end_date !== currentPostEvent.date
+            ? currentPostEvent.end_date : "";
+    $("postEditStartTime").value = currentPostEvent.start_time || "";
+    $("postEditEndTime").value = currentPostEvent.end_time || "";
+
+    postEditIcon = currentPostEvent.icon || EVENT_ICONS[0];
+    postEditColor = currentPostEvent.color || EVENT_COLORS[0];
+    selectPostEditIcon(postEditIcon);
+    selectPostEditColor(postEditColor);
+
+    setPostEditImage(
+        currentPostEvent.image || "",
+        currentPostEvent.image_position ? { ...currentPostEvent.image_position } : { x: 50, y: 50 }
+    );
+
+    $("postEditGifAllowedTag").style.display = Planora.canUseGif(viewer) ? "" : "none";
+
+    $("postEditForm").hidden = false;
+}
+
+function exitPostEditMode() {
+    postEditing = false;
+    $("postEditForm").hidden = true;
+    $("postTitle").hidden = false;
+    $("postCaption").hidden = !currentPostEvent || !currentPostEvent.description;
+}
+
+async function savePostEdit() {
+    if (!currentPostEvent) return;
+
+    const title = $("postEditTitle").value.trim();
+    const date = $("postEditDate").value;
+    if (!title || !date) {
+        toast("Add a name and date first.", "error");
+        return;
+    }
+
+    const endDate = $("postEditEndDate").value;
+    if (endDate && endDate < date) {
+        toast("End date can't be before the start date.", "error");
+        return;
+    }
+
+    const eventId = currentPostEvent.id;
+    const startTime = $("postEditStartTime").value;
+
+    const saveBtn = $("postEditSave");
+    saveBtn.disabled = true;
+    const originalLabel = saveBtn.textContent;
+    saveBtn.textContent = "Saving…";
+
+    try {
+        const updated = await PlanoraData.editEvent(eventId, {
+            title,
+            description: $("postEditDescription").value.trim(),
+            date,
+            endDate,
+            startTime,
+            endTime: $("postEditEndTime").value,
+            timezone: startTime ? Intl.DateTimeFormat().resolvedOptions().timeZone : "",
+            icon: postEditIcon,
+            color: postEditColor,
+            image: postEditImage,
+            imagePosition: postEditImagePosition
+        });
+
+        // Same underlying record homepage.js edits — updating it here
+        // updates it everywhere, including the homepage's month grid,
+        // the next time either page fetches it.
+        currentPostEvent = { ...currentPostEvent, ...updated };
+
+        const idx = (profile.publicEvents || []).findIndex(e => e.id === eventId);
+        if (idx !== -1) {
+            profile.publicEvents[idx] = { ...profile.publicEvents[idx], ...updated };
+        }
+        renderEvents();
+
+        $("postTitle").textContent = currentPostEvent.title;
+        $("postDate").textContent = formatEventDate(currentPostEvent);
+        $("postCaption").textContent = currentPostEvent.description || "";
+        $("postCaption").hidden = !currentPostEvent.description;
+
+        const pos = safePosition(currentPostEvent.image_position);
+        const banner = $("postBanner");
+        if (safeImage(currentPostEvent.image)) {
+            banner.style.backgroundImage = `url("${safeImage(currentPostEvent.image)}")`;
+            banner.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+            banner.classList.remove("no-image");
+            banner.textContent = "";
+        } else {
+            banner.style.backgroundImage = "";
+            banner.classList.add("no-image");
+            banner.style.background = `linear-gradient(135deg, ${safeColor(currentPostEvent.color)}, #1b1b1b)`;
+            banner.textContent = currentPostEvent.icon || "";
+        }
+
+        exitPostEditMode();
+        toast("Event updated.", "success");
+    } catch (err) {
+        toast(err.message, "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = originalLabel;
+    }
+}
+
+function bindPostEditImagePicker() {
+    const imageInput = $("postEditImageInput");
+    const removeBtn = $("postEditRemoveImage");
+    const frame = $("postEditImageFrame");
+
+    imageInput.addEventListener("change", async () => {
+        const file = imageInput.files[0];
+        if (!file) return;
+        try {
+            const dataUrl = await Planora.resizeImage(file, { allowGif: Planora.canUseGif(viewer) });
+            setPostEditImage(dataUrl, { x: 50, y: 50 });
+        } catch (err) {
+            toast(err.message, "error");
+        }
+        imageInput.value = "";
+    });
+
+    removeBtn.addEventListener("click", () => setPostEditImage("", { x: 50, y: 50 }));
+
+    let dragging = false;
+
+    function positionFromPointer(e) {
+        const rect = frame.getBoundingClientRect();
+        const x = Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
+        const y = Math.min(100, Math.max(0, ((e.clientY - rect.top) / rect.height) * 100));
+        return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
+    }
+
+    frame.addEventListener("pointerdown", (e) => {
+        if (!postEditImage) return;
+        dragging = true;
+        frame.setPointerCapture(e.pointerId);
+        postEditImagePosition = positionFromPointer(e);
+        applyPostEditImageVisual();
+    });
+    frame.addEventListener("pointermove", (e) => {
+        if (!dragging) return;
+        postEditImagePosition = positionFromPointer(e);
+        applyPostEditImageVisual();
+    });
+    function endDrag() { dragging = false; }
+    frame.addEventListener("pointerup", endDrag);
+    frame.addEventListener("pointercancel", endDrag);
+}
+
+
 function bindPostModal() {
     $("postClose").addEventListener("click", closePost);
     $("postOverlay").addEventListener("click", closePost);
@@ -769,6 +1039,24 @@ function bindPostModal() {
             button.disabled = false;
         }
     });
+
+    // ⋮ menu — Edit event (owner only; postMenuWrap stays hidden otherwise)
+    $("postMenuButton").addEventListener("click", (e) => {
+        e.stopPropagation();
+        $("postMenuDropdown").classList.toggle("show");
+    });
+    document.addEventListener("click", (e) => {
+        if (!$("postMenuWrap").contains(e.target)) {
+            $("postMenuDropdown").classList.remove("show");
+        }
+    });
+    $("postEditItem").addEventListener("click", () => {
+        $("postMenuDropdown").classList.remove("show");
+        enterPostEditMode();
+    });
+    $("postEditCancel").addEventListener("click", exitPostEditMode);
+    $("postEditSave").addEventListener("click", savePostEdit);
+    bindPostEditImagePicker();
 
     // refresh comment timestamps periodically, same idea as the homepage
     setInterval(() => {
