@@ -268,7 +268,15 @@
 }
 
 .settings-switch[aria-checked="true"] {
-    background: var(--accent, #c9a227);
+    /* FIX: was var(--accent, #c9a227) — on the homepage, body sets --accent
+       to a bare "R, G, B" triplet for its own rgba(var(--accent), x) calls,
+       which isn't a valid standalone color. Since --accent is inherited,
+       the settings overlay picked up that broken value too, and the
+       var()'s fallback only applies when a property is fully unset, not
+       when it's set-but-invalid — so the switch's background just failed
+       to render. --gold is base.css's own uncontested token for this
+       exact color, with nothing else on the page redefining it. */
+    background: var(--gold);
 }
 
 .settings-switch[aria-checked="true"]::after {
@@ -302,9 +310,11 @@
 }
 
 .settings-theme-toggle button.active {
-    border-color: var(--accent, #c9a227);
+    /* FIX: same --accent collision as the switch above — using --gold
+       instead so this doesn't silently break on the homepage. */
+    border-color: var(--gold);
     color: var(--text); /* FIX: was hardcoded white */
-    background: color-mix(in srgb, var(--accent, #c9a227) 18%, var(--bg-input));
+    background: color-mix(in srgb, var(--gold) 18%, var(--bg-input));
 }
 
 .settings-danger-zone {
