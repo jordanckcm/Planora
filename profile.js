@@ -6,8 +6,8 @@
      profile.html?u=someone  -> someone else's profile (read only)
 
    You usually land on someone else's by clicking their name on a comment.
-   Public events show for everyone; the Private tab and the Edit button
-   only exist on your own profile, and the server enforces that too.
+   Public events show for everyone; Edit button only exists on your own
+   profile, and the server enforces that too.
 ========================================================= */
 
 const ACCENT_PALETTE = [
@@ -21,7 +21,6 @@ const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 let viewer = null;      // who is signed in
 let profile = null;     // whose page this is
-let activeTab = "public";
 let draft = null;       // the editor's unsaved copy
 
 const $ = (id) => document.getElementById(id);
@@ -226,81 +225,51 @@ function render() {
         chips.appendChild(el);
     });
 
-    // stats
-    $("statPublic").textContent = p.stats.publicEvents;
-    $("statEvents").textContent = p.stats.events;
-    $("statComments").textContent = p.stats.comments;
-
     // now listening
     const hasSong = Boolean(p.nowSong);
     $("nowPlaying").hidden = !hasSong;
     $("npSong").textContent = p.nowSong;
     $("npArtist").textContent = p.nowArtist;
 
-    // tabs: the Private tab is only ever yours
-    $("tabPrivate").hidden = !p.isSelf;
-    if (!p.isSelf) activeTab = "public";
-    renderTabs();
+    $("tabNote").textContent = p.isSelf
+        ? "Anyone who visits your profile can see these."
+        : "";
+
     renderEvents();
-}
-
-function renderTabs() {
-    const isPublic = activeTab === "public";
-
-    $("tabPublic").classList.toggle("active", isPublic);
-    $("tabPublic").setAttribute("aria-selected", String(isPublic));
-    $("tabPrivate").classList.toggle("active", !isPublic);
-    $("tabPrivate").setAttribute("aria-selected", String(!isPublic));
-
-    if (isPublic) {
-        $("tabNote").textContent = profile.isSelf
-            ? "Anyone who visits your profile can see these."
-            : "";
-    } else {
-        $("tabNote").textContent = "Only you can see these.";
-    }
 }
 
 function renderEvents() {
     const grid = $("eventGrid");
     grid.textContent = "";
 
-    const isPublic = activeTab === "public";
-    const list = isPublic ? profile.publicEvents : (profile.privateEvents || []);
+    const list = profile.publicEvents || [];
 
     if (!list.length) {
-        grid.appendChild(emptyState(isPublic));
+        grid.appendChild(emptyState());
         return;
     }
 
-    list.forEach((event) => grid.appendChild(eventTile(event, !isPublic)));
+    list.forEach((event) => grid.appendChild(eventTile(event)));
 }
 
-function emptyState(isPublic) {
+function emptyState() {
     const box = document.createElement("div");
     box.className = "empty-state";
 
     const title = document.createElement("div");
     title.className = "empty-title";
+    title.textContent = "No public events yet";
 
     const text = document.createElement("p");
-
-    if (isPublic && profile.isSelf) {
-        title.textContent = "No public events yet";
-        text.textContent = "Press + on the calendar and switch the event to Public to show it here.";
-    } else if (isPublic) {
-        title.textContent = "No public events yet";
-        text.textContent = `${profile.displayName} hasn't shared any events.`;
-    } else {
-        title.textContent = "No private events";
-        text.textContent = "Private events stay on your calendar and never show on your profile.";
-    }
+    text.textContent = profile.isSelf
+        ? "Press + on the calendar and switch the event to Public to show it here."
+        : `${profile.displayName} hasn't shared any events.`;
 
     box.append(title, text);
     return box;
 }
 
-function eventTile(event, showLock) {
+function eventTile(event) {
     const tile = document.createElement("article");
     tile.className = "event-tile";
     tile.setAttribute("role", "button");
@@ -319,17 +288,10 @@ function eventTile(event, showLock) {
         cover.textContent = event.icon;
     }
 
-    if (showLock) {
-        const lock = document.createElement("span");
-        lock.className = "tile-lock";
-        lock.textContent = "Private";
-        cover.appendChild(lock);
-    }
-
     // Quick add-to-calendar, right on the tile - only for someone else's
     // public event you haven't already added. Your own tiles and ones
     // you've already added don't get this.
-    if (!showLock && !profile.isSelf && !event.addedByMe) {
+    if (!profile.isSelf && !event.addedByMe) {
         const addBtn = document.createElement("button");
         addBtn.type = "button";
         addBtn.className = "tile-add-button";
@@ -341,7 +303,7 @@ function eventTile(event, showLock) {
             quickAddToCalendar(event, addBtn);
         });
         cover.appendChild(addBtn);
-    } else if (!showLock && !profile.isSelf && event.addedByMe) {
+    } else if (!profile.isSelf && event.addedByMe) {
         const addedMark = document.createElement("span");
         addedMark.className = "tile-added-mark";
         addedMark.textContent = "✓";
@@ -371,17 +333,10 @@ function eventTile(event, showLock) {
 
     tile.append(cover, body);
 
-    // Private events on your own profile aren't posts to open (no public
-    // comment thread makes sense for something only you can see) - the
-    // tile just shows, it doesn't open anything.
-    if (!showLock) {
-        tile.addEventListener("click", () => openPost(event));
-        tile.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") openPost(event);
-        });
-    } else {
-        tile.classList.add("not-clickable");
-    }
+    tile.addEventListener("click", () => openPost(event));
+    tile.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") openPost(event);
+    });
 
     return tile;
 }
@@ -866,9 +821,6 @@ function bindStaticActions() {
         await Planora.logout();
         window.location.href = "login.html";
     });
-
-    $("tabPublic").addEventListener("click", () => { activeTab = "public"; renderTabs(); renderEvents(); });
-    $("tabPrivate").addEventListener("click", () => { activeTab = "private"; renderTabs(); renderEvents(); });
 
     $("editProfileButton").addEventListener("click", openEditor);
     $("closeEditor").addEventListener("click", closeEditor);
