@@ -62,22 +62,6 @@
                 </div>
             </section>
 
-            <!-- STATS -->
-            <div class="stat-row">
-                <div class="stat">
-                    <div class="stat-value" id="statPublic">0</div>
-                    <div class="stat-label">Public events</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value" id="statEvents">0</div>
-                    <div class="stat-label">Events made</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-value" id="statComments">0</div>
-                    <div class="stat-label">Comments</div>
-                </div>
-            </div>
-
             <!-- NOW LISTENING (Spotify-style) -->
             <section class="now-playing" id="nowPlaying" hidden>
                 <div class="np-art" id="npArt">♪</div>
@@ -91,10 +75,7 @@
 
             <!-- EVENTS -->
             <section class="events-section">
-                <div class="tab-row" role="tablist">
-                    <button class="tab active" id="tabPublic" role="tab" aria-selected="true">Public</button>
-                    <button class="tab" id="tabPrivate" role="tab" aria-selected="false" hidden>Private</button>
-                </div>
+                <div class="events-heading">Public events</div>
                 <p class="tab-note" id="tabNote"></p>
                 <div class="event-grid" id="eventGrid"></div>
             </section>
