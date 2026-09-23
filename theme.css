@@ -1,0 +1,91 @@
+/* =========================================================
+   PLANORA — THEME
+   Load this AFTER base.css (and before page-specific CSS) on every
+   page. It doesn't set a dark theme itself — base.css already does
+   that as the default — it only adds a light override, switched on
+   two ways:
+
+     1. Explicit choice: <html data-theme="light"> or
+        <html data-theme="dark"> — set by settings.js (and, before
+        the network responds, by a small inline <script> in each
+        page's <head> reading the cached preference so there's no
+        flash of the wrong theme on load).
+     2. "System": no data-theme attribute at all — follows the OS's
+        prefers-color-scheme automatically.
+
+   Redefines the SAME custom property names base.css already defines
+   (--panel, --border, --border-strong, --text, --text-dim,
+   --text-faint) rather than inventing new ones, so every page that
+   already styles itself with var(--panel) etc. repaints for free —
+   nothing needs to know a theme system exists.
+
+   A few surfaces (profile.css's editor drawer, form inputs, the
+   comment box) used literal dark colors instead of variables before
+   this existed. Those have been converted to var(--bg-surface) /
+   var(--bg-input) / var(--bg-input-alt), defined here with dark
+   defaults matching what they used to be, so this is additive and
+   nothing breaks if theme.css isn't loaded on some page.
+
+   Backdrop/scrim colors (modal overlays, ⋮ menu buttons sitting on
+   top of photos) are deliberately left alone — a translucent dark
+   scrim reads fine over either theme, same as Discord's own light
+   mode still dims the backdrop behind a modal.
+========================================================= */
+
+:root {
+    --bg-surface: #191919;
+    --bg-input: rgb(19, 19, 19);
+    --bg-input-alt: rgb(15, 15, 15);
+}
+
+:root[data-theme="light"] {
+    --panel: #ffffff;
+    --border: #e3e3e7;
+    --border-strong: #d0d0d6;
+    --text: #17171a;
+    --text-dim: #47474e;
+    --text-faint: #7c7c85;
+
+    --bg-surface: #ffffff;
+    --bg-input: #f1f1f4;
+    --bg-input-alt: #e9e9ee;
+}
+
+body {
+    background: #131313;
+}
+
+:root[data-theme="light"] body {
+    background: #f3f3f5;
+}
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme]) {
+        --panel: #ffffff;
+        --border: #e3e3e7;
+        --border-strong: #d0d0d6;
+        --text: #17171a;
+        --text-dim: #47474e;
+        --text-faint: #7c7c85;
+
+        --bg-surface: #ffffff;
+        --bg-input: #f1f1f4;
+        --bg-input-alt: #e9e9ee;
+    }
+
+    :root:not([data-theme]) body {
+        background: #f3f3f5;
+    }
+}
+
+/* "Reduce motion" setting — a broader kill switch than
+   prefers-reduced-motion alone, for people who want animations off in
+   Planora specifically regardless of their OS-wide setting. */
+:root[data-reduce-motion] *,
+:root[data-reduce-motion] *::before,
+:root[data-reduce-motion] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+}
