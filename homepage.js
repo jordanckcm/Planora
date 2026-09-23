@@ -575,9 +575,9 @@ function enhanceMonthHeaders() {
 
 /* =========================
    PROFILE MENU
-   Avatar opens a small dropdown (View profile / Admin panel /
-   Log out) instead of separate topbar buttons, which is what
-   used to break the layout on narrow screens.
+   Avatar opens a small dropdown (View profile / Discover / Settings /
+   Admin panel / Log out) instead of separate topbar buttons, which is
+   what used to break the layout on narrow screens.
 ========================= */
 
 function buildProfileMenu() {
@@ -619,6 +619,15 @@ function buildProfileMenu() {
     // no ?u= means "my own profile"
     document.getElementById("viewProfileItem").addEventListener("click", () => {
         window.location.href = "profile.html";
+    });
+
+    document.getElementById("discoverItem").addEventListener("click", () => {
+        window.location.href = "directory.html";
+    });
+
+    document.getElementById("settingsItem").addEventListener("click", () => {
+        closeDropdown();
+        Planora.Settings.open(currentUser);
     });
 
     document.getElementById("logoutItem").addEventListener("click", async () => {
