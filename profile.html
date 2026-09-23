@@ -170,7 +170,10 @@
     <!-- =========================
          EVENT POST VIEW (Instagram-style)
          Opens when you click a public event tile: the event's banner
-         on top, then its full comment thread below.
+         on top, its comment thread scrolls in the middle, and the
+         comment composer stays pinned to the bottom of the modal
+         (outside the scrolling area) so it's never something you
+         have to scroll down to reach.
     ========================== -->
     <div class="post-overlay" id="postOverlay" hidden></div>
 
@@ -198,22 +201,26 @@
 
                 <div class="post-comments">
                     <div class="comment-list" id="postCommentList"></div>
-
-                    <div class="reply-banner" id="postReplyBanner">
-                        <span class="reply-banner-label" id="postReplyLabel"></span>
-                        <button type="button" class="reply-banner-cancel" id="postReplyCancel" aria-label="Cancel reply">×</button>
-                    </div>
-
-                    <div class="comment-form">
-                        <div class="comment-input-row">
-                            <textarea class="comment-input" id="postCommentInput" placeholder="Add a comment..." maxlength="240" rows="1"></textarea>
-                            <span class="comment-counter" id="postCommentCounter"></span>
-                        </div>
-                        <button class="comment-submit" id="postCommentSubmit" disabled>Post</button>
-                    </div>
                 </div>
 
             </div>
+
+            <!-- pinned footer: stays put while the comments above it scroll -->
+            <div class="post-composer">
+                <div class="reply-banner" id="postReplyBanner">
+                    <span class="reply-banner-label" id="postReplyLabel"></span>
+                    <button type="button" class="reply-banner-cancel" id="postReplyCancel" aria-label="Cancel reply">×</button>
+                </div>
+
+                <div class="comment-form">
+                    <div class="comment-input-row">
+                        <textarea class="comment-input" id="postCommentInput" placeholder="Add a comment..." maxlength="240" rows="1"></textarea>
+                        <span class="comment-counter" id="postCommentCounter"></span>
+                    </div>
+                    <button class="comment-submit" id="postCommentSubmit" disabled>Post</button>
+                </div>
+            </div>
+
         </div>
     </div>
 
