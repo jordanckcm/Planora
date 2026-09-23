@@ -50,6 +50,22 @@
     font-family: var(--font-ui);
 }
 
+/* FIX: the blanket `* { font-family: var(--font-ui); }` reset above has
+   ZERO specificity (the universal selector always does), so base.css's
+   plain `button { font-family: "VHS"; }` — an element selector, which
+   carries real specificity — always won regardless of load order. That's
+   why the topbar (← Calendar / Discover / Settings / Log out, and the
+   Local/Global/Timeline pills, all real <button> elements) stayed in the
+   pixel font. These class selectors carry more specificity than a bare
+   `button`, so they actually take effect. */
+.custom-button,
+.back-button,
+.logout-button,
+.today-pill,
+.local-button,
+.global-button,
+.timeline-button,
+
 .event-count,
 .event-title,
 .event-date,
