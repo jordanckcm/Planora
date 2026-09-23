@@ -158,15 +158,46 @@ def clean_text(value, limit):
     return value.strip()[:limit]
 
 
-def clean_image(value):
+GIF_PATTERN = re.compile(r"^data:image/gif;base64,[A-Za-z0-9+/=]+$")
+
+# Roles allowed to upload an animated GIF anywhere an image goes (profile
+# picture, banner, event cover) - static images stay open to everyone.
+GIF_ROLES = ("community_plus", "admin")
+
+
+def clean_image(value, allow_gif=False):
     """Returns (image, error). An empty string means 'no image'."""
     if not value:
         return "", None
     if not isinstance(value, str) or len(value) > MAX_IMAGE_CHARS:
         return "", "That image is too big. Try a smaller one."
+    if GIF_PATTERN.match(value):
+        if not allow_gif:
+            return "", "GIFs need a Community+ or Admin account."
+        return value, None
     if not IMAGE_PATTERN.match(value):
-        return "", "Only JPEG, PNG or WebP images are allowed."
+        return "", "Only JPEG, PNG, WebP images are allowed (GIF needs Community+ or Admin)."
     return value, None
+
+
+DEFAULT_IMAGE_POSITION = {"x": 50.0, "y": 50.0}
+
+
+def clean_position(value):
+    """A focal point for an image - {'x': 0-100, 'y': 0-100}, percentages
+    from the top-left, same idea as CSS background-position. Anything
+    missing or out of range falls back to dead center rather than erroring
+    the whole request over a cosmetic field."""
+    if not isinstance(value, dict):
+        return dict(DEFAULT_IMAGE_POSITION)
+    try:
+        x = float(value.get("x"))
+        y = float(value.get("y"))
+    except (TypeError, ValueError):
+        return dict(DEFAULT_IMAGE_POSITION)
+    if not (0 <= x <= 100 and 0 <= y <= 100):
+        return dict(DEFAULT_IMAGE_POSITION)
+    return {"x": round(x, 1), "y": round(y, 1)}
 
 
 def clean_time(value):
@@ -202,10 +233,12 @@ def user_public_info(user):
         "bio": user["bio"],
         "avatarColor": user["avatar_color"],
         "avatarImage": user.get("avatar_image", ""),
+        "avatarPosition": user.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION),
         "createdAt": user["created_at"],
         "role": user["role"],
         # profile extras - .get() so accounts made before these existed still work
         "bannerImage": user.get("banner_image", ""),
+        "bannerPosition": user.get("banner_position") or dict(DEFAULT_IMAGE_POSITION),
         "accent": user.get("accent", "") or user["avatar_color"],
         "pronouns": user.get("pronouns", ""),
         "location": user.get("location", ""),
@@ -310,17 +343,23 @@ def make_local_copy(source_event, username):
         "color": source_event.get("color", EVENT_COLORS[0]),
         "icon": source_event.get("icon", EVENT_ICONS[0]),
         "image": source_event.get("image", ""),
+        "image_position": source_event.get("image_position") or dict(DEFAULT_IMAGE_POSITION),
         "cloned_from": source_event["id"],
         "created_at": now_in_ms(),
+        "edited": False,
+        "edited_at": None,
     }
     next_event_id += 1
     return copy
 
 
 def profile_event_view(event):
-    """The trimmed-down shape of an event shown on a profile page."""
+    """The trimmed-down shape of an event shown on a profile page - enough
+    to render it as a post (banner, caption, comments) if the viewer
+    clicks into it, not just as a grid tile."""
     return {
         "id": event["id"],
+        "owner": event["owner"],
         "title": event["title"],
         "description": event["description"],
         "date": event["date"],
@@ -330,7 +369,11 @@ def profile_event_view(event):
         "color": event.get("color", EVENT_COLORS[0]),
         "icon": event.get("icon", EVENT_ICONS[0]),
         "image": event.get("image", ""),
+        "image_position": event.get("image_position") or dict(DEFAULT_IMAGE_POSITION),
         "visibility": event["visibility"],
+        "edited": bool(event.get("edited")),
+        "edited_at": event.get("edited_at"),
+        "created_at": event.get("created_at"),
     }
 
 
@@ -497,18 +540,30 @@ def update_me():
         updates["bio"] = clean_text(data["bio"], MAX_BIO)
 
     # Profile picture and banner. Same rules as event covers: small base64
-    # data URL, JPEG/PNG/WebP only. Send "" to remove.
+    # data URL, JPEG/PNG/WebP for everyone, GIF too for Community+/Admin.
+    # Send "" to remove.
+    allow_gif = user["role"] in GIF_ROLES
+
     if "avatarImage" in data:
-        image, image_error = clean_image(data["avatarImage"])
+        image, image_error = clean_image(data["avatarImage"], allow_gif)
         if image_error:
             return jsonify({"error": image_error}), 400
         updates["avatar_image"] = image
 
     if "bannerImage" in data:
-        image, image_error = clean_image(data["bannerImage"])
+        image, image_error = clean_image(data["bannerImage"], allow_gif)
         if image_error:
             return jsonify({"error": image_error}), 400
         updates["banner_image"] = image
+
+    # Where within the image the focal point sits - lets a photo that's
+    # wider or taller than its frame still show the part that matters,
+    # instead of always cropping dead center.
+    if "avatarPosition" in data:
+        updates["avatar_position"] = clean_position(data["avatarPosition"])
+
+    if "bannerPosition" in data:
+        updates["banner_position"] = clean_position(data["bannerPosition"])
 
     # kept as the fallback/background behind a picture
     if "avatarColor" in data:
@@ -586,7 +641,18 @@ def get_user_profile(username):
         "publicEvents": len(public_events),
         "comments": len([c for c in comments if c["author"].lower() == target["username"].lower()]),
     }
-    info["publicEvents"] = [profile_event_view(e) for e in public_events]
+
+    public_event_views = []
+    for e in public_events:
+        view = profile_event_view(e)
+        # never true for your own profile - a public event already IS
+        # your calendar event, there's no separate copy to "add"
+        view["addedByMe"] = (not is_self) and any(
+            other["owner"].lower() == viewer["username"].lower() and other.get("cloned_from") == e["id"]
+            for other in events
+        )
+        public_event_views.append(view)
+    info["publicEvents"] = public_event_views
 
     if is_self:
         private_events = sorted(
@@ -632,6 +698,9 @@ def get_events():
         event_copy.setdefault("end_time", "")
         event_copy.setdefault("timezone", "")
         event_copy.setdefault("image", "")
+        event_copy.setdefault("image_position", dict(DEFAULT_IMAGE_POSITION))
+        event_copy.setdefault("edited", False)
+        event_copy.setdefault("edited_at", None)
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
         # so the card can show the host's face instead of a bare day
@@ -714,9 +783,11 @@ def add_event():
     if end_date < date:
         return jsonify({"error": "End date can't be before the start date."}), 400
 
-    image, image_error = clean_image(data.get("image", ""))
+    image, image_error = clean_image(data.get("image", ""), user["role"] in GIF_ROLES)
     if image_error:
         return jsonify({"error": image_error}), 400
+
+    image_position = clean_position(data.get("imagePosition"))
 
     # Only meaningful when there's a start_time - an all-day event has no
     # single instant to convert, so there's nothing for a timezone to do.
@@ -758,8 +829,11 @@ def add_event():
         "color": color,
         "icon": icon,
         "image": image,
+        "image_position": image_position,
         "cloned_from": None,
         "created_at": now_in_ms(),
+        "edited": False,
+        "edited_at": None,
     }
     next_event_id += 1
     events.append(new_event)
@@ -810,6 +884,99 @@ def set_event_visibility(event_id):
     return jsonify(response)
 
 
+@app.route("/api/events/<int:event_id>", methods=["PUT"])
+def edit_event(event_id):
+    """
+    Edits the content of an event you own - title, description, date,
+    time, image, icon, color. Visibility has its own endpoint above and
+    isn't touched here.
+
+    A copy you added from someone else's Global post isn't editable -
+    it's not yours to rewrite, only the original poster's. If you DO own
+    the Global post, the edit also updates everyone's calendar copy of
+    it, so it doesn't just silently drift out of sync with what they
+    added. Editing marks the event (and, for a Global post, its clones)
+    as edited, same idea as an edited comment.
+    """
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    event = find_event(event_id)
+    if not event or event["owner"].lower() != user["username"].lower():
+        return jsonify({"error": "Event not found."}), 404
+
+    if event.get("cloned_from") is not None:
+        return jsonify({"error": "You can't edit an event you added from Global - only the person who posted it can."}), 403
+
+    data = body()
+
+    title = clean_text(data.get("title", ""), MAX_TITLE)
+    description = clean_text(data.get("description", ""), MAX_DESCRIPTION)
+    date = data.get("date", "")
+
+    if not title or not isinstance(date, str) or not DATE_PATTERN.match(date):
+        return jsonify({"error": "Add a name and date first."}), 400
+
+    start_time = clean_time(data.get("startTime", ""))
+    end_time = clean_time(data.get("endTime", ""))
+
+    end_date = data.get("endDate", "")
+    end_date = end_date.strip() if isinstance(end_date, str) else ""
+    if end_date and not DATE_PATTERN.match(end_date):
+        return jsonify({"error": "That end date isn't a real date."}), 400
+    end_date = end_date or date
+
+    if end_date < date:
+        return jsonify({"error": "End date can't be before the start date."}), 400
+
+    color = data.get("color")
+    if color not in EVENT_COLORS:
+        color = event["color"]
+
+    icon = data.get("icon")
+    if icon not in EVENT_ICONS:
+        icon = event["icon"]
+
+    image, image_error = clean_image(data.get("image", ""), user["role"] in GIF_ROLES)
+    if image_error:
+        return jsonify({"error": image_error}), 400
+
+    image_position = clean_position(data.get("imagePosition"))
+
+    timezone = clean_timezone(data.get("timezone", "")) if start_time else ""
+
+    edited_at = now_in_ms()
+    changes = {
+        "title": title,
+        "description": description,
+        "date": date,
+        "end_date": end_date,
+        "start_time": start_time,
+        "end_time": end_time,
+        "timezone": timezone,
+        "color": color,
+        "icon": icon,
+        "image": image,
+        "image_position": image_position,
+        "edited": True,
+        "edited_at": edited_at,
+    }
+    event.update(changes)
+
+    # A Global post's clones mirror its content - an edit here should
+    # show up on everyone's calendar copy of it too, not just the post
+    # itself, or their copy would silently go stale.
+    if event["visibility"] == "global":
+        for clone in events:
+            if clone.get("cloned_from") == event["id"]:
+                clone.update(changes)
+
+    response = dict(event)
+    response["isMine"] = True
+    return jsonify(response)
+
+
 @app.route("/api/events/<int:event_id>/add", methods=["POST"])
 def add_to_my_calendar(event_id):
     user = get_logged_in_user()
@@ -822,12 +989,11 @@ def add_to_my_calendar(event_id):
     if not source_event:
         return jsonify({"error": "Event not found."}), 404
 
-    # Only Global posts are addable. Without this check anyone could copy
-    # a stranger's private event - title, description, cover and all - just
-    # by guessing its id. (Public events are viewable on profiles, but
-    # they're not a Global feed, so they aren't addable either.)
-    if source_event["visibility"] != "global":
-        return jsonify({"error": "That event isn't posted to Global."}), 403
+    # Global posts AND public profile events are addable. Without this
+    # check anyone could copy a stranger's PRIVATE event - title,
+    # description, cover and all - just by guessing its id.
+    if source_event["visibility"] not in ("global", "public"):
+        return jsonify({"error": "That event isn't public."}), 403
 
     # Posting to Global already drops the owner a copy automatically, so
     # normally they'd hit the "already added" check right below like
