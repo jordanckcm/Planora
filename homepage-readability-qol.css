@@ -620,3 +620,101 @@ textarea.comment-input {
         gap: 0;
     }
 }
+
+
+/* =========================================================
+   EDIT EVENTS + IMAGE REPOSITIONING + GIF SUPPORT
+   Add on to the bottom of homepage-extra.css, same as the rest
+   of this file.
+========================================================= */
+
+/* --- "EDITED" badge, same shape as the existing NEW badge --- */
+
+.event-edited-badge {
+    padding: 2px 7px;
+
+    border-radius: 20px;
+
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.5);
+
+    font-size: 8.5px;
+    letter-spacing: 0.06em;
+}
+
+/* --- cover image now honors a per-image focal point instead of always
+   cropping dead center — homepage.js sets --cover-position/--tl-position
+   from the event's saved position (or the live drag position in the
+   create/edit form's own preview) --- */
+
+.event-cover.has-image {
+    background-position: var(--cover-position, center);
+}
+
+.timeline-body.has-image::after {
+    background-position: var(--tl-position, center);
+}
+
+
+/* --- drag-to-reposition control ---
+   Sits under the image picker once an image is chosen. Dragging
+   anywhere on the frame moves the focal point; a small crosshair
+   marks exactly where it's currently set to. */
+
+.image-reposition {
+    margin-top: 10px;
+    margin-bottom: 14px;
+}
+
+.image-reposition-frame {
+    position: relative;
+    overflow: hidden;
+
+    width: 100%;
+    height: 130px;
+
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.image-reposition-frame:active {
+    cursor: grabbing;
+}
+
+.image-reposition-photo {
+    position: absolute;
+    inset: 0;
+
+    background-size: cover;
+    /* background-position is set inline from JS as the drag moves */
+
+    pointer-events: none;
+}
+
+.image-reposition-crosshair {
+    position: absolute;
+
+    width: 22px;
+    height: 22px;
+    margin-left: -11px;
+    margin-top: -11px;
+
+    border: 2px solid white;
+    border-radius: 50%;
+
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.4);
+
+    pointer-events: none;
+}
+
+.image-reposition-hint {
+    margin-top: 6px;
+
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    text-align: center;
+}
