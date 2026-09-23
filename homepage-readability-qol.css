@@ -22,12 +22,17 @@
 ========================================================= */
 
 :root {
-    /* Same stack Discord and Instagram fall back to on every OS when
-       their own webfont isn't loaded — this IS that fallback, just
-       used on purpose instead of by accident. */
-    --font-ui: "gg sans", "Inter", -apple-system, BlinkMacSystemFont,
-               "Segoe UI", Roboto, Helvetica, Arial, sans-serif,
-               "Apple Color Emoji", "Segoe UI Emoji";
+    /* Same stack planora-ui.css already imports and loads (Noto Sans /
+       Open Sans, the free faces closest to Discord's own gg sans) —
+       reusing --font-discord here instead of a second, unloaded stack
+       means this actually renders the intended look instead of quietly
+       falling back to whatever generic font the OS picks. Falls back to
+       the plain system stack only if planora-ui.css isn't loaded on a
+       given page. */
+    --font-ui: var(--font-discord, "gg sans", "Noto Sans", "Open Sans",
+                    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                    Helvetica, Arial, sans-serif,
+                    "Apple Color Emoji", "Segoe UI Emoji");
 }
 
 
