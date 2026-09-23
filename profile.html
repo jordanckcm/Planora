@@ -42,35 +42,16 @@
                     </div>
                     <div class="profile-username">
                         <span id="usernameView"></span>
-                        <span class="pronouns" id="pronounsView" hidden></span>
-                    </div>
-
-                    <div class="status-pill" id="statusPill" hidden>
-                        <span class="status-emoji" id="statusEmoji"></span>
-                        <span id="statusText"></span>
                     </div>
 
                     <p class="profile-bio" id="bioView" hidden></p>
 
                     <div class="meta-row">
-                        <span class="meta-item" id="locationView" hidden></span>
-                        <a class="meta-item meta-link" id="linkView" target="_blank" rel="noopener noreferrer nofollow" hidden></a>
                         <span class="meta-item" id="joinedView"></span>
                     </div>
 
                     <div class="chip-row" id="interestChips"></div>
                 </div>
-            </section>
-
-            <!-- NOW LISTENING (Spotify-style) -->
-            <section class="now-playing" id="nowPlaying" hidden>
-                <div class="np-art" id="npArt">♪</div>
-                <div class="np-text">
-                    <div class="np-label">Now listening</div>
-                    <div class="np-song" id="npSong"></div>
-                    <div class="np-artist" id="npArtist"></div>
-                </div>
-                <div class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
             </section>
 
             <!-- EVENTS -->
@@ -105,7 +86,6 @@
                     <div class="preview-avatar" id="previewAvatar"></div>
                     <div class="preview-name" id="previewName"></div>
                     <div class="preview-handle" id="previewHandle"></div>
-                    <div class="preview-status" id="previewStatus"></div>
                 </div>
             </div>
 
@@ -166,33 +146,8 @@
                 <label class="field-label" for="displayNameInput">Display name</label>
                 <input class="field-input" id="displayNameInput" maxlength="40" autocomplete="off">
 
-                <label class="field-label" for="pronounsInput">Pronouns</label>
-                <input class="field-input" id="pronounsInput" maxlength="20" placeholder="she/her, he/him, they/them…" autocomplete="off">
-
                 <label class="field-label" for="bioInput">Bio <span class="counter" id="bioCount">0/200</span></label>
                 <textarea class="field-input bio-input" id="bioInput" maxlength="200" placeholder="Say something about yourself..."></textarea>
-
-                <label class="field-label" for="locationInput">Location</label>
-                <input class="field-input" id="locationInput" maxlength="40" placeholder="Davao City" autocomplete="off">
-
-                <label class="field-label" for="linkInput">Link</label>
-                <input class="field-input" id="linkInput" maxlength="100" placeholder="https://" inputmode="url" autocomplete="off">
-            </div>
-
-            <div class="editor-section">
-                <div class="section-title">Status</div>
-                <div class="status-fields">
-                    <input class="field-input status-emoji-input" id="statusEmojiInput" maxlength="4" placeholder="🙂" aria-label="Status emoji" autocomplete="off">
-                    <input class="field-input" id="statusTextInput" maxlength="60" placeholder="What are you up to?" aria-label="Status text" autocomplete="off">
-                </div>
-            </div>
-
-            <div class="editor-section">
-                <div class="section-title">Now listening</div>
-                <label class="field-label" for="nowSongInput">Song</label>
-                <input class="field-input" id="nowSongInput" maxlength="60" autocomplete="off">
-                <label class="field-label" for="nowArtistInput">Artist</label>
-                <input class="field-input" id="nowArtistInput" maxlength="60" autocomplete="off">
             </div>
 
             <div class="editor-section">
