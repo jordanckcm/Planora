@@ -215,3 +215,38 @@ a.ig-pill:hover { text-decoration: underline; }
 @media (prefers-reduced-motion: reduce) {
     .event-form, .event-form .event-form-box { transition: none !important; }
 }
+
+
+/* ---------- YEAR + CONTROLS (Local / Global / Timeline) ---------- */
+/* stop any leftover sideways scroll on phones */
+body { overflow-x: hidden; }
+
+.year-selector {
+    gap: 14px; margin: 14px 0 6px; padding: 0 12px; max-width: 100%;
+}
+/* big decorative year, but sized to always fit next to the two arrows */
+.year-selector .year {
+    min-width: 0; text-align: center;
+    font-size: clamp(56px, 15vw, 170px);
+    font-weight: 800; line-height: 1; letter-spacing: -0.02em;
+}
+.year-selector button {
+    flex: none; width: 38px; height: 38px; font-size: 16px;
+    border-color: rgba(var(--accent), 0.35);
+}
+.year-selector button:hover {
+    background: rgba(var(--accent), 0.16); border-color: rgba(var(--accent), 0.7); transform: scale(1.05);
+}
+.year-selector button:active { transform: scale(0.94); }
+
+.today-row { margin: 0 0 12px; }
+.today-pill {
+    padding: 6px 18px; font-size: 12px; font-weight: 600;
+    background: rgba(var(--accent), 0.12); border-color: rgba(var(--accent), 0.45); color: var(--text, #fff);
+}
+.today-pill:hover { background: rgba(var(--accent), 0.22); border-color: rgba(var(--accent), 0.75); }
+
+@media (max-width: 600px) {
+    .year-selector { gap: 10px; margin-top: 10px; }
+    .year-selector button { width: 34px; height: 34px; font-size: 14px; }
+}
