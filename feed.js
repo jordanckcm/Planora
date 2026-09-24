@@ -8,11 +8,22 @@
    comment plus a "View all comments" link. Tapping that (or the post
    image) opens a full-screen post-detail modal with every comment,
    threaded replies, and Reply/Edit/Delete on your own comments —
-   mirroring an Instagram-style post lightbox. */
+   mirroring an Instagram-style post lightbox.
+
+   Notifications: a link like homepage.html?post=ID&comment=ID opens that
+   post's modal straight away, scrolls to the comment and flashes it. */
 
 (function () {
-    const view = new URLSearchParams(location.search).get("view");
-    let feedActive = !["local", "global", "timeline"].includes(view);
+    const urlParams = new URLSearchParams(location.search);
+    const view = urlParams.get("view");
+
+    // ?post=ID&comment=ID comes from a notification: open that post's modal
+    let pendingOpen = Number(urlParams.get("post"))
+        ? { eventId: Number(urlParams.get("post")), commentId: Number(urlParams.get("comment")) || null }
+        : null;
+    if (pendingOpen) history.replaceState(null, "", location.pathname);
+
+    let feedActive = pendingOpen !== null || !["local", "global", "timeline"].includes(view);
     if (!feedActive) mode = view; // homepage.js's mode, set before its first render
 
     const feed = document.createElement("div");
@@ -23,7 +34,7 @@
     window.render = async function () {
         document.body.classList.toggle("feed-on", feedActive);
         if (window.PlanoraNav) PlanoraNav.setActive(feedActive ? "home" : mode);
-        if (feedActive) return loadFeed();
+        if (feedActive) { await loadFeed(); openPendingPost(); return; }
         return baseRender();
     };
 
@@ -52,6 +63,20 @@
         posts.forEach((p) => feed.appendChild(buildPost(p)));
     }
 
+    // Opens the post a notification points at. The feed only holds the 20
+    // newest posts, so this asks the server for that one post directly.
+    async function openPendingPost() {
+        if (!pendingOpen) return;
+        const target = pendingOpen;
+        pendingOpen = null;
+        try {
+            const post = await apiRequest(`/api/events/${target.eventId}`);
+            openPostDetail(post, target.commentId);
+        } catch (err) {
+            toast("That post isn't available anymore.", "error");
+        }
+    }
+
     function el(tag, cls, text) {
         const n = document.createElement(tag);
         if (cls) n.className = cls;
@@ -67,29 +92,12 @@
             Boolean(item.updated_at && item.created_at && item.updated_at !== item.created_at);
     }
 
-    // True once a post or comment has been changed after it was created.
-    // Looks for either an explicit `edited` flag or an `updated_at` that
-    // differs from `created_at` — whichever the API actually provides.
-    function wasEdited(item) {
-        return Boolean(item.edited) ||
-            Boolean(item.updated_at && item.created_at && item.updated_at !== item.created_at);
-    }
-
-    // Turns "@username" tokens in plain text into profile links (visual
-    // only — it doesn't validate the username exists, same as Twitter/IG
-    // client-side mention rendering). Appended into `container` in order,
+    // Turns "@username" tokens in plain text into profile links - but only
+    // for names the server confirmed are real users (the `mentions` array
+    // on the comment/event). Appended into `container` in order,
     // interleaved with the surrounding plain-text nodes.
-    function appendTextWithMentions(container, text) {
-        const re = /@([a-zA-Z0-9_]+)/g;
-        let last = 0, match;
-        while ((match = re.exec(text))) {
-            if (match.index > last) container.appendChild(document.createTextNode(text.slice(last, match.index)));
-            const a = el("a", "cm-mention", "@" + match[1]);
-            a.href = profileUrl(match[1]);
-            container.appendChild(a);
-            last = match.index + match[0].length;
-        }
-        if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+    function appendTextWithMentions(container, text, mentions) {
+        Planora.appendWithMentions(container, text, mentions, "cm-mention");
     }
 
     function paintAv(node, image, color, name) {
@@ -135,7 +143,7 @@
         body.appendChild(el("div", "post-title", p.title));
         if (p.description) {
             const desc = el("div", "post-desc");
-            appendTextWithMentions(desc, p.description);
+            appendTextWithMentions(desc, p.description, p.mentions);
             body.appendChild(desc);
         }
         body.appendChild(el("div", "post-when", formatEventWhen(p)));
@@ -197,7 +205,8 @@
        full=true   -> full-screen modal: every comment, all threads open-able
        Renders into listEl (comment list + reply banner) and formEl (composer).
        For the inline panel these are the same node; for the modal they're
-       the scrolling body and the pinned footer, respectively. */
+       the scrolling body and the pinned footer, respectively.
+       focusId (modal only): a comment id to open the thread of. */
     async function renderComments(post, { full, focusId, listEl: listContainer, formEl: composerContainer, countBtn }) {
         let list = [];
         try { list = await PlanoraData.getComments(post.id); } catch (err) { /* show empty */ }
@@ -208,6 +217,7 @@
 
         let mode = null; // { type: "reply" | "edit", comment }
         const input = el("input");
+        input.dataset.mentions = "1"; // @mention autocomplete (planora-mentions.js)
         const banner = el("div", "cm-replying");
         const bannerText = el("span");
         const bannerX = el("button", "cm-x", "×");
@@ -247,6 +257,7 @@
 
         function row(c, isReply) {
             const r = el("div", "cm" + (isReply ? " cm-reply" : ""));
+            r.dataset.commentId = c.id;
 
             const av = el("a", "cm-avatar");
             av.href = profileUrl(c.author);
@@ -261,7 +272,7 @@
                 m.href = profileUrl(c.reply_to);
                 line.appendChild(m);
             }
-            appendTextWithMentions(line, c.text);
+            appendTextWithMentions(line, c.text, c.mentions);
 
             const meta = el("div", "cm-meta");
             const when = el("span", "", formatRelativeShort(c.created_at));
@@ -319,7 +330,9 @@
 
                     const toggle = el("button", "cm-toggle");
                     toggle.type = "button";
-                    let open = top.id === focusId;
+                    // open the thread if it IS the focused comment, or contains it
+                    // (a notification can point at a reply inside a collapsed thread)
+                    let open = top.id === focusId || replies.some((r) => r.id === focusId);
                     const sync = () => {
                         box.hidden = !open;
                         toggle.textContent = open ? "Hide replies" : `View ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`;
@@ -427,7 +440,7 @@
         scroll.appendChild(el("div", "pd-title", post.title));
         if (post.description) {
             const pdDesc = el("div", "pd-desc");
-            appendTextWithMentions(pdDesc, post.description);
+            appendTextWithMentions(pdDesc, post.description, post.mentions);
             scroll.appendChild(pdDesc);
         }
         scroll.appendChild(el("hr", "pd-divider"));
@@ -454,7 +467,15 @@
         document.addEventListener("keydown", onKey);
         overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
 
-        renderComments(post, { full: true, focusId, listEl: commentsHost, formEl: composer, countBtn: null });
+        renderComments(post, { full: true, focusId, listEl: commentsHost, formEl: composer, countBtn: null })
+            .then(() => {
+                if (!focusId) return;
+                const target = commentsHost.querySelector(`[data-comment-id="${focusId}"]`);
+                if (!target) return;
+                target.scrollIntoView({ block: "center" });
+                target.classList.add("cm-flash");
+                setTimeout(() => target.classList.remove("cm-flash"), 1800);
+            });
     }
 })();
 
