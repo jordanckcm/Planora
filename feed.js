@@ -167,3 +167,51 @@
         panel.appendChild(form);
     }
 })();
+
+
+/* Create/edit event form -> slide-in drawer, same structure as the profile editor:
+   header (title + close), scrolling body, pinned footer. Nodes are moved, not
+   rebuilt, so every id and listener homepage.js set up keeps working. */
+(function () {
+    function mk(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+    }
+
+    function drawerize() {
+        const form = document.querySelector(".event-form");
+        const box = form && form.querySelector(".event-form-box");
+        if (!box) return false;
+        if (box.dataset.drawer) return true;
+        box.dataset.drawer = "1";
+
+        const title = box.querySelector(".form-title");
+        const buttons = box.querySelector(".form-buttons");
+        const head = mk("div", "ef-head");
+        const scroll = mk("div", "ef-scroll");
+        Array.from(box.children).forEach((c) => { if (c !== title && c !== buttons) scroll.appendChild(c); });
+
+        const close = mk("button", "ef-close", "×");
+        close.type = "button";
+        close.setAttribute("aria-label", "Close");
+        const cancel = () => document.getElementById("cancelEvent").click();
+        close.addEventListener("click", cancel);
+
+        head.append(title, close);
+        box.append(head, scroll, buttons);
+
+        form.addEventListener("click", (e) => { if (e.target === form) cancel(); }); // click the dark area
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && form.classList.contains("show")) cancel();
+        });
+        return true;
+    }
+
+    if (!drawerize()) {
+        // the form is built after login check, so wait for it to appear
+        const obs = new MutationObserver(() => { if (drawerize()) obs.disconnect(); });
+        obs.observe(document.body, { childList: true });
+    }
+})();
