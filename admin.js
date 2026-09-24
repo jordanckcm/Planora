@@ -14,6 +14,11 @@ const ROLE_COLORS = {
     community: "#7a8290"
 };
 
+// Everything a render/load should clear out of a table before redrawing it.
+// (Loading and empty-state rows used to be left behind, which is why
+// "Loading users…" and "No events yet." stayed on screen forever.)
+const CLEARABLE_ROWS = ".admin-row:not(.admin-row-head), .admin-loading-row, .admin-empty-row";
+
 let allUsers = [];
 let allEvents = [];
 let currentUsername = "";
@@ -156,7 +161,7 @@ function filterUsers(users, query) {
 
 async function loadUsers() {
     const table = document.getElementById("usersTable");
-    table.querySelectorAll(".admin-row:not(.admin-row-head)").forEach(row => row.remove());
+    table.querySelectorAll(CLEARABLE_ROWS).forEach(row => row.remove());
 
     const loadingRow = document.createElement("div");
     loadingRow.className = "admin-loading-row";
@@ -176,7 +181,7 @@ async function loadUsers() {
 
 function renderUsers(users) {
     const table = document.getElementById("usersTable");
-    table.querySelectorAll(".admin-row:not(.admin-row-head)").forEach(row => row.remove());
+    table.querySelectorAll(CLEARABLE_ROWS).forEach(row => row.remove());
 
     if (users.length === 0) {
         const empty = document.createElement("div");
@@ -292,7 +297,7 @@ function filterEvents(events, query) {
 
 async function loadEvents() {
     const table = document.getElementById("eventsTable");
-    table.querySelectorAll(".admin-row:not(.admin-row-head)").forEach(row => row.remove());
+    table.querySelectorAll(CLEARABLE_ROWS).forEach(row => row.remove());
 
     const loadingRow = document.createElement("div");
     loadingRow.className = "admin-loading-row";
@@ -314,7 +319,7 @@ async function loadEvents() {
 
 function renderEvents(events) {
     const table = document.getElementById("eventsTable");
-    table.querySelectorAll(".admin-row:not(.admin-row-head)").forEach(row => row.remove());
+    table.querySelectorAll(CLEARABLE_ROWS).forEach(row => row.remove());
 
     if (events.length === 0) {
         const empty = document.createElement("div");
@@ -349,7 +354,7 @@ function renderEvents(events) {
         const visCell = cell("Visibility");
         const badge = document.createElement("span");
         badge.className = event.visibility === "global" ? "badge badge-global" : "badge badge-local";
-        badge.textContent = event.visibility === "global" ? "Global" : "Local";
+        badge.textContent = { global: "Global", public: "Public", local: "Private" }[event.visibility] || event.visibility;
         visCell.appendChild(badge);
 
         const actionCell = cell();
