@@ -26,6 +26,7 @@ const IMAGE_DATA_URL = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
 let viewer = null;      // who is signed in
+let currentEventsTab = "public";
 let profile = null;     // whose page this is
 let draft = null;       // the editor's unsaved copy
 
@@ -208,10 +209,19 @@ function render() {
         chips.appendChild(el);
     });
 
-   $("tabNote").textContent = p.isSelf
-       ? "Public and Global posts are visible to everyone. Private events are visible only to you."
-       : "";
-
+    const privateTab = $("privateTab");
+    privateTab.hidden = !p.isSelf;
+    if (!p.isSelf && currentEventsTab === "private") {
+        currentEventsTab = "public";
+    }
+    document.querySelectorAll(".events-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === currentEventsTab);
+    });
+   
+    $("tabNote").textContent = p.isSelf
+        ? "Public and Global are visible to everyone. Private is visible only to you."
+        : "";
+   
     renderEvents();
 }
 
@@ -219,11 +229,12 @@ function renderEvents() {
     const grid = $("eventGrid");
     grid.textContent = "";
 
-    const list = [
-        ...(profile.publicEvents || []),
-        ...(profile.globalEvents || []),
-        ...(profile.privateEvents || [])
-    ].sort((a, b) => (a.date + (a.start_time || "")).localeCompare(b.date + (b.start_time || "")));
+    const sourceByTab = {
+        public: profile.publicEvents || [],
+        global: profile.globalEvents || [],
+        private: profile.privateEvents || []
+    };
+    const list = sourceByTab[currentEventsTab] || [];
 
     if (!list.length) {
         grid.appendChild(emptyState());
@@ -239,12 +250,21 @@ function emptyState() {
 
     const title = document.createElement("div");
     title.className = "empty-title";
-    title.textContent = "No public events yet";
 
     const text = document.createElement("p");
-    text.textContent = profile.isSelf
-        ? "Press + on the calendar and switch the event to Public to show it here."
-        : `${profile.displayName} hasn't shared any events.`;
+
+    const labels = { public: "public", global: "Global", private: "private" };
+    const label = labels[currentEventsTab];
+
+    if (currentEventsTab === "private") {
+        title.textContent = "No private events yet";
+        text.textContent = "Events you keep off your public profile show up here.";
+    } else {
+        title.textContent = `No ${label} events yet`;
+        text.textContent = profile.isSelf
+            ? `Press + on the calendar and set an event to ${labels[currentEventsTab] === "Global" ? "Global" : "Public"} to show it here.`
+            : `${profile.displayName} hasn't shared any ${label} events.`;
+    }
 
     box.append(title, text);
     return box;
@@ -1112,6 +1132,21 @@ function bindStaticActions() {
     });
 
     bindEditorInputs();
+    bindEventsTabs();
+}
+
+function setEventsTab(tab) {
+    currentEventsTab = tab;
+    document.querySelectorAll(".events-tab").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === tab);
+    });
+    renderEvents();
+}
+
+function bindEventsTabs() {
+    document.querySelectorAll(".events-tab").forEach((btn) => {
+        btn.addEventListener("click", () => setEventsTab(btn.dataset.tab));
+    });
 }
 
 
