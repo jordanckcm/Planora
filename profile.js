@@ -223,6 +223,7 @@ function render() {
         : "";
    
     renderEvents();
+    renderFriendButton();
 }
 
 function renderFriendButton() {
