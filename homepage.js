@@ -26,6 +26,12 @@
    PROFILES + REPLIES:
    Names and avatars on cards and comments link to profile.html?u=NAME.
    Comments can be replied to (one level deep, handled by the server).
+
+   MENTIONS:
+   @username in comments and event descriptions renders as a profile
+   link (only for names the server confirmed, via the `mentions` array),
+   and inputs marked data-mentions get @ autocomplete from
+   planora-mentions.js.
 ========================================================= */
 
 let currentUser = null;
@@ -1058,7 +1064,7 @@ function renderTimeline(events, query) {
             const descEl = document.createElement("div");
             descEl.className = "event-description";
             descEl.style.marginTop = "4px";
-            descEl.textContent = event.description;
+            Planora.appendWithMentions(descEl, event.description, event.mentions);
             body.appendChild(descEl);
         }
         body.appendChild(dateEl);
@@ -1324,7 +1330,7 @@ async function buildEventCard(event) {
     if (event.description) {
         const descEl = document.createElement("div");
         descEl.className = "event-description";
-        descEl.textContent = event.description;
+        Planora.appendWithMentions(descEl, event.description, event.mentions);
         info.appendChild(descEl);
     }
 
@@ -1466,7 +1472,8 @@ async function buildComments(event) {
             text.appendChild(mention);
             text.appendChild(document.createTextNode(" "));
         }
-        text.appendChild(document.createTextNode(comment.text));
+        // @mentions inside the text become profile links (real users only)
+        Planora.appendWithMentions(text, comment.text, comment.mentions);
 
         const body = document.createElement("span");
         body.className = "comment-body";
@@ -1496,6 +1503,7 @@ async function buildComments(event) {
             editInput.className = "comment-edit-input";
             editInput.value = comment.text;
             editInput.maxLength = 240;
+            editInput.dataset.mentions = "1"; // @mention autocomplete
 
             const saveBtn = document.createElement("button");
             saveBtn.className = "comment-edit-save";
@@ -1627,6 +1635,7 @@ async function buildComments(event) {
     input.placeholder = "Add a comment...";
     input.maxLength = 240;
     input.rows = 1;
+    input.dataset.mentions = "1"; // @mention autocomplete (planora-mentions.js)
 
     const counter = document.createElement("span");
     counter.className = "comment-counter";
@@ -1835,7 +1844,7 @@ function buildAddEventUI() {
             </div>
 
             <div class="field-label">Description <span class="optional-tag">optional</span></div>
-            <textarea id="eventDescription" placeholder="Add some details..." maxlength="400"></textarea>
+            <textarea id="eventDescription" data-mentions placeholder="Add some details..." maxlength="400"></textarea>
 
             <div id="visibilitySection">
                 <div class="field-label">Who can see this?</div>
