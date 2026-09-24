@@ -12,18 +12,25 @@
 :root {
     --lg-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
                sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-    --lg-bg: #131316;
-    --lg-card: #17171b;
-    --lg-field: #0f0f12;
-    --lg-btn: #2a2a31;
+    --lg-bg: #0a0a0a;
+    --lg-card: rgba(18, 18, 18, 0.86);
+    --lg-field: #0a0a0a;
+    --lg-btn: #2a2a2a;
     --lg-border: rgba(255, 255, 255, 0.1);
     --lg-text: #f5f5f5;
-    --lg-dim: #a8a8b0;
+    --lg-dim: #a3a3a3;
     --lg-gold: #c9a227;
     --lg-gold-hi: #dcb93a;
 }
 
 *, *::before, *::after { font-family: var(--lg-font); box-sizing: border-box; }
+
+/* buttons + inputs: same plain font everywhere (base.css .btn styles can't override this) */
+button, input, .btn {
+    font-family: var(--lg-font) !important;
+    letter-spacing: normal !important;
+    text-transform: none !important;
+}
 
 html { background: var(--lg-bg); color-scheme: dark; }
 
@@ -38,19 +45,17 @@ body {
     color: var(--lg-text);
 }
 
-/* ---------- artwork (CSS bookshelves until you have your own image) ----------
-   To use a real image, replace the whole background below with:
-   background: linear-gradient(rgba(0,0,0,.35), rgba(0,0,0,.55)), url(images/login-art.jpg) center / cover; */
+/* ---------- background: dark fanned rays ----------
+   Uses images/login-bg.jpg. The conic gradient under it is a fallback if the file is missing. */
 .bg-art {
     position: fixed;
     inset: 0;
     z-index: -1;
     background:
-        linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.6)),
-        repeating-linear-gradient(180deg, transparent 0 128px, #d9958f 128px 140px),
-        repeating-linear-gradient(90deg,
-            #1f3a7a 0 14px, #2b58a6 14px 24px, #16295c 24px 36px, #3b6fb8 36px 44px,
-            #e2758f 44px 50px, #1b4b6b 50px 64px, #2f8f8a 64px 72px, #24356f 72px 86px);
+        url(images/login-bg.jpg) center / cover no-repeat,
+        conic-gradient(from 265deg at 96% 100%,
+            #080808 0 6deg, #2a2a2a 6deg 16deg, #0e0e0e 16deg 30deg, #2d2d2d 30deg 40deg,
+            #0b0b0b 40deg 58deg, #2a2a2a 58deg 66deg, #0c0c0c 66deg 80deg, #262626 80deg 86deg, #080808 86deg 100deg);
 }
 
 .lg-top {
@@ -71,6 +76,9 @@ body {
     padding: 36px 40px 28px;
     background: var(--lg-card);
     border-radius: 24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
     text-align: center;
 }
@@ -108,7 +116,7 @@ body {
     font-weight: 600;
     cursor: pointer;
 }
-.auth-btn:hover { background: #35353d; }
+.auth-btn:hover { background: #363636; }
 .auth-btn.primary { background: var(--lg-gold); color: #111; }
 .auth-btn.primary:hover { background: var(--lg-gold-hi); }
 
@@ -132,7 +140,7 @@ body {
     outline: none;
 }
 .field-input:focus { border-color: var(--lg-gold); box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.2); }
-.field-input::placeholder { color: #6f6f78; }
+.field-input::placeholder { color: #6b6b6b; }
 
 .password-wrap { position: relative; }
 .password-wrap .field-input { padding-right: 64px; }
@@ -192,7 +200,7 @@ body {
     .auth-title { margin-bottom: 6px; font-size: 30px; text-align: left; }
 
     .field-label { margin-top: 20px; }
-    .field-input { height: 52px; border-color: transparent; background: #1f1f25; font-size: 16px; }
+    .field-input { height: 52px; border-color: transparent; background: #1c1c1c; font-size: 16px; }
     .reveal-toggle { height: 52px; }
 
     .auth-card .auth-submit { height: 52px; margin-top: 10px; border-radius: 14px; font-size: 16px; }
