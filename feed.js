@@ -14,6 +14,7 @@
    post's modal straight away, scrolls to the comment and flashes it. */
 
 (function () {
+    const hooks = window.PlanoraFeedHooks = { panels: new Map(), modal: null, onModalClose: null };
     const urlParams = new URLSearchParams(location.search);
     const view = urlParams.get("view");
 
@@ -52,6 +53,7 @@
             toast(err.message, "error");
             return;
         }
+        hooks.panels.clear();
         feed.textContent = "";
         if (!posts.length) {
             const empty = document.createElement("div");
@@ -113,6 +115,7 @@
 
     function buildPost(p) {
         const post = el("article", "post");
+        post.dataset.postId = p.id;
 
         // header
         const head = el("div", "post-head");
@@ -194,10 +197,13 @@
         // inline preview panel: just the first comment + "View all comments"
         let panel = null;
         count.addEventListener("click", async () => {
-            if (panel) { panel.remove(); panel = null; return; }
+            if (panel) { panel.remove(); panel = null; hooks.panels.delete(p.id); return; }
             panel = el("div", "post-comments");
             post.appendChild(panel);
-            await renderComments(p, { full: false, focusId: null, listEl: panel, formEl: panel, countBtn: count });
+            const panelEl = panel;
+            const opts = { full: false, focusId: null, listEl: panelEl, formEl: panelEl, countBtn: count };
+            hooks.panels.set(p.id, { panel: panelEl, reload: () => renderComments(p, opts) });
+            await renderComments(p, opts);
         });
 
         return post;
@@ -456,6 +462,7 @@
         // composer stays pinned at the bottom of the modal
         const composer = el("div", "pd-composer");
         box.appendChild(composer);
+        hooks.modal = { id: post.id, composer, reload: () => renderComments(post, { full: true, focusId: null, listEl: commentsHost, formEl: composer, countBtn: null }) };
 
         document.body.appendChild(overlay);
         document.body.classList.add("pd-lock");
@@ -464,6 +471,8 @@
         function closeModal() {
             overlay.classList.remove("show");
             document.body.classList.remove("pd-lock");
+            hooks.modal = null;
+            if (hooks.onModalClose) hooks.onModalClose();
             document.removeEventListener("keydown", onKey);
             setTimeout(() => overlay.remove(), 200);
         }
