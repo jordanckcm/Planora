@@ -279,7 +279,6 @@ def user_public_info(user):
         "avatarPosition": user.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION),
         "createdAt": user["created_at"],
         "role": user["role"],
-        # profile extras - .get() so accounts made before these existed still work
         "bannerImage": user.get("banner_image", ""),
         "bannerPosition": user.get("banner_position") or dict(DEFAULT_IMAGE_POSITION),
         "accent": user.get("accent", "") or user["avatar_color"],
@@ -291,8 +290,6 @@ def user_public_info(user):
         "nowSong": user.get("now_song", ""),
         "nowArtist": user.get("now_artist", ""),
         "interests": user.get("interests", []),
-        # client preferences - follow the account across devices, same
-        # idea as Discord's account-level appearance settings
         "themePreference": user.get("theme_preference", "system"),
         "reduceMotion": bool(user.get("reduce_motion", False)),
     }
@@ -547,6 +544,7 @@ def feed_item(e, me):
     item["ownerDisplayName"] = owner["display_name"] if owner else e["owner"]
     item["ownerAvatarColor"] = owner["avatar_color"] if owner else EVENT_COLORS[0]
     item["ownerAvatarImage"] = owner.get("avatar_image", "") if owner else ""
+    item["ownerAvatarPosition"] = (owner.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION)) if owner else dict(DEFAULT_IMAGE_POSITION)
     item["isMine"] = e["owner"].lower() == me
     item["addedByMe"] = any(
         o["owner"].lower() == me and o.get("cloned_from") == e["id"] for o in events
@@ -566,6 +564,7 @@ def comment_view(comment):
     out["authorDisplayName"] = author["display_name"] if author else comment["author"]
     out["authorAvatarColor"] = author["avatar_color"] if author else AVATAR_COLORS[0]
     out["authorAvatarImage"] = author.get("avatar_image", "") if author else ""
+    out["authorAvatarPosition"] = (author.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION)) if author else dict(DEFAULT_IMAGE_POSITION)
     return out
 
 
@@ -977,6 +976,7 @@ def get_events():
         owner_user = find_user(event["owner"])
         event_copy["ownerAvatarColor"] = owner_user["avatar_color"] if owner_user else EVENT_COLORS[0]
         event_copy["ownerAvatarImage"] = owner_user.get("avatar_image", "") if owner_user else ""
+        event_copy["ownerAvatarPosition"] = (owner_user.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION)) if owner_user else dict(DEFAULT_IMAGE_POSITION)
         event_copy["ownerDisplayName"] = owner_user["display_name"] if owner_user else event["owner"]
 
         if mode == "global":
