@@ -112,13 +112,15 @@ import json as json_lib
 import re
 import time
 import os
+import base64
 import threading
 from datetime import datetime, timedelta
 from functools import wraps
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, available_timezones
 
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify, session, Response
+from itsdangerous import URLSafeTimedSerializer, BadSignature
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -194,6 +196,7 @@ PUSH_TIMEOUT_SECONDS = 10
 REMINDER_LEADS = (10, 30, 60, 120)    # minutes before an event starts
 REMINDER_CHECK_SECONDS = 30
 MAX_PUSH_TITLE = 50                   # event titles get shortened in push headlines
+AVATAR_LINK_MAX_AGE = 7 * 24 * 3600   # a push's profile-picture link stops working after a week
 
 DEFAULT_PUSH_PREFS = {
     "enabled": True,        # master switch
@@ -620,6 +623,22 @@ def clean_push_subscription(sub):
     return {"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}}
 
 
+# Signs the profile-picture links that go inside pushes. Picture data is far too
+# big to fit in a push message (about 4 KB), so the push carries a link and the
+# browser downloads the picture when it shows the notification.
+_avatar_signer = URLSafeTimedSerializer(app.secret_key, salt="push-avatar")
+
+
+def push_avatar_url(user):
+    """A signed, expiring link to this person's profile picture, or "" if they
+    don't have one. The link works without logging in (the browser fetches it on
+    its own), but it can't be guessed and it only exists inside pushes sent to
+    someone who was meant to see this person's name anyway."""
+    if not user or not user.get("avatar_image"):
+        return ""
+    return "/push-avatar/" + _avatar_signer.dumps(user["username"])
+
+
 def user_subscriptions(username):
     return [e for e in push_subscriptions if e["username"].lower() == username.lower()]
 
@@ -675,7 +694,8 @@ def _deliver(subs, payload):
 
 
 def push_to_user(username, kind, title, snippet="", fallback_body="Tap to open",
-                 url="/", tag="", event_id=None, event_title="", urgent=False):
+                 url="/", tag="", event_id=None, event_title="", urgent=False,
+                 actor="", event_icon="", actor_username=""):
     """
     Decides whether a push goes out and, if so, sends it in the background.
     kind: "mention" | "reply" | "comment" | "reminder"
@@ -707,11 +727,17 @@ def push_to_user(username, kind, title, snippet="", fallback_body="Tap to open",
     if not subs:
         return
 
+    # the previews setting hides other people's words; a reminder's
+    # "Starts in 20 min" isn't private, so it always shows
+    show_text = bool(snippet) and (prefs["previews"] or kind == "reminder")
+
     payload = json_lib.dumps({
         "title": title,
-        # the previews setting hides other people's words; a reminder's
-        # "Starts in 20 min" isn't private, so it always shows
-        "body": snippet if (snippet and (prefs["previews"] or kind == "reminder")) else fallback_body,
+        "body": snippet if show_text else fallback_body,
+        "preview": show_text,        # False -> the body is just "Tap to open"
+        "actor": actor,              # who did it (display name), for grouped pushes
+        "avatarUrl": push_avatar_url(find_user(actor_username)) if actor_username else "",
+        "eventIcon": event_icon,     # the event's emoji, shown in front of the headline
         "url": url,
         "tag": tag,
         "kind": kind,
@@ -856,6 +882,9 @@ def create_notification(recipient, actor, kind, event, comment=None, text=""):
         tag=f"event-{event['id']}",
         event_id=event["id"],
         event_title=event_title,
+        actor=actor_name,
+        event_icon=event.get("icon", ""),
+        actor_username=actor,
     )
 
 
@@ -2021,6 +2050,31 @@ def get_stats():
 # ---------------------------------------------------------------------------
 # PUSH ROUTES
 # ---------------------------------------------------------------------------
+
+@app.route("/push-avatar/<token>", methods=["GET"])
+def push_avatar(token):
+    """The picture shown on a push notification. No login (the browser fetches
+    it by itself), so access is controlled by the signed, expiring token."""
+    try:
+        username = _avatar_signer.loads(token, max_age=AVATAR_LINK_MAX_AGE)
+    except BadSignature:   # also covers an expired token
+        return "", 404
+
+    user = find_user(username)
+    match = re.match(r"^data:(image/[a-z]+);base64,(.+)$", (user or {}).get("avatar_image") or "")
+    if not match:
+        return "", 404
+
+    try:
+        raw = base64.b64decode(match.group(2))
+    except ValueError:
+        return "", 404
+
+    response = Response(raw, mimetype=match.group(1))
+    response.headers["Cache-Control"] = "private, max-age=3600"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
 
 @app.route("/api/push/vapid-public-key", methods=["GET"])
 def get_vapid_public_key():
