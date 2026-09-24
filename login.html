@@ -9,26 +9,34 @@
     <link rel="stylesheet" href="login.css">
 </head>
 <body>
+    <div class="bg-art"></div>
+    <div class="lg-top">Planora</div>
+
     <div class="auth-shell">
+        <div class="auth-card" data-view="home">
 
-        <div class="brand-name">Planora</div>
+            <div class="auth-brand">
+                <div class="brand-name">Planora</div>
+                <div class="brand-tag">Never miss a moment.</div>
+            </div>
 
-        <div class="auth-card">
-
-            <div class="auth-tabs">
-                <button class="auth-tab active" data-tab="login">Sign in</button>
-                <button class="auth-tab" data-tab="signup">Create account</button>
+            <!-- ================= HOME (desktop) ================= -->
+            <div class="auth-home">
+                <p class="auth-lead">Plan it once. Show up for everyone.</p>
+                <button type="button" class="auth-btn primary" data-go="signup">Create account</button>
+                <button type="button" class="auth-btn" data-go="login">Login</button>
             </div>
 
             <!-- ================= LOGIN ================= -->
-            <form class="auth-form active" id="loginForm" autocomplete="off" novalidate>
+            <form class="auth-form" id="loginForm" autocomplete="off" novalidate>
+                <h2 class="auth-title">Welcome back</h2>
 
                 <label class="field-label" for="loginUsername">Username</label>
-                <input class="field-input" id="loginUsername" name="username" type="text" placeholder="Username" autocomplete="username" required>
+                <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
 
                 <label class="field-label" for="loginPassword">Password</label>
                 <div class="password-wrap">
-                    <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Password" autocomplete="current-password" required>
+                    <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
                     <button type="button" class="reveal-toggle" data-target="loginPassword">Show</button>
                 </div>
 
@@ -41,20 +49,23 @@
 
                 <button type="submit" class="btn btn-solid auth-submit" id="loginSubmit">Sign in</button>
 
+                <p class="auth-switch">Need an account? <button type="button" class="auth-link" data-go="signup">Register</button></p>
+                <button type="button" class="auth-link auth-back" data-go="home">← Back</button>
             </form>
 
             <!-- ================= SIGN UP ================= -->
             <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
+                <h2 class="auth-title">Create an account</h2>
 
                 <label class="field-label" for="signupDisplayName">Display name</label>
-                <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="Display name" maxlength="40">
+                <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
 
                 <label class="field-label" for="signupUsername">Username</label>
-                <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Username" autocomplete="username" required>
+                <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Letters, numbers, . and _" autocomplete="username" required>
 
                 <label class="field-label" for="signupPassword">Password</label>
                 <div class="password-wrap">
-                    <input class="field-input" id="signupPassword" name="password" type="password" placeholder="Password" autocomplete="new-password" required>
+                    <input class="field-input" id="signupPassword" name="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required>
                     <button type="button" class="reveal-toggle" data-target="signupPassword">Show</button>
                 </div>
                 <div class="strength-hint" id="strengthHint">Mix letters and numbers, 8+ characters.</div>
@@ -63,6 +74,8 @@
 
                 <button type="submit" class="btn btn-solid auth-submit" id="signupSubmit">Create account</button>
 
+                <p class="auth-switch">Already have an account? <button type="button" class="auth-link" data-go="login">Log in</button></p>
+                <button type="button" class="auth-link auth-back" data-go="home">← Back</button>
             </form>
 
             <p class="auth-footnote">
@@ -70,13 +83,23 @@
             </p>
 
         </div>
-
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
 
     <script src="api.js"></script>
     <script src="login.js"></script>
+    <script>
+        // switches between home / login / signup (login.js handles the actual sign in)
+        const card = document.querySelector(".auth-card");
+        const views = { login: document.getElementById("loginForm"), signup: document.getElementById("signupForm") };
+        function go(view) {
+            card.dataset.view = view;
+            Object.entries(views).forEach(([name, form]) => form.classList.toggle("active", name === view));
+        }
+        document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
+        go(matchMedia("(max-width: 600px)").matches ? "login" : "home");
+    </script>
 
 </body>
 </html>
