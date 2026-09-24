@@ -2080,9 +2080,21 @@ a.comment-mention:hover {
 
 /* =========================================================
    LIGHT-MODE FIX — MODE BACKGROUNDS
-   (unchanged — this block was already correct)
+
+   TEMP — SETTINGS HIDDEN, DARK FORCED:
+   This block used to give body.mode-local/global/timeline a light
+   background whenever data-theme="light" was set (or the OS was in
+   light mode with no theme attribute at all) — completely independent
+   of theme.css, which is why disabling theme.css's own light rules
+   fixed profile.html (no homepage-extra.css there) but NOT the
+   homepage, which loads this file and still had this override sitting
+   at the bottom, winning over the plain dark version above it.
+   Commented out for now so this can't produce a light background
+   either, regardless of data-theme or system preference. Uncomment
+   when Settings/light mode comes back.
 ========================================================= */
 
+/*
 :root[data-theme="light"] body.mode-local {
     background:
         radial-gradient(ellipse 900px 500px at 50% 0%, rgba(var(--accent), 0.09), transparent 65%),
@@ -2120,3 +2132,4 @@ a.comment-mention:hover {
             #f3f3f5;
     }
 }
+*/
