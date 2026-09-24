@@ -6,14 +6,83 @@
 (function () {
     // Load the shared stylesheet from the same folder as this script, so one
     // <script> tag is enough on any page (profile, directory, admin, ...).
-    if (!document.querySelector('link[href*="planora-shell.css"]')) {
+    // ---- Loading cover -------------------------------------------------
+    // Covers the page while it's still unstyled / fetching, so nothing
+    // half-built (like the raw menu) ever flashes on screen. It self-styles
+    // with its own <style> so it works even before planora-shell.css arrives.
+    let cssReady = false;
+    let pageLoaded = document.readyState === "complete";
+    let inflight = 0;
+    let lastActivity = Date.now();
+
+    const realFetch = window.fetch.bind(window);
+    window.fetch = function () {
+        inflight++;
+        lastActivity = Date.now();
+        return realFetch.apply(null, arguments).finally(() => {
+            inflight--;
+            lastActivity = Date.now();
+        });
+    };
+    window.addEventListener("load", () => { pageLoaded = true; });
+
+    const loaderStyle = document.createElement("style");
+    loaderStyle.textContent =
+        "#plLoader{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;" +
+        "background:#131313;opacity:1;transition:opacity .2s ease}" +
+        "#plLoader.off{opacity:0;pointer-events:none}" +
+        "#plLoader i{width:34px;height:34px;border-radius:50%;border:3px solid rgba(255,255,255,.15);" +
+        "border-top-color:#fff;animation:plSpin .7s linear infinite}" +
+        "@keyframes plSpin{to{transform:rotate(360deg)}}" +
+        "@media(prefers-reduced-motion:reduce){#plLoader i{animation-duration:2s}}";
+    document.head.appendChild(loaderStyle);
+
+    const loader = document.createElement("div");
+    loader.id = "plLoader";
+    loader.setAttribute("role", "status");
+    loader.setAttribute("aria-label", "Loading");
+    loader.innerHTML = "<i></i>";
+    document.body.appendChild(loader);
+
+    function showLoader() { loader.classList.remove("off"); }
+    function hideLoader() { loader.classList.add("off"); }
+
+    // Resolves once styles are in, the page has loaded and requests have been
+    // quiet for a moment (or after 6s, so it can never get stuck).
+    function settle(minMs) {
+        const started = Date.now();
+        return new Promise((resolve) => {
+            (function check() {
+                const waited = Date.now() - started;
+                const quiet = inflight === 0 && Date.now() - lastActivity > 300;
+                if ((quiet && waited > minMs && cssReady && pageLoaded) || waited > 6000) return resolve();
+                setTimeout(check, 60);
+            })();
+        });
+    }
+
+    // coming back with the browser's Back button can restore the page as-is
+    window.addEventListener("pageshow", (e) => { if (e.persisted) hideLoader(); });
+
+    // Load the shared stylesheet from the same folder as this script, so one
+    // <script> tag is enough on any page (profile, directory, admin, ...).
+    const existingLink = document.querySelector('link[href*="planora-shell.css"]');
+    if (existingLink) {
+        cssReady = Boolean(existingLink.sheet);
+        existingLink.addEventListener("load", () => { cssReady = true; });
+        existingLink.addEventListener("error", () => { cssReady = true; });
+    } else {
         const link = document.createElement("link");
         link.rel = "stylesheet";
         link.href = document.currentScript
             ? document.currentScript.src.replace(/planora-nav\.js.*$/, "planora-shell.css")
             : "planora-shell.css";
+        link.addEventListener("load", () => { cssReady = true; });
+        link.addEventListener("error", () => { cssReady = true; });
         document.head.appendChild(link);
     }
+
+    settle(350).then(hideLoader);
 
     const onHome = Boolean(document.getElementById("timelineContainer"));
     const page = location.pathname.split("/").pop();
@@ -101,6 +170,7 @@
 
     async function go(key) {
         setOpen(false);
+        showLoader();
         if (key === "logout") {
             await Planora.logout();
             location.href = "login.html";
@@ -112,6 +182,7 @@
             location.href = "admin.html";
         } else if (onHome && window.__planoraSetView) {
             window.__planoraSetView(key);
+            settle(250).then(hideLoader);
         } else {
             location.href = "homepage.html" + (key === "home" ? "" : "?view=" + key);
         }
