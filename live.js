@@ -244,9 +244,10 @@
   // ---------- tiny default styling (works on light and dark; override freely) ----------
   const css = document.createElement("style");
   css.textContent = `
-    .planora-pill{position:fixed;top:calc(env(safe-area-inset-top,0px) + 12px);left:50%;transform:translateX(-50%);
+    .planora-pill{position:fixed;top:calc(env(safe-area-inset-top,0px) + 64px);left:50%;transform:translateX(-50%);
       z-index:1000;padding:.5rem 1rem;border:0;border-radius:999px;font:inherit;font-weight:600;cursor:pointer;
-      background:var(--accent,#c9a227);color:#111;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+      background:var(--gold,var(--accent,#c9a227));color:#111;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+    body.pd-lock .planora-pill{display:none}
     .planora-end{text-align:center;padding:2rem 1rem 3rem;opacity:.9}
     .planora-end-msg{font-weight:600;margin-bottom:.75rem}
     .planora-end-btn{padding:.5rem 1.25rem;border-radius:999px;border:1px solid rgba(128,128,128,.5);
