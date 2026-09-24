@@ -1,7 +1,6 @@
-/* PLANORA — LOGIN
-   Desktop: pixiv-style. Artwork background, centered card, Create account / Login.
-   Mobile: full-screen dark form, big title, labels above fields (Discord-ish layout, own look).
-   Fonts match shell.css: one simple stack + Gotham for the wordmark. */
+/* =========================================================
+   PLANORA — LOGIN
+========================================================= */
 
 @font-face {
     font-family: "Gotham";
@@ -9,201 +8,579 @@
     font-display: swap;
 }
 
-:root {
-    --lg-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
-               sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
-    --lg-bg: #0a0a0a;
-    --lg-card: rgba(18, 18, 18, 0.86);
-    --lg-field: #0a0a0a;
-    --lg-btn: #2a2a2a;
-    --lg-border: rgba(255, 255, 255, 0.1);
-    --lg-text: #f5f5f5;
-    --lg-dim: #a3a3a3;
-    --lg-gold: #c9a227;
-    --lg-gold-hi: #dcb93a;
+@font-face {
+    font-family: "VHS";
+    src: url(fonts/vhs-gothic.ttf);
+    font-display: swap;
 }
 
-*, *::before, *::after { font-family: var(--lg-font); box-sizing: border-box; }
+@font-face {
+    font-family: "Stronger";
+    src: url(fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf);
+    font-display: swap;
+}
 
-/* buttons + inputs: same plain font everywhere (base.css .btn styles can't override this) */
-button, input, .btn {
+@font-face {
+    font-family: "StarShield";
+    src: url(fonts/StarShieldV2-9M52K.ttf);
+    font-display: swap;
+}
+
+@font-face {
+    font-family: "Gothikka";
+    src: url(fonts/Gothikka.ttf);
+    font-display: swap;
+}
+
+:root {
+    /* readable font used inside the form */
+    --lg-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
+               sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+html {
+    overflow: hidden;
+}
+
+body {
+    min-height: 100dvh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 24px;
+    overflow-x: hidden;
+    overflow: hidden;
+    position: relative;
+    background: rgb(252, 252, 252);
+}
+
+/* Dedicated viewport-locked layer for the giant number. Fixed +
+   its own overflow:hidden means the oversized rotated text can
+   never inflate the page's scrollable area, no matter how big
+   font-size gets — it's clipped right here, independent of body. */
+.random-number-clip {
+    position: fixed;
+    inset: 0;
+
+    overflow: hidden;
+
+    z-index: 1;
+    pointer-events: none;
+}
+
+.random-number {
+    font-size: 2550px;
+    left: 50%;
+    top: 20%;
+    transform: translateX(-50%) rotate(90deg);
+    font-family: "StarShield"; 
+    font-weight: bold;
+    
+    position: absolute;
+    color: black;
+    opacity: 0.125;
+    user-select: none;
+    pointer-events: none;
+}
+
+@media (max-width: 600px) {
+    .random-number {
+        font-size: 750px;
+    }
+}
+
+.table-glow {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+}
+
+/* =========================
+   PAGE LAYOUT
+   (auth-shell + the pin board sit side by side on wide
+   screens; on narrow screens it's just the auth-shell,
+   centered, same as before)
+========================= */
+
+.auth-page {
+    position: relative;
+    z-index: 2;
+
+    width: 100%;
+    max-width: 1120px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 56px;
+}
+
+.auth-shell {
+    width: min(100%, 380px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 28px;
+}
+
+
+/* =========================
+   PINTEREST-STYLE BOARD
+   Black/white "pins" with a gold date chip. No photos to pull
+   from, so each image is a small grayscale gradient standing in.
+   Hidden below 1000px; the auth-shell alone carries mobile.
+========================= */
+
+.pin-board {
+    display: none;
+}
+
+@media (min-width: 1000px) {
+
+    .pin-board {
+        display: block;
+
+        width: 400px;
+        height: min(700px, 90dvh);
+
+        overflow: hidden;
+        -webkit-mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
+        mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
+
+        animation: pin-board-in 0.5s ease-out;
+    }
+
+    .pin-columns {
+        column-count: 2;
+        column-gap: 14px;
+    }
+
+    .pin-card {
+        position: relative;
+        break-inside: avoid;
+        margin-bottom: 14px;
+
+        border-radius: 18px;
+        border: 1px solid rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .pin-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+    }
+
+    .pin-card.light {
+        background: rgb(252, 252, 252);
+        color: #0c0c0c;
+        border-color: rgba(0, 0, 0, 0.12);
+    }
+
+    .pin-card.dark {
+        background: rgb(19, 19, 19);
+        color: #f2f2f2;
+        border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    /* "Save" pill on hover, like Pinterest */
+    .pin-card:has(.pin-photo)::after {
+        content: "Save";
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 6px 14px;
+        border-radius: 999px;
+        background: #0c0c0c;
+        color: #fff;
+        font-family: var(--lg-font);
+        font-size: 12px;
+        font-weight: 700;
+        opacity: 0;
+        transform: translateY(-4px);
+        transition: opacity 0.15s ease, transform 0.15s ease;
+        pointer-events: none;
+    }
+
+    .pin-card:hover::after {
+        opacity: 1;
+        transform: none;
+    }
+
+    .pin-photo {
+        position: relative;
+        width: 100%;
+    }
+
+    /* gold date chip on the photo */
+    .pin-chip {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: #c9a227;
+        color: #111;
+        font-family: var(--lg-font);
+        font-size: 11px;
+        font-weight: 700;
+    }
+
+    .pin-card.h-sm .pin-photo { height: 90px; }
+    .pin-card.h-md .pin-photo { height: 140px; }
+    .pin-card.h-lg .pin-photo { height: 200px; }
+
+    .pin-photo-1 { background: linear-gradient(150deg, #050505, #3a3a3a 55%, #0c0c0c); }
+    .pin-photo-2 { background: linear-gradient(160deg, #dcdcdc, #f7f7f7 60%, #cfcfcf); }
+    .pin-photo-3 { background: linear-gradient(140deg, #101010, #454545 45%, #050505 100%); }
+    .pin-photo-4 { background: linear-gradient(155deg, #e6e6e6, #ffffff 50%, #d2d2d2); }
+    .pin-photo-5 { background: linear-gradient(145deg, #0a0a0a, #363636 40%, #121212); }
+    .pin-photo-6 { background: repeating-linear-gradient(45deg, #f2f2f2, #f2f2f2 8px, #dcdcdc 8px, #dcdcdc 16px); }
+
+    .pin-caption {
+        padding: 12px 14px 14px;
+        font-family: var(--lg-font);
+    }
+
+    .pin-caption-solo {
+        padding: 18px 16px;
+        display: flex;
+        align-items: center;
+        min-height: 100%;
+        border-left: 3px solid #c9a227;
+    }
+
+    .pin-card.h-sm .pin-caption-solo { min-height: 90px; }
+    .pin-card.h-md .pin-caption-solo { min-height: 140px; }
+
+    .pin-title {
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.3;
+    }
+
+    .pin-caption-solo .pin-title {
+        font-size: 16px;
+        line-height: 1.35;
+    }
+
+    .pin-meta {
+        margin-top: 4px;
+        font-size: 12px;
+        opacity: 0.6;
+    }
+
+    /* who's going: overlapping dots + count */
+    .pin-foot {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 10px;
+        font-size: 11.5px;
+        opacity: 0.75;
+    }
+
+    .pin-avatars {
+        display: flex;
+    }
+
+    .pin-avatars i {
+        width: 18px;
+        height: 18px;
+        margin-left: -6px;
+        border-radius: 50%;
+        border: 2px solid currentColor;
+        background: #8a8a8a;
+        box-sizing: border-box;
+    }
+
+    .pin-avatars i:first-child { margin-left: 0; background: #c9a227; }
+    .pin-avatars i:nth-child(2) { background: #5a5a5a; }
+    .pin-avatars i:nth-child(3) { background: #b5b5b5; }
+
+    .pin-card.light .pin-avatars i { border-color: rgb(252, 252, 252); }
+    .pin-card.dark .pin-avatars i { border-color: rgb(19, 19, 19); }
+
+    @keyframes pin-board-in {
+        from {
+            opacity: 0;
+            transform: translateY(10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .pin-board {
+            animation: none;
+        }
+        .pin-card, .pin-card::after {
+            transition: none;
+        }
+    }
+}
+
+
+/* =========================
+   BRAND
+========================= */
+
+.auth-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.brand-mark {
+    width: 46px;
+    height: 46px;
+    margin-bottom: 4px;
+
+    background-image: url(icons/planora.png);
+    background-size: cover;
+    background-position: center;
+}
+
+.brand-name {
+    font-family: "Gotham";
+    font-size: 75px;
+    letter-spacing: 0.01em;
+    color: black;
+}
+
+.brand-tag {
+    font-family: "VHS";
+    font-size: 12px;
+    color: black;
+    opacity: 0.85;
+}
+
+
+/* =========================
+   CARD
+========================= */
+
+.auth-card {
+    width: 100%;
+
+    padding: 22px;
+
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+}
+
+
+/* =========================
+   TABS
+========================= */
+
+.auth-tabs {
+    display: flex;
+    gap: 6px;
+
+    margin-bottom: 20px;
+
+    padding: 4px;
+
+    background: rgb(19, 19, 19);
+    border-radius: var(--radius-pill);
+}
+
+.auth-tab {
+    flex: 1;
+
+    height: 38px;
+
+    border: none;
+    border-radius: var(--radius-pill);
+
+    background: transparent;
+    color: var(--text-dim);
+
+    font-family: "Gotham";
+    font-size: 18px;
+
+    cursor: pointer;
+
+    transition: 0.2s ease;
+}
+
+.auth-tab.active {
+    background: var(--text);
+    color: #0c0c0c;
+}
+
+
+/* =========================
+   FORM
+========================= */
+
+.auth-form {
+    display: none;
+    flex-direction: column;
+}
+
+.auth-form.active {
+    display: flex;
+}
+
+.field-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+    margin-top: 14px;
+}
+
+.field-label:first-child {
+    margin-top: 0;
+}
+
+.field-input {
+    width: 100%;
+    height: 46px;
+
+    padding: 0 14px;
+
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+
+    background: rgb(19, 19, 19);
+    color: var(--text);
+
+    font-size: 14px;
+
+    outline: none;
+
+    transition: border-color 0.2s ease;
+}
+
+.field-input:focus {
+    border-color: var(--border-strong);
+}
+
+.field-input::placeholder {
+    color: var(--text-faint);
+    font-size: 12.5px;
+}
+
+.password-wrap {
+    position: relative;
+}
+
+.reveal-toggle {
+    position: absolute;
+    right: 6px;
+    top: 6px;
+
+    height: 34px;
+    padding: 0 12px;
+
+    border: none;
+    border-radius: var(--radius-sm);
+
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-dim);
+
+    font-size: 10px;
+
+    cursor: pointer;
+}
+
+.reveal-toggle:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.strength-hint {
+    margin-top: 8px;
+
+    font-size: 10.5px;
+    color: var(--text-faint);
+}
+
+.strength-hint.ok {
+    color: #9fd89f;
+}
+
+.remember-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    margin-top: 16px;
+
+    font-size: 11.5px;
+    color: var(--text-dim);
+
+    cursor: pointer;
+}
+
+.remember-row input {
+    width: 15px;
+    height: 15px;
+    accent-color: var(--gold);
+}
+
+.form-error {
+    min-height: 16px;
+    margin-top: 12px;
+
+    font-size: 11.5px;
+    color: #e08b86;
+}
+
+.auth-submit {
+    width: 100%;
+    height: 46px;
+    margin-top: 6px;
+
+    font-family: "Gotham";
+    font-size: 18px;
+}
+
+.auth-footnote {
+    margin-top: 18px;
+
+    text-align: center;
+
+    font-size: 10px;
+    line-height: 1.5;
+    color: var(--text-faint);
+}
+
+
+/* =========================
+   READABLE FONTS INSIDE THE FORM
+   Tabs, labels, inputs, buttons and small text all use the
+   plain font. The brand and tagline keep their own fonts.
+========================= */
+
+.auth-tab,
+.auth-form,
+.field-label,
+.field-input,
+.reveal-toggle,
+.strength-hint,
+.remember-row,
+.form-error,
+.auth-submit,
+.auth-footnote {
     font-family: var(--lg-font) !important;
     letter-spacing: normal !important;
     text-transform: none !important;
 }
 
-html { background: var(--lg-bg); color-scheme: dark; }
-
-body {
-    min-height: 100dvh;
-    margin: 0;
-    padding: 24px;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    background: transparent;
-    color: var(--lg-text);
-}
-
-/* ---------- background: dark fanned rays ----------
-   Uses images/login-bg.jpg. The conic gradient under it is a fallback if the file is missing. */
-.bg-art {
-    position: fixed;
-    inset: 0;
-    z-index: -1;
-    background:
-        url(images/login-bg.jpg) center / cover no-repeat,
-        conic-gradient(from 265deg at 96% 100%,
-            #080808 0 6deg, #2a2a2a 6deg 16deg, #0e0e0e 16deg 30deg, #2d2d2d 30deg 40deg,
-            #0b0b0b 40deg 58deg, #2a2a2a 58deg 66deg, #0c0c0c 66deg 80deg, #262626 80deg 86deg, #080808 86deg 100deg);
-}
-
-.lg-top {
-    position: fixed;
-    top: 18px;
-    left: 22px;
-    font-family: "Gotham", var(--lg-font);
-    font-size: 24px;
-    letter-spacing: 0.16em;
-    color: #fff;
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-}
-
-/* ---------- card ---------- */
-.auth-shell { width: min(100%, 392px); }
-
-.auth-card {
-    padding: 36px 40px 28px;
-    background: var(--lg-card);
-    border-radius: 24px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
-    text-align: center;
-}
-
-.brand-name {
-    font-family: "Gotham", var(--lg-font);
-    font-size: 44px;
-    line-height: 1;
-    letter-spacing: 0.16em;
-    text-indent: 0.16em;
-    color: #fff;
-}
-
-.brand-tag {
-    margin-top: 8px;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--lg-gold);
-}
-
-/* ---------- home view (Create account / Login) ---------- */
-.auth-home { display: none; }
-.auth-card[data-view="home"] .auth-home { display: flex; flex-direction: column; gap: 10px; margin-top: 28px; }
-
-.auth-lead { margin: 0 0 14px; font-size: 15px; font-weight: 600; }
-
-.auth-btn {
-    width: 100%;
-    height: 40px;
-    border: none;
-    border-radius: 999px;
-    background: var(--lg-btn);
-    color: var(--lg-text);
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-}
-.auth-btn:hover { background: #363636; }
-.auth-btn.primary { background: var(--lg-gold); color: #111; }
-.auth-btn.primary:hover { background: var(--lg-gold-hi); }
-
-/* ---------- forms ---------- */
-.auth-form { display: none; flex-direction: column; margin-top: 24px; text-align: left; }
-.auth-form.active { display: flex; }
-
-.auth-title { margin: 0 0 4px; font-size: 20px; font-weight: 700; text-align: center; }
-
-.field-label { margin: 14px 0 6px; font-size: 13px; font-weight: 600; color: var(--lg-dim); }
-
-.field-input {
-    width: 100%;
-    height: 44px;
-    padding: 0 14px;
-    border: 1px solid var(--lg-border);
-    border-radius: 10px;
-    background: var(--lg-field);
-    color: var(--lg-text);
-    font-size: 14px;
-    outline: none;
-}
-.field-input:focus { border-color: var(--lg-gold); box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.2); }
-.field-input::placeholder { color: #6b6b6b; }
-
-.password-wrap { position: relative; }
-.password-wrap .field-input { padding-right: 64px; }
-.reveal-toggle {
-    position: absolute; right: 12px; top: 0; height: 44px; padding: 0;
-    border: none; background: none; color: var(--lg-dim);
-    font-size: 13px; font-weight: 600; cursor: pointer;
-}
-.reveal-toggle:hover { color: var(--lg-text); }
-
-.strength-hint { margin-top: 8px; font-size: 12px; color: var(--lg-dim); }
-.strength-hint.ok { color: #9fd89f; }
-
-.remember-row { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--lg-dim); cursor: pointer; }
-.remember-row input { accent-color: var(--lg-gold); }
-
-.form-error { min-height: 16px; margin-top: 10px; font-size: 13px; color: #e08b86; }
-
-.auth-card .auth-submit {
-    height: 44px; margin-top: 6px; border: none; border-radius: 999px;
-    background: var(--lg-gold); color: #111; font-size: 15px; font-weight: 700; cursor: pointer;
-}
-.auth-card .auth-submit:hover { background: var(--lg-gold-hi); }
-.auth-card .auth-submit:disabled { opacity: 0.6; cursor: default; }
-
-.auth-switch { margin: 16px 0 0; font-size: 13px; color: var(--lg-dim); text-align: center; }
-.auth-link { padding: 0; border: none; background: none; color: var(--lg-gold); font-size: 13px; font-weight: 600; cursor: pointer; }
-.auth-link:hover { text-decoration: underline; }
-.auth-back { margin-top: 6px; }
-
-.auth-footnote {
-    margin: 22px 0 0; padding-top: 16px;
-    border-top: 1px solid var(--lg-border);
-    font-size: 11.5px; line-height: 1.5; color: var(--lg-dim);
-}
-
-/* ---------- mobile: full-screen form, no card ---------- */
-@media (max-width: 600px) {
-    body { padding: 0; align-items: flex-start; background: var(--lg-bg); }
-    .bg-art, .lg-top, .auth-back { display: none; }
-
-    .auth-shell { width: 100%; }
-
-    .auth-card {
-        min-height: 100dvh;
-        padding: 56px 24px 32px;
-        background: transparent;
-        border-radius: 0;
-        box-shadow: none;
-        text-align: left;
-    }
-
-    .brand-name { font-size: 30px; text-indent: 0; }
-    .brand-tag { margin-top: 6px; }
-
-    .auth-form { margin-top: 36px; }
-    .auth-title { margin-bottom: 6px; font-size: 30px; text-align: left; }
-
-    .field-label { margin-top: 20px; }
-    .field-input { height: 52px; border-color: transparent; background: #1c1c1c; font-size: 16px; }
-    .reveal-toggle { height: 52px; }
-
-    .auth-card .auth-submit { height: 52px; margin-top: 10px; border-radius: 14px; font-size: 16px; }
-    .auth-switch { text-align: left; }
-    .auth-footnote { border-top: none; padding-top: 0; }
-}
+.auth-tab { font-size: 15px; font-weight: 700; }
+.auth-submit { font-size: 16px; font-weight: 700; }
+.field-label { font-size: 13px; font-weight: 600; }
+.field-input { font-size: 15px; }
+.field-input::placeholder { font-size: 14px; }
+.reveal-toggle { font-size: 12px; font-weight: 600; }
+.strength-hint, .form-error { font-size: 12.5px; }
+.remember-row { font-size: 13px; }
+.auth-footnote { font-size: 11.5px; }
