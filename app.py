@@ -100,6 +100,17 @@ PUSH NOTIFICATIONS (Web Push)
     checked so they can only point at real push services (otherwise the
     server could be tricked into calling arbitrary URLs).
 
+LIVE UPDATES
+    Pages don't need a refresh to see new things. Whenever something changes
+    (an event posted/edited/deleted, a comment, a profile, a notification) the
+    server writes one line to a small change log. The browser asks
+    GET /api/changes?since=<n> every few seconds and gets back only WHAT
+    changed (ids and usernames, not the content), then re-fetches just that.
+    Private events never show up for people who can't see them. If the log
+    has moved on too far (or the server restarted) the answer says
+    "reset": true and the page should refresh everything once.
+    The browser side lives in live.js.
+
 PREFERENCES
     Each account also carries a couple of small client-preference
     fields - theme_preference ("system" | "light" | "dark") and
@@ -164,6 +175,7 @@ MAX_DIRECTORY_RESULTS = 100
 
 # notifications / mentions
 MAX_NOTIFICATIONS_PER_USER = 100
+MAX_CHANGE_LOG = 500          # how many recent changes the server remembers
 MAX_MENTIONS_PER_TEXT = 5
 NOTIFICATION_SNIPPET = 80
 # "@name" that isn't glued to a word, "@" or "." - so emails (a@b.com) don't count
@@ -257,6 +269,10 @@ push_lock = threading.Lock()
 next_event_id = 1
 next_comment_id = 1
 next_notification_id = 1
+
+change_log = []          # [{"seq", "type", ...}] newest last - see LIVE UPDATES
+next_change_seq = 1
+change_lock = threading.Lock()
 
 login_attempts = {}
 
@@ -456,6 +472,7 @@ def cascade_delete_event(deleted_event):
         events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
     comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
     prune_notifications()
+    log_change("event", event_id=deleted_event["id"])
 
 
 def prune_orphan_replies():
@@ -832,6 +849,21 @@ def start_reminder_scheduler():
 
 
 # ---------------------------------------------------------------------------
+# LIVE UPDATES
+# ---------------------------------------------------------------------------
+
+def log_change(kind, **fields):
+    """Records that something changed so open pages can notice.
+    kind: "event" | "comments" | "profile" | "notifications"."""
+    global next_change_seq
+    with change_lock:
+        change_log.append({"seq": next_change_seq, "type": kind, **fields})
+        next_change_seq += 1
+        if len(change_log) > MAX_CHANGE_LOG:
+            del change_log[: len(change_log) - MAX_CHANGE_LOG]
+
+
+# ---------------------------------------------------------------------------
 # IN-APP NOTIFICATIONS (each one also fires a push)
 # ---------------------------------------------------------------------------
 
@@ -860,6 +892,7 @@ def create_notification(recipient, actor, kind, event, comment=None, text=""):
         "created_at": now_in_ms(),
     })
     next_notification_id += 1
+    log_change("notifications", recipient=recipient)
 
     # keep each person's inbox bounded - oldest fall off first
     mine = [n for n in notifications if n["recipient"].lower() == recipient.lower()]
@@ -1102,6 +1135,7 @@ def signup():
         "reduce_motion": False,
     }
     users.append(new_user)
+    log_change("profile", username=username)   # they now show up in the directory
 
     session["username"] = username
     return jsonify(user_public_info(new_user))
@@ -1270,6 +1304,7 @@ def update_me():
         updates["interests"] = cleaned
 
     user.update(updates)
+    log_change("profile", username=user["username"])
     return jsonify(user_public_info(user))
 
 
@@ -1298,6 +1333,8 @@ def delete_me():
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
     prune_orphan_replies()
     drop_user_push_data(username)
+    log_change("profile", username=username)
+    log_change("comments", event_id=None)   # their comments vanished
 
     session.pop("username", None)
     return jsonify({"ok": True})
@@ -1587,6 +1624,8 @@ def add_event():
     if visibility == "global":
         events.append(make_local_copy(new_event, user["username"]))
 
+    log_change("event", event_id=new_event["id"])
+
     # ping anyone @mentioned in a public/global description
     notify_event_mentions(new_event, user["username"])
 
@@ -1625,6 +1664,7 @@ def set_event_visibility(event_id):
         return jsonify({"error": "Events you added from Global can't be made public."}), 400
 
     event["visibility"] = new_visibility
+    log_change("event", event_id=event["id"])
     response = dict(event)
     response["isMine"] = True
     return jsonify(response)
@@ -1719,6 +1759,8 @@ def edit_event(event_id):
             if clone.get("cloned_from") == event["id"]:
                 clone.update(changes)
 
+    log_change("event", event_id=event["id"])
+
     # only people newly @mentioned in the description get pinged
     notify_event_mentions(event, user["username"], old_description)
 
@@ -1766,6 +1808,7 @@ def add_to_my_calendar(event_id):
 
     clone = make_local_copy(source_event, username)
     events.append(clone)
+    log_change("event", event_id=event_id)   # the post's "added by" list changed
     return jsonify(clone)
 
 
@@ -1859,6 +1902,7 @@ def add_comment(event_id):
     next_comment_id += 1
 
     comments.append(new_comment)
+    log_change("comments", event_id=event_id)
     notify_comment(event, new_comment)
     return jsonify(comment_view(new_comment))
 
@@ -1887,6 +1931,7 @@ def edit_comment(event_id, comment_id):
     comment["text"] = text
     comment["edited"] = True
     comment["mentions"] = extract_mentions(text)
+    log_change("comments", event_id=event_id)
 
     # only people newly @mentioned by this edit get pinged
     if event:
@@ -1929,6 +1974,7 @@ def delete_comment(event_id, comment_id):
         if c["id"] != comment["id"] and c.get("parent_id") != comment["id"]
     ]
     prune_notifications()
+    log_change("comments", event_id=event_id)
     return jsonify({"ok": True})
 
 
@@ -2021,6 +2067,74 @@ def clear_notifications():
 
     notifications[:] = [n for n in notifications if n["recipient"].lower() != user["username"].lower()]
     return jsonify({"ok": True, "unreadCount": 0})
+
+
+@app.route("/api/changes", methods=["GET"])
+def get_changes():
+    """
+    What changed since the last time this page asked? Send ?since=<seq> (the
+    "seq" from the previous answer); leave it off on the first call to just
+    get the current position. Answer:
+        seq            - send this back as ?since= next time
+        reset          - true if the page missed too much (or the server
+                         restarted) and should re-fetch everything once
+        events         - event ids that changed (null = "something changed,
+                         can't say which"); refresh feeds/calendars
+        comments       - event ids whose comments changed (null = any)
+        profiles       - usernames whose profile changed
+        notifications  - true if this person got a new notification
+        unread         - their current unread count, always included
+    Comments on events the viewer can't see are left out.
+    """
+    viewer = get_logged_in_user()
+    if not viewer:
+        return jsonify({"error": "Not signed in."}), 401
+
+    since = request.args.get("since", type=int)
+
+    with change_lock:
+        latest = next_change_seq - 1
+        entries = list(change_log)
+
+    result = {
+        "seq": latest, "reset": False, "unread": unread_count(viewer),
+        "events": [], "comments": [], "profiles": [], "notifications": False,
+    }
+
+    if since is not None:
+        # ahead of the server (it restarted) or behind what it still remembers
+        missed = since < latest and (not entries or entries[0]["seq"] > since + 1)
+        if since > latest or since < 0 or missed:
+            result["reset"] = True
+        else:
+            me = viewer["username"].lower()
+            for entry in entries:
+                if entry["seq"] <= since:
+                    continue
+                kind = entry["type"]
+
+                if kind == "notifications":
+                    if entry["recipient"].lower() == me:
+                        result["notifications"] = True
+
+                elif kind == "profile":
+                    if entry["username"] not in result["profiles"]:
+                        result["profiles"].append(entry["username"])
+
+                elif kind in ("event", "comments"):
+                    event_id = entry.get("event_id")
+                    event = find_event(event_id) if event_id is not None else None
+                    visible = event is None or can_see_event(viewer, event)
+                    if kind == "comments" and not visible:
+                        continue
+                    key = "events" if kind == "event" else "comments"
+                    value = event_id if visible else None   # never name an event they can't see
+                    if value not in result[key]:
+                        result[key].append(value)
+
+    response = jsonify(result)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @app.route("/api/stats", methods=["GET"])
@@ -2213,6 +2327,7 @@ def admin_set_role(current_user, username):
         return jsonify({"error": "You can't demote yourself."}), 400
 
     target["role"] = new_role
+    log_change("profile", username=target["username"])
     return jsonify(user_public_info(target))
 
 
@@ -2238,6 +2353,8 @@ def admin_delete_user(current_user, username):
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
     prune_orphan_replies()
     drop_user_push_data(username)
+    log_change("profile", username=target["username"])
+    log_change("comments", event_id=None)
 
     return jsonify({"ok": True})
 
