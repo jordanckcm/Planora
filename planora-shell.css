@@ -10,6 +10,9 @@
 /* every font on the site becomes the same simple one */
 *, *::before, *::after { font-family: var(--pl-font) !important; }
 
+/* the hidden attribute must always win, even over display:flex/grid rules */
+[hidden] { display: none !important; }
+
 /* old topbars are kept in the DOM (scripts still use them) but hidden */
 .topbar { display: none !important; }
 
