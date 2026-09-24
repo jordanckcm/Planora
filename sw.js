@@ -1,150 +1,130 @@
-/* =========================================================
-   PLANORA — SERVICE WORKER
-   Keeps the app shell (HTML/CSS/JS/fonts) available with no
-   connection at all. Never touches /api/* requests — those
-   are handled (with their own offline fallback) inside api.js.
+/*
+  Planora service worker  ->  save as sw.js next to app.py (it must be served
+  from the site root, i.e. https://yoursite/sw.js, so it can control every page).
 
-   How files are served:
-     - pages, CSS and JS: NETWORK FIRST. You always get the
-       newest deploy when you're online; the cached copy is only
-       used when the network fails.
-     - fonts and icons: CACHE FIRST. They never change and are
-       big, so there's no reason to re-download them.
-========================================================= */
+  Push payload from the server:
+    { title, body, url, tag, kind, eventId, eventTitle, badge, ts }
+  kind is "mention" | "reply" | "comment" | "reminder" | "test".
+*/
 
-const CACHE_NAME = "planora-shell-v3";
+const ICON = "/icon-192.png";        // put a 192x192 PNG here
+const BADGE_ICON = "/badge-72.png";  // optional: small monochrome PNG for the Android status bar
 
-const PRECACHE_URLS = [
-    "/",
-    "/index.html",
-    "/login.html",
-    "/login.css",
-    "/login.js",
-    "/numchange.js",
-    "/base.css",
-    "/api.js",
-    "/homepage.html",
-    "/homepage.css",
-    "/homepage-extra.css",
-    "/homepage-readability-qol.css",
-    "/homepage.js",
-    "/mode-effects.js",
-    "/planora-ui.css",
-    "/planora-shell.css",
-    "/planora-nav.js",
-    "/settings.css",
-    "/settings.js",
-    "/feed.js",
-    "/profile.html",
-    "/profile.css",
-    "/profile.js",
-    "/admin.html",
-    "/admin.css",
-    "/admin.js",
-    "/directory.html",
-    "/directory.css",
-    "/directory.js",
-    "/fonts/Gotham.ttf",
-    "/fonts/vhs-gothic.ttf",
-    "/fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf",
-    "/fonts/StarShieldV2-9M52K.ttf",
-    "/fonts/Gothikka.ttf",
-    "/icon-192.png",
-    "/icon-512.png"
-];
+self.addEventListener("install", () => self.skipWaiting());
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
 
-self.addEventListener("install", (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then(async (cache) => {
-            await Promise.all(
-                PRECACHE_URLS.map((url) => cache.add(url).catch(() => {}))
-            );
-        })
-    );
-    self.skipWaiting();
-});
-
-self.addEventListener("activate", (event) => {
-    event.waitUntil(
-        caches.keys().then((names) =>
-            Promise.all(
-                names
-                    .filter((name) => name !== CACHE_NAME)
-                    .map((name) => caches.delete(name))
-            )
-        )
-    );
-    self.clients.claim();
-});
-
-function saveCopy(request, response) {
-    if (response && response.ok) {
-        const clone = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
-    }
-    return response;
-}
-
-self.addEventListener("fetch", (event) => {
-    const { request } = event;
-
-    if (request.method !== "GET") return;
-
-    const url = new URL(request.url);
-    if (url.origin !== self.location.origin) return;
-    if (url.pathname.startsWith("/api/")) return;
-
-    const isStaticAsset =
-        url.pathname.startsWith("/fonts/") ||
-        url.pathname === "/icon-192.png" ||
-        url.pathname === "/icon-512.png";
-
-    if (isStaticAsset) {
-        event.respondWith(
-            caches.match(request).then((cached) => {
-                return cached || fetch(request).then((response) => saveCopy(request, response));
-            })
-        );
-        return;
-    }
-
-    event.respondWith(
-        fetch(request)
-            .then((response) => saveCopy(request, response))
-            .catch(() => caches.match(request))
-    );
-});
 
 self.addEventListener("push", (event) => {
-    let data = { title: "Planora", body: "You have a new notification.", url: "/" };
-    try {
-        if (event.data) data = event.data.json();
-    } catch (e) { /* fall back to defaults above */ }
-
-    event.waitUntil(
-        self.registration.showNotification(data.title, {
-            body: data.body,
-            icon: "/icon-192.png",
-            badge: "/icon-192.png",
-            data: { url: data.url || "/" }
-        })
-    );
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (e) {
+    data = { title: "Planora", body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(showPush(data));
 });
 
-self.addEventListener("notificationclick", (event) => {
-    event.notification.close();
-    const targetUrl = event.notification.data && event.notification.data.url
-        ? event.notification.data.url
-        : "/";
 
-    event.waitUntil(
-        clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
-            for (const client of windowClients) {
-                if (client.url.includes(targetUrl.split("?")[0]) && "focus" in client) {
-                    return client.focus();
-                }
-            }
-            if (clients.openWindow) return clients.openWindow(targetUrl);
-        })
-    );
+async function showPush(d) {
+  const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+
+  // Let any open tab refresh its bell right away.
+  windows.forEach((c) => c.postMessage({ type: "push", payload: d }));
+
+  // App-icon badge (installed PWAs on Android, desktop, iOS).
+  if (typeof d.badge === "number" && self.navigator && self.navigator.setAppBadge) {
+    try {
+      if (d.badge > 0) await self.navigator.setAppBadge(d.badge);
+      else await self.navigator.clearAppBadge();
+    } catch (e) { /* badge is optional */ }
+  }
+
+  // If they're looking at Planora right now, the in-app bell is enough - so show
+  // the notification quietly and take it away after a few seconds. (Don't skip
+  // showing it entirely: Safari cancels a site's push subscription if pushes
+  // arrive without a visible notification.)
+  const looking = windows.some((c) => c.visibilityState === "visible");
+
+  // Collapse a burst about the same post into one notification:
+  // "3 new notifications in Movie Night" instead of three buzzes.
+  let title = d.title || "Planora";
+  let body = d.body || "";
+  let count = 1;
+  const groupable = d.tag && d.kind !== "reminder" && d.kind !== "test";
+
+  if (groupable) {
+    const existing = await self.registration.getNotifications({ tag: d.tag });
+    if (existing.length) {
+      count = ((existing[0].data && existing[0].data.count) || 1) + 1;
+      existing.forEach((n) => n.close());
+      title = `${count} new notifications in ${d.eventTitle || "Planora"}`;
+      body = d.body ? `Latest: ${d.body}` : "";
+    }
+  }
+
+  const options = {
+    body,
+    icon: ICON,
+    badge: BADGE_ICON,
+    tag: d.tag || undefined,
+    renotify: !!d.tag,               // a new push on the same tag still alerts
+    timestamp: d.ts || Date.now(),
+    silent: looking,
+    data: { url: d.url || "/", count, kind: d.kind },
+  };
+
+  await self.registration.showNotification(title, options);
+
+  if (looking) {
+    setTimeout(async () => {
+      const shown = await self.registration.getNotifications({ tag: d.tag || undefined });
+      shown.forEach((n) => n.close());
+    }, 5000);
+  }
+}
+
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL((event.notification.data && event.notification.data.url) || "/", self.location.origin).href;
+
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const c of windows) {
+      if (new URL(c.url).origin === self.location.origin) {
+        await c.focus();
+        if ("navigate" in c) await c.navigate(target);
+        return;
+      }
+    }
+    await self.clients.openWindow(target);
+  })());
+});
+
+
+// The browser can rotate a subscription on its own. Re-register the new one.
+function urlB64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map((ch) => ch.charCodeAt(0)));
+}
+
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil((async () => {
+    try {
+      const res = await fetch("/api/push/vapid-public-key");
+      const { key } = await res.json();
+      const sub = await self.registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlB64ToUint8Array(key),
+      });
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ subscription: sub.toJSON() }),
+      });
+    } catch (e) { /* they'll be re-subscribed next time they open the app */ }
+  })());
 });
