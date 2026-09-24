@@ -250,3 +250,47 @@ body { overflow-x: hidden; }
     .year-selector { gap: 10px; margin-top: 10px; }
     .year-selector button { width: 34px; height: 34px; font-size: 14px; }
 }
+
+
+/* ---------- POSTS: spacing, ⋮ menu, Instagram-style comments ---------- */
+.post-actions { padding: 10px 12px 14px; }
+
+.post-menu-wrap { flex: none; }
+.post-menu {
+    display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+    border: none; border-radius: 50%; background: transparent;
+    color: var(--text-dim, #aaa); font-size: 18px; line-height: 1; cursor: pointer;
+}
+.post-menu:hover { background: color-mix(in srgb, var(--text, #fff) 8%, transparent); color: var(--text, #fff); }
+
+.post-comments { padding-top: 12px; }
+.cm-list { display: flex; flex-direction: column; gap: 14px; }
+.cm { display: flex; align-items: flex-start; gap: 10px; }
+.cm-avatar {
+    display: flex; align-items: center; justify-content: center; flex: none;
+    width: 30px; height: 30px; border-radius: 50%; color: #fff; font-size: 12px; font-weight: 700; text-decoration: none;
+}
+.cm-reply .cm-avatar { width: 24px; height: 24px; font-size: 10px; }
+.cm-body { flex: 1; min-width: 0; }
+.cm-line { font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.cm-name { margin-right: 6px; font-weight: 700; color: var(--text, #fff); text-decoration: none; }
+.cm-mention { margin-right: 4px; color: color-mix(in srgb, rgb(var(--accent, 72, 156, 72)) 70%, white); text-decoration: none; }
+.cm-name:hover, .cm-mention:hover { text-decoration: underline; }
+.cm-meta { display: flex; gap: 14px; margin-top: 2px; font-size: 12px; color: var(--text-faint, #888); }
+.cm-reply-btn, .cm-toggle {
+    padding: 0; border: none; background: none; cursor: pointer;
+    font-size: 12px; font-weight: 600; color: var(--text-faint, #888);
+}
+.cm-reply-btn:hover, .cm-toggle:hover { color: var(--text, #fff); }
+.cm-toggle { display: flex; align-items: center; gap: 8px; margin: 8px 0 0 40px; }
+.cm-toggle::before { content: ""; width: 22px; height: 1px; background: var(--border-strong, #444); }
+.cm-replies { display: flex; flex-direction: column; gap: 12px; margin: 12px 0 0 40px; }
+.cm-empty { font-size: 13px; color: var(--text-faint, #888); }
+.cm-replying {
+    display: flex; align-items: center; justify-content: space-between; margin-top: 12px;
+    padding: 5px 6px 5px 14px; border-radius: 999px; font-size: 12px; color: var(--text-dim, #aaa);
+    background: color-mix(in srgb, var(--text, #fff) 8%, transparent);
+}
+.cm-x { width: 22px; height: 22px; border: none; border-radius: 50%; background: transparent; color: inherit; font-size: 16px; line-height: 1; cursor: pointer; }
+.cm-x:hover { background: color-mix(in srgb, var(--text, #fff) 12%, transparent); }
+.post-composer { align-items: center; }
