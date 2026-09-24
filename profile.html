@@ -5,16 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Profile · Planora</title>
 
-    <!-- Applied before any CSS paints, from whatever's cached from the
-         last /api/me response, so the page doesn't flash the wrong
-         theme while api.js's own network-backed bootstrap catches up. -->
+    <!-- TEMP: Settings (and its theme toggle) is hidden for now, so this
+         no longer reads a cached theme preference or falls back to the
+         OS's light/dark setting — it just pins dark mode unconditionally.
+         Revert to reading `cached.themePreference` here once Settings
+         comes back. -->
     <script>
         (function () {
+            document.documentElement.setAttribute("data-theme", "dark");
             try {
                 var cached = JSON.parse(localStorage.getItem("planora_cached_me") || "null");
-                if (cached && (cached.themePreference === "light" || cached.themePreference === "dark")) {
-                    document.documentElement.setAttribute("data-theme", cached.themePreference);
-                }
                 if (cached && cached.reduceMotion) {
                     document.documentElement.setAttribute("data-reduce-motion", "");
                 }
@@ -34,7 +34,10 @@
         <button class="back-button" id="backButton">← Calendar</button>
         <div class="topbar-spacer"></div>
         <button class="custom-button" id="discoverButton">Discover</button>
-        <button class="custom-button" id="settingsButton">Settings</button>
+        <!-- TEMP: hidden while Settings is disabled — kept in the DOM
+             (not removed) so profile.js's existing
+             getElementById("settingsButton") call doesn't error. -->
+        <button class="custom-button" id="settingsButton" style="display:none;">Settings</button>
         <button class="custom-button logout-button" id="logoutButton">Log out</button>
     </div>
 
@@ -194,16 +197,6 @@
 
     <!-- =========================
          EVENT POST VIEW (Instagram-style)
-         Opens when you click a public event tile: the event's banner
-         on top, its comment thread scrolls in the middle, and the
-         comment composer stays pinned to the bottom of the modal
-         (outside the scrolling area) so it's never something you
-         have to scroll down to reach.
-
-         If you own the event, a ⋮ menu (top-left, next to close)
-         lets you edit it in place — same PUT /api/events/<id> the
-         homepage's own Edit uses, so it's the same record and shows
-         up updated on the homepage too, not a separate copy.
     ========================== -->
     <div class="post-overlay" id="postOverlay" hidden></div>
 
