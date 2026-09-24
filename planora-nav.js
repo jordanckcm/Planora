@@ -144,6 +144,12 @@
             drawer.insertBefore(d, beforeNode || null);
             return;
         }
+        if (item.key === "notifications" || item.key === "friends") {
+            const badge = document.createElement("span");
+            badge.className = "pl-badge";
+            badge.hidden = true;
+            b.appendChild(badge);
+        }
         const b = document.createElement("button");
         b.type = "button";
         b.className = "pl-item" + (item.danger ? " danger" : "");
