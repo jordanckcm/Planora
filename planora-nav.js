@@ -221,6 +221,8 @@
             location.href = "login.html";
         } else if (key === "discover") {
             location.href = "directory.html";
+        } else if (key === "friends") {
+            location.href = "friends.html";
         } else if (key === "notifications") {
             location.href = "notifications.html";
         } else if (key === "profile") {
