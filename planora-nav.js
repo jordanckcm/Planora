@@ -3,7 +3,8 @@
    On the homepage, Local/Global/Timeline/Home switch views in place (via feed.js);
    everywhere else they link to homepage.html?view=...
    Also shows an unread-notifications badge on the Notifications item
-   (and a dot on the burger while the menu is closed). */
+   (and a dot on the burger while the menu is closed), plus a badge on
+   the Friends item for pending incoming friend requests. */
 
 (function () {
     // Load the shared stylesheet from the same folder as this script, so one
@@ -144,18 +145,12 @@
             drawer.insertBefore(d, beforeNode || null);
             return;
         }
-        if (item.key === "notifications" || item.key === "friends") {
-            const badge = document.createElement("span");
-            badge.className = "pl-badge";
-            badge.hidden = true;
-            b.appendChild(badge);
-        }
         const b = document.createElement("button");
         b.type = "button";
         b.className = "pl-item" + (item.danger ? " danger" : "");
         b.dataset.key = item.key;
         b.textContent = item.label;
-        if (item.key === "notifications") {
+        if (item.key === "notifications" || item.key === "friends") {
             const badge = document.createElement("span");
             badge.className = "pl-badge";
             badge.hidden = true;
@@ -185,7 +180,7 @@
         drawer.querySelectorAll(".pl-item").forEach((el) => el.classList.toggle("active", el.dataset.key === key));
     }
 
-    /* ---- unread notifications badge ---- */
+    /* ---- unread notifications / friend-request badges ---- */
     const notifStyle = document.createElement("style");
     notifStyle.textContent =
         ".pl-badge{display:inline-block;margin-left:8px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;" +
@@ -195,7 +190,6 @@
     document.head.appendChild(notifStyle);
 
     const burgerDot = bar.querySelector(".pl-dot");
-
 
     function setUnread(n) {
         const badge = drawer.querySelector('[data-key="notifications"] .pl-badge');
@@ -221,7 +215,7 @@
             badge.hidden = n === 0;
         }
     }
-   
+
     async function refreshFriendRequests() {
         if (document.hidden) return;
         try {
@@ -308,5 +302,4 @@
     setTimeout(hideLegacyBars, 500); // in case a page builds its bar after load
 
     window.PlanoraNav = { setActive, setUnread, setFriendRequests, refreshUnread, refreshFriendRequests };
-   
 })();
