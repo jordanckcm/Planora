@@ -106,7 +106,8 @@ LIVE UPDATES
     server writes one line to a small change log. The browser asks
     GET /api/changes?since=<n> every few seconds and gets back only WHAT
     changed (ids and usernames, not the content), then re-fetches just that.
-    Private events never show up for people who can't see them. If the log
+    Your own actions are not echoed back to you (your page already shows
+    them). Private events never show up for people who can't see them. If the log
     has moved on too far (or the server restarted) the answer says
     "reset": true and the page should refresh everything once.
     The browser side lives in live.js.
@@ -130,7 +131,7 @@ from functools import wraps
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, available_timezones
 
-from flask import Flask, request, jsonify, session, Response
+from flask import Flask, request, jsonify, session, Response, has_request_context
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -856,8 +857,10 @@ def log_change(kind, **fields):
     """Records that something changed so open pages can notice.
     kind: "event" | "comments" | "profile" | "notifications"."""
     global next_change_seq
+    # remember WHO did it, so their own page isn't told about its own action
+    by = session.get("username") if has_request_context() else None
     with change_lock:
-        change_log.append({"seq": next_change_seq, "type": kind, **fields})
+        change_log.append({"seq": next_change_seq, "type": kind, "by": by, **fields})
         next_change_seq += 1
         if len(change_log) > MAX_CHANGE_LOG:
             del change_log[: len(change_log) - MAX_CHANGE_LOG]
@@ -2112,6 +2115,10 @@ def get_changes():
                 if entry["seq"] <= since:
                     continue
                 kind = entry["type"]
+
+                # your own actions: the page you did them on already shows them
+                if kind != "notifications" and (entry.get("by") or "").lower() == me:
+                    continue
 
                 if kind == "notifications":
                     if entry["recipient"].lower() == me:
