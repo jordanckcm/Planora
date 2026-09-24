@@ -72,7 +72,8 @@ PREFERENCES
     they're just stored so a person's theme/motion choice follows them
     to a new device, the same way Discord's account-level settings do.
 """
-
+from pywebpush import webpush, WebPushException
+import json as json_lib
 import re
 import time
 import os
@@ -126,6 +127,9 @@ MAX_DIRECTORY_RESULTS = 100
 MAX_NOTIFICATIONS_PER_USER = 100
 MAX_MENTIONS_PER_TEXT = 5
 NOTIFICATION_SNIPPET = 80
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS = {"sub": "mailto:admin@planora.app"}
 # "@name" that isn't glued to a word, "@" or "." - so emails (a@b.com) don't count
 MENTION_PATTERN = re.compile(r"(?<![\w@.])@([A-Za-z0-9_.]{3,40})")
 
@@ -166,6 +170,7 @@ users = []
 events = []
 comments = []
 notifications = []
+push_subscriptions = []  # [{"username": ..., "subscription": {...}}, ...]
 
 next_event_id = 1
 next_comment_id = 1
@@ -438,6 +443,39 @@ def create_notification(recipient, actor, kind, event, comment=None, text=""):
         drop = {n["id"] for n in mine[:overflow]}
         notifications[:] = [n for n in notifications if n["id"] not in drop]
 
+    # NEW: fire a real push alongside the in-app notification
+    verb = {"mention": "mentioned you", "reply": "replied to you", "comment": "commented"}
+    send_push(
+        recipient,
+        title=f"@{actor} {verb.get(kind, 'notified you')}",
+        body=(comment["text"] if comment else text)[:120] or event.get("title", ""),
+        url=f"/homepage.html?post={event['id']}" + (f"&comment={comment['id']}" if comment else "")
+    )
+
+def send_push(username, title, body, url="/"):
+    """Best-effort — a dead/expired subscription just gets dropped
+    silently, same spirit as everything else here being in-memory."""
+    if not VAPID_PRIVATE_KEY:
+        return  # keys not configured yet — no-op instead of crashing
+
+    payload = json_lib.dumps({"title": title, "body": body, "url": url})
+    stale = []
+
+    for entry in push_subscriptions:
+        if entry["username"].lower() != username.lower():
+            continue
+        try:
+            webpush(
+                subscription_info=entry["subscription"],
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims=dict(VAPID_CLAIMS),
+            )
+        except WebPushException:
+            stale.append(entry)
+
+    for entry in stale:
+        push_subscriptions.remove(entry)
 
 def notify_comment(event, comment):
     """Event owner -> "comment", person replied to -> "reply", @mentioned ->
@@ -1641,6 +1679,42 @@ def admin_delete_user(current_user, username):
 @require_role("admin")
 def admin_list_events(current_user):
     return jsonify(events)
+
+@app.route("/api/push/vapid-public-key", methods=["GET"])
+def get_vapid_public_key():
+    return jsonify({"key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    subscription = body().get("subscription")
+    if not isinstance(subscription, dict) or "endpoint" not in subscription:
+        return jsonify({"error": "Invalid subscription."}), 400
+
+    # replace any existing subscription with the same endpoint (re-subscribing)
+    push_subscriptions[:] = [
+        e for e in push_subscriptions if e["subscription"].get("endpoint") != subscription["endpoint"]
+    ]
+    push_subscriptions.append({"username": user["username"], "subscription": subscription})
+    return jsonify({"ok": True})
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    endpoint = body().get("endpoint")
+    push_subscriptions[:] = [
+        e for e in push_subscriptions
+        if not (e["username"].lower() == user["username"].lower() and e["subscription"].get("endpoint") == endpoint)
+    ]
+    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
