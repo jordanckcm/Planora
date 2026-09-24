@@ -46,6 +46,14 @@ function applyReduceMotion(on) {
     } catch (e) { /* no cache yet, or it's corrupt — fine, defaults apply */ }
 })();
 
+/* Link style for @mentions, injected here so it works on every page that
+   loads api.js (homepage, profile, notifications, ...). */
+(function injectMentionStyle() {
+    const s = document.createElement("style");
+    s.textContent = "a.mention{color:#c9a227;font-weight:600;text-decoration:none}a.mention:hover{text-decoration:underline}";
+    document.head.appendChild(s);
+})();
+
 
 async function apiRequest(url, options = {}) {
     let response;
@@ -100,6 +108,49 @@ const Planora = (() => {
         const div = document.createElement("div");
         div.textContent = str ?? "";
         return div.innerHTML;
+    }
+
+    /* Escapes text, then turns confirmed @mentions into profile links
+       (HTML string version). `mentions` is the array the server sends back
+       on comments/events - only those names get linked. */
+    function renderMentions(text, mentions = []) {
+        const safe = escapeHTML(text);
+        const names = new Set((mentions || []).map(n => n.toLowerCase()));
+        if (!names.size) return safe;
+        return safe.replace(/(^|[^\w@.])@([A-Za-z0-9_.]{3,40})/g, (whole, lead, raw) => {
+            let name = raw;
+            if (!names.has(name.toLowerCase())) name = raw.replace(/\.+$/, "");
+            if (!names.has(name.toLowerCase())) return whole;
+            const trailing = raw.slice(name.length);
+            return `${lead}<a class="mention" href="profile.html?u=${encodeURIComponent(name)}">@${name}</a>${trailing}`;
+        });
+    }
+
+    /* Same idea, DOM version - the one the pages use, since they build
+       everything with textContent instead of innerHTML. Appends `text`
+       into `container`, linking server-confirmed @mentions. */
+    function appendWithMentions(container, text, mentions = [], className = "mention") {
+        text = text || "";
+        const names = new Set((mentions || []).map(n => n.toLowerCase()));
+        const re = /(^|[^\w@.])@([A-Za-z0-9_.]{3,40})/g;
+        let last = 0, match;
+        while ((match = re.exec(text))) {
+            const raw = match[2];
+            let name = raw;
+            if (!names.has(name.toLowerCase())) name = raw.replace(/\.+$/, "");
+            if (!names.has(name.toLowerCase())) continue;
+
+            const at = match.index + match[1].length; // where the "@" is
+            if (at > last) container.appendChild(document.createTextNode(text.slice(last, at)));
+            const a = document.createElement("a");
+            a.className = className;
+            a.href = "profile.html?u=" + encodeURIComponent(name);
+            a.textContent = "@" + name;
+            container.appendChild(a);
+            last = at + 1 + name.length;
+            re.lastIndex = last;
+        }
+        if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
     }
 
     function passwordStrength(password) {
@@ -200,8 +251,9 @@ const Planora = (() => {
 
     /* The discovery directory — everyone on Planora, optionally narrowed
        by a text search and/or a single interest tag. Used by
-       directory.js, and by the "click an interest chip" link on a
-       profile (which just points here with ?interest=<tag>). */
+       directory.js, by the "click an interest chip" link on a
+       profile (which just points here with ?interest=<tag>), and by
+       the @mention autocomplete. */
     async function searchUsers({ q = "", interest = "" } = {}) {
         const params = new URLSearchParams();
         if (q) params.set("q", q);
@@ -292,6 +344,8 @@ const Planora = (() => {
 
     return {
         escapeHTML,
+        renderMentions,
+        appendWithMentions,
         passwordStrength,
         signup,
         login,
@@ -313,7 +367,7 @@ const Planora = (() => {
 
 
 /* =========================
-   EVENTS / COMMENTS
+   EVENTS / COMMENTS / NOTIFICATIONS
 ========================= */
 
 const PlanoraData = (() => {
@@ -401,6 +455,35 @@ const PlanoraData = (() => {
         return apiRequest("/api/stats");
     }
 
+    /* ----- notifications ----- */
+
+    // { notifications: [...], actors: { username: {...} }, unreadCount }
+    async function getNotifications() {
+        return apiRequest("/api/notifications");
+    }
+
+    // just the number - cheap enough for the nav to poll
+    async function getUnreadCount() {
+        const result = await apiRequest("/api/notifications/unread-count");
+        return result.unreadCount;
+    }
+
+    async function markNotificationRead(id) {
+        return apiRequest(`/api/notifications/${id}/read`, { method: "POST" });
+    }
+
+    async function markAllNotificationsRead() {
+        return apiRequest("/api/notifications/read-all", { method: "POST" });
+    }
+
+    async function deleteNotification(id) {
+        return apiRequest(`/api/notifications/${id}`, { method: "DELETE" });
+    }
+
+    async function clearNotifications() {
+        return apiRequest("/api/notifications", { method: "DELETE" });
+    }
+
     return {
         getEvents,
         addEvent,
@@ -413,7 +496,13 @@ const PlanoraData = (() => {
         addComment,
         deleteComment,
         editComment,
-        getStats
+        getStats,
+        getNotifications,
+        getUnreadCount,
+        markNotificationRead,
+        markAllNotificationsRead,
+        deleteNotification,
+        clearNotifications
     };
 
 })();
