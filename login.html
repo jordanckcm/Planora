@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
     <title>Planora</title>
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="login.css">
@@ -100,6 +101,9 @@
                 <!-- ================= LOGIN ================= -->
                 <form class="auth-form active" id="loginForm" autocomplete="off" novalidate>
 
+                    <h2 class="auth-title">Welcome back</h2>
+                    <p class="auth-sub">Pick up where your plans left off.</p>
+
                     <label class="field-label" for="loginUsername">Username</label>
                     <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
 
@@ -122,6 +126,9 @@
 
                 <!-- ================= SIGN UP ================= -->
                 <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
+
+                    <h2 class="auth-title">Join Planora</h2>
+                    <p class="auth-sub">Make plans, share them, show up.</p>
 
                     <label class="field-label" for="signupDisplayName">Display name</label>
                     <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
