@@ -225,6 +225,78 @@ function render() {
     renderEvents();
 }
 
+function renderFriendButton() {
+    const btn = $("friendButton");
+    if (profile.isSelf) {
+        btn.hidden = true;
+        return;
+    }
+    btn.hidden = false;
+    btn.disabled = false;
+
+    const status = profile.friendStatus;
+
+    if (status === "friends") {
+        btn.textContent = "Friends ✓";
+        btn.onclick = async () => {
+            const confirmed = await confirmAction({
+                title: "Unfriend?",
+                message: `Remove ${profile.displayName} from your friends?`,
+                confirmLabel: "Unfriend"
+            });
+            if (!confirmed) return;
+            try {
+                await api(`/api/friends/${encodeURIComponent(profile.username)}`, { method: "DELETE" });
+                profile.friendStatus = "none";
+                renderFriendButton();
+                toast("Unfriended.");
+            } catch (err) {
+                toast(err.message, "error");
+            }
+        };
+    } else if (status === "pending_outgoing") {
+        btn.textContent = "Request sent";
+        btn.onclick = async () => {
+            try {
+                await api(`/api/friends/${encodeURIComponent(profile.username)}`, { method: "DELETE" });
+                profile.friendStatus = "none";
+                renderFriendButton();
+                toast("Request canceled.");
+            } catch (err) {
+                toast(err.message, "error");
+            }
+        };
+    } else if (status === "pending_incoming") {
+        btn.textContent = "Accept request";
+        btn.onclick = async () => {
+            btn.disabled = true;
+            try {
+                await api(`/api/friends/accept/${encodeURIComponent(profile.username)}`, { method: "POST" });
+                profile.friendStatus = "friends";
+                renderFriendButton();
+                toast(`You and ${profile.displayName} are now friends.`, "success");
+            } catch (err) {
+                toast(err.message, "error");
+                btn.disabled = false;
+            }
+        };
+    } else {
+        btn.textContent = "Add friend";
+        btn.onclick = async () => {
+            btn.disabled = true;
+            try {
+                const result = await api(`/api/friends/request/${encodeURIComponent(profile.username)}`, { method: "POST" });
+                profile.friendStatus = result.status;
+                renderFriendButton();
+                toast(result.status === "friends" ? "You're now friends." : "Friend request sent.");
+            } catch (err) {
+                toast(err.message, "error");
+                btn.disabled = false;
+            }
+        };
+    }
+}
+
 function renderEvents() {
     const grid = $("eventGrid");
     grid.textContent = "";
