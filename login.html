@@ -3,103 +3,166 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="color-scheme" content="dark">
     <title>Planora</title>
     <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="login.css">
 </head>
 <body>
-    <div class="bg-art"></div>
-    <div class="lg-top">Planora</div>
+    <div class="random-number-clip">
+        <div class="random-number" id="randomNumberone">0000</div>
+    </div>
+    <div class="table-glow"></div>
 
-    <div class="auth-shell">
-        <div class="auth-card" data-view="home">
+    <div class="auth-page">
+
+        <!-- ================= PINTEREST-STYLE BOARD (wide screens only) ================= -->
+        <div class="pin-board">
+            <div class="pin-columns">
+
+                <div class="pin-card dark h-md">
+                    <div class="pin-caption pin-caption-solo">
+                        <div class="pin-title">Plan it once.<br>Show up for everyone.</div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-lg">
+                    <div class="pin-photo pin-photo-1"><span class="pin-chip">Fri</span></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Rooftop movie night</div>
+                        <div class="pin-meta">Fri · 8:00 PM</div>
+                        <div class="pin-foot"><span class="pin-avatars"><i></i><i></i><i></i></span><span>12 going</span></div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-sm">
+                    <div class="pin-photo pin-photo-2"><span class="pin-chip">Daily</span></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Morning run club</div>
+                        <div class="pin-meta">Daily · 6:30 AM</div>
+                        <div class="pin-foot"><span class="pin-avatars"><i></i><i></i><i></i></span><span>8 going</span></div>
+                    </div>
+                </div>
+
+                <div class="pin-card dark h-lg">
+                    <div class="pin-photo pin-photo-3"><span class="pin-chip">Thu</span></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Open mic night</div>
+                        <div class="pin-meta">Thu · The Landing</div>
+                        <div class="pin-foot"><span class="pin-avatars"><i></i><i></i><i></i></span><span>24 going</span></div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-md">
+                    <div class="pin-photo pin-photo-4"><span class="pin-chip">Sat</span></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Farmers market walk</div>
+                        <div class="pin-meta">Sat · 9:00 AM</div>
+                        <div class="pin-foot"><span class="pin-avatars"><i></i><i></i><i></i></span><span>15 going</span></div>
+                    </div>
+                </div>
+
+                <div class="pin-card dark h-sm">
+                    <div class="pin-caption pin-caption-solo">
+                        <div class="pin-title">Never double-book again.</div>
+                    </div>
+                </div>
+
+                <div class="pin-card light h-lg">
+                    <div class="pin-photo pin-photo-5"><span class="pin-chip">Sat</span></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Game night @ Jordan's</div>
+                        <div class="pin-meta">Sat · 7:00 PM</div>
+                        <div class="pin-foot"><span class="pin-avatars"><i></i><i></i><i></i></span><span>6 going</span></div>
+                    </div>
+                </div>
+
+                <div class="pin-card dark h-md">
+                    <div class="pin-photo pin-photo-6"><span class="pin-chip">Tue</span></div>
+                    <div class="pin-caption">
+                        <div class="pin-title">Study group — Rm 204</div>
+                        <div class="pin-meta">Tue · 4:00 PM</div>
+                        <div class="pin-foot"><span class="pin-avatars"><i></i><i></i><i></i></span><span>5 going</span></div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="auth-shell">
 
             <div class="auth-brand">
+                <div class="brand-mark"></div>
                 <div class="brand-name">Planora</div>
                 <div class="brand-tag">Never miss a moment.</div>
             </div>
 
-            <!-- ================= HOME (desktop) ================= -->
-            <div class="auth-home">
-                <p class="auth-lead">Plan it once. Show up for everyone.</p>
-                <button type="button" class="auth-btn primary" data-go="signup">Create account</button>
-                <button type="button" class="auth-btn" data-go="login">Login</button>
+            <div class="auth-card">
+
+                <div class="auth-tabs">
+                    <button class="auth-tab active" data-tab="login">Sign in</button>
+                    <button class="auth-tab" data-tab="signup">Create account</button>
+                </div>
+
+                <!-- ================= LOGIN ================= -->
+                <form class="auth-form active" id="loginForm" autocomplete="off" novalidate>
+
+                    <label class="field-label" for="loginUsername">Username</label>
+                    <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
+
+                    <label class="field-label" for="loginPassword">Password</label>
+                    <div class="password-wrap">
+                        <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
+                        <button type="button" class="reveal-toggle" data-target="loginPassword">Show</button>
+                    </div>
+
+                    <label class="remember-row">
+                        <input type="checkbox" id="rememberMe" checked>
+                        <span>Keep me signed in on this device</span>
+                    </label>
+
+                    <div class="form-error" id="loginError"></div>
+
+                    <button type="submit" class="btn btn-solid auth-submit" id="loginSubmit">Sign in</button>
+
+                </form>
+
+                <!-- ================= SIGN UP ================= -->
+                <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
+
+                    <label class="field-label" for="signupDisplayName">Display name</label>
+                    <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
+
+                    <label class="field-label" for="signupUsername">Username</label>
+                    <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Letters, numbers, . and _" autocomplete="username" required>
+
+                    <label class="field-label" for="signupPassword">Password</label>
+                    <div class="password-wrap">
+                        <input class="field-input" id="signupPassword" name="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required>
+                        <button type="button" class="reveal-toggle" data-target="signupPassword">Show</button>
+                    </div>
+                    <div class="strength-hint" id="strengthHint">Mix letters and numbers, 8+ characters.</div>
+
+                    <div class="form-error" id="signupError"></div>
+
+                    <button type="submit" class="btn btn-solid auth-submit" id="signupSubmit">Create account</button>
+
+                </form>
+
+                <p class="auth-footnote">
+                    Accounts and stuff are saved in a list, there's no actual database yet.
+                </p>
+
             </div>
 
-            <!-- ================= LOGIN ================= -->
-            <form class="auth-form" id="loginForm" autocomplete="off" novalidate>
-                <h2 class="auth-title">Welcome back</h2>
-
-                <label class="field-label" for="loginUsername">Username</label>
-                <input class="field-input" id="loginUsername" name="username" type="text" placeholder="e.g. sable" autocomplete="username" required>
-
-                <label class="field-label" for="loginPassword">Password</label>
-                <div class="password-wrap">
-                    <input class="field-input" id="loginPassword" name="password" type="password" placeholder="Enter your password" autocomplete="current-password" required>
-                    <button type="button" class="reveal-toggle" data-target="loginPassword">Show</button>
-                </div>
-
-                <label class="remember-row">
-                    <input type="checkbox" id="rememberMe" checked>
-                    <span>Keep me signed in on this device</span>
-                </label>
-
-                <div class="form-error" id="loginError"></div>
-
-                <button type="submit" class="btn btn-solid auth-submit" id="loginSubmit">Sign in</button>
-
-                <p class="auth-switch">Need an account? <button type="button" class="auth-link" data-go="signup">Register</button></p>
-                <button type="button" class="auth-link auth-back" data-go="home">← Back</button>
-            </form>
-
-            <!-- ================= SIGN UP ================= -->
-            <form class="auth-form" id="signupForm" autocomplete="off" novalidate>
-                <h2 class="auth-title">Create an account</h2>
-
-                <label class="field-label" for="signupDisplayName">Display name</label>
-                <input class="field-input" id="signupDisplayName" name="displayName" type="text" placeholder="What should people see?" maxlength="40">
-
-                <label class="field-label" for="signupUsername">Username</label>
-                <input class="field-input" id="signupUsername" name="username" type="text" placeholder="Letters, numbers, . and _" autocomplete="username" required>
-
-                <label class="field-label" for="signupPassword">Password</label>
-                <div class="password-wrap">
-                    <input class="field-input" id="signupPassword" name="password" type="password" placeholder="At least 8 characters" autocomplete="new-password" required>
-                    <button type="button" class="reveal-toggle" data-target="signupPassword">Show</button>
-                </div>
-                <div class="strength-hint" id="strengthHint">Mix letters and numbers, 8+ characters.</div>
-
-                <div class="form-error" id="signupError"></div>
-
-                <button type="submit" class="btn btn-solid auth-submit" id="signupSubmit">Create account</button>
-
-                <p class="auth-switch">Already have an account? <button type="button" class="auth-link" data-go="login">Log in</button></p>
-                <button type="button" class="auth-link auth-back" data-go="home">← Back</button>
-            </form>
-
-            <p class="auth-footnote">
-                Accounts and stuff are saved in a list, there's no actual database yet.
-            </p>
-
         </div>
+
     </div>
 
     <div class="toast-stack" id="toastStack"></div>
 
     <script src="api.js"></script>
     <script src="login.js"></script>
-    <script>
-        // switches between home / login / signup (login.js handles the actual sign in)
-        const card = document.querySelector(".auth-card");
-        const views = { login: document.getElementById("loginForm"), signup: document.getElementById("signupForm") };
-        function go(view) {
-            card.dataset.view = view;
-            Object.entries(views).forEach(([name, form]) => form.classList.toggle("active", name === view));
-        }
-        document.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => go(b.dataset.go)));
-        go(matchMedia("(max-width: 600px)").matches ? "login" : "home");
-    </script>
+    <script src="numchange.js"></script>
 
 </body>
 </html>
