@@ -84,7 +84,11 @@
 
             <!-- EVENTS -->
             <section class="events-section">
-                <div class="events-heading">Events</div>
+                <div class="events-tabs" id="eventsTabs">
+                    <button type="button" class="events-tab active" data-tab="public">Public</button>
+                    <button type="button" class="events-tab" data-tab="global">Global</button>
+                    <button type="button" class="events-tab" data-tab="private" id="privateTab" hidden>Private</button>
+                </div>
                 <p class="tab-note" id="tabNote"></p>
                 <div class="event-grid" id="eventGrid"></div>
             </section>
