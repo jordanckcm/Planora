@@ -45,8 +45,16 @@
     <link rel="stylesheet" href="homepage-readability-qol.css">
     <link rel="stylesheet" href="settings.css">
     <link rel="stylesheet" href="planora-shell.css">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0a">
 </head>
 
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
+    
 <body>
 
     <!-- TOP BAR -->
