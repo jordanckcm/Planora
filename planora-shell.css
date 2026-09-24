@@ -1,6 +1,11 @@
 /* PLANORA — SHELL (load LAST on every page)
    One font, burger nav, Instagram-style feed + profile. */
 
+@font-face {
+    font-family: "Gotham";
+    src: url(fonts/Gotham.ttf);
+}
+
 :root {
     --pl-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial,
                sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
@@ -27,7 +32,8 @@
 }
 .pl-brand {
     color: var(--text, #fff); text-decoration: none;
-    font-size: 18px; font-weight: 800; letter-spacing: 0.14em;
+    font-family: "Gotham", var(--pl-font) !important;
+    font-size: 18px; font-weight: 400; letter-spacing: 0.14em;
 }
 .pl-burger {
     display: flex; flex-direction: column; justify-content: center; gap: 5px;
@@ -76,8 +82,10 @@ body.feed-on .search-bar, body.feed-on .month-wrapper, body.feed-on .timeline-co
     width: 34px; height: 34px; border-radius: 50%;
     color: #fff; font-size: 13px; font-weight: 700; text-decoration: none;
 }
-.post-who { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text, #fff); text-decoration: none; }
+.post-names { display: flex; flex: 1; flex-direction: column; min-width: 0; }
+.post-who { font-size: 14px; font-weight: 600; color: var(--text, #fff); text-decoration: none; }
 .post-who:hover { text-decoration: underline; }
+.post-handle { font-size: 12px; color: var(--text-faint, #888); }
 .post-time { font-size: 12px; color: var(--text-faint, #888); }
 .post-tag { padding: 1px 7px; border: 1px solid var(--border-strong, #444); border-radius: 999px; font-size: 10px; color: var(--text-dim, #aaa); }
 .post-media {
@@ -91,8 +99,9 @@ body.feed-on .search-bar, body.feed-on .month-wrapper, body.feed-on .timeline-co
 }
 .post-btn:hover { background: color-mix(in srgb, var(--text, #fff) 8%, transparent); }
 .post-btn.done { color: #9fd89f; border-color: rgba(72, 156, 72, 0.5); cursor: default; }
-.post-body { padding: 8px 12px 12px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
-.post-body b { margin-right: 6px; }
+.post-body { padding: 0 12px 12px; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.post-title { font-size: 16px; font-weight: 700; }
+.post-desc { margin-top: 2px; color: var(--text-dim, #aaa); }
 .post-when { margin-top: 4px; font-size: 12px; color: var(--text-faint, #888); }
 .post-comments { padding: 0 12px 12px; border-top: 1px solid var(--border, #2a2a2a); }
 .post-comment { padding-top: 8px; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
