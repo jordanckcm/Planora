@@ -100,9 +100,11 @@
         Planora.appendWithMentions(container, text, mentions, "cm-mention");
     }
 
-    function paintAv(node, image, color, name) {
+    // position defaults to dead center when none is on record
+    function paintAv(node, image, color, name, position) {
         if (image) {
-            node.style.background = `center / cover no-repeat url("${image}")`;
+            const pos = position || { x: 50, y: 50 };
+            node.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${image}")`;
         } else {
             node.style.background = `linear-gradient(135deg, ${color || EVENT_COLORS[0]}, #1b1b1b)`;
             node.textContent = (name || "?").charAt(0).toUpperCase();
@@ -117,7 +119,8 @@
         const avatar = el("a", "post-avatar");
         avatar.href = profileUrl(p.owner);
         if (p.ownerAvatarImage) {
-            avatar.style.background = `center / cover no-repeat url("${p.ownerAvatarImage}")`;
+            const pos = p.ownerAvatarPosition || { x: 50, y: 50 };
+            avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${p.ownerAvatarImage}")`;
         } else {
             avatar.style.background = `linear-gradient(135deg, ${p.ownerAvatarColor}, #1b1b1b)`;
             avatar.textContent = (p.ownerDisplayName || p.owner).charAt(0).toUpperCase();
@@ -261,7 +264,7 @@
 
             const av = el("a", "cm-avatar");
             av.href = profileUrl(c.author);
-            paintAv(av, c.authorAvatarImage, c.authorAvatarColor, c.authorDisplayName || c.author);
+            paintAv(av, c.authorAvatarImage, c.authorAvatarColor, c.authorDisplayName || c.author, c.authorAvatarPosition);
 
             const line = el("div", "cm-line");
             const name = el("a", "cm-name", c.author);
@@ -357,7 +360,7 @@
 
         const form = el("div", "post-composer");
         const me = el("span", "cm-avatar");
-        paintAv(me, currentUser.avatarImage, currentUser.avatarColor, currentUser.displayName || currentUser.username);
+        paintAv(me, currentUser.avatarImage, currentUser.avatarColor, currentUser.displayName || currentUser.username, currentUser.avatarPosition);
         input.placeholder = "Add a comment...";
         input.maxLength = 240;
         const send = el("button", "post-btn", "Post");
@@ -425,7 +428,8 @@
         const avatar = el("a", "post-avatar");
         avatar.href = profileUrl(post.owner);
         if (post.ownerAvatarImage) {
-            avatar.style.background = `center / cover no-repeat url("${post.ownerAvatarImage}")`;
+            const pos = post.ownerAvatarPosition || { x: 50, y: 50 };
+            avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${post.ownerAvatarImage}")`;
         } else {
             avatar.style.background = `linear-gradient(135deg, ${post.ownerAvatarColor}, #1b1b1b)`;
             avatar.textContent = (post.ownerDisplayName || post.owner).charAt(0).toUpperCase();
