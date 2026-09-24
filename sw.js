@@ -13,7 +13,7 @@
 ========================================================= */
 
 // Bump this number whenever you want every visitor's old cache thrown away.
-const CACHE_NAME = "planora-shell-v2";
+const CACHE_NAME = "planora-shell-v3";
 
 // Best-effort list. Anything that 404s here is just skipped —
 // it won't stop the rest of the shell from being cached, and
@@ -30,20 +30,31 @@ const PRECACHE_URLS = [
     "/homepage.html",
     "/homepage.css",
     "/homepage-extra.css",
+    "/homepage-readability-qol.css",
     "/homepage.js",
     "/mode-effects.js",
+    "/planora-ui.css",
+    "/planora-shell.css",
+    "/planora-nav.js",
+    "/settings.css",
+    "/settings.js",
+    "/feed.js",
     "/profile.html",
     "/profile.css",
     "/profile.js",
     "/admin.html",
     "/admin.css",
     "/admin.js",
+    "/directory.html",
+    "/directory.css",
+    "/directory.js",
     "/fonts/Gotham.ttf",
     "/fonts/vhs-gothic.ttf",
     "/fonts/BelieveStrongerPersonalUseOnlyRegular-aYdXK.ttf",
     "/fonts/StarShieldV2-9M52K.ttf",
     "/fonts/Gothikka.ttf",
-    "/icons/planora.png"
+    "/icon-192.png",
+    "/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -91,7 +102,9 @@ self.addEventListener("fetch", (event) => {
     if (url.pathname.startsWith("/api/")) return;
 
     const isStaticAsset =
-        url.pathname.startsWith("/fonts/") || url.pathname.startsWith("/icons/");
+        url.pathname.startsWith("/fonts/") ||
+        url.pathname === "/icon-192.png" ||
+        url.pathname === "/icon-512.png";
 
     if (isStaticAsset) {
         // cache first: fonts and icons don't change
