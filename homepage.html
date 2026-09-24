@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
     <title>Planora</title>
     <link rel="icon" type="image/png"
@@ -49,12 +49,6 @@
     <meta name="theme-color" content="#0a0a0a">
 </head>
 
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js');
-        }
-    </script>
-    
 <body>
 
     <!-- TOP BAR -->
@@ -288,6 +282,12 @@
     <script src="mode-effects.js"></script>
     <script src="planora-nav.js"></script>
     <script src="feed.js"></script>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/sw.js');
+        }
+    </script>
 
 </body>
 
