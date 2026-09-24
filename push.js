@@ -10,7 +10,7 @@
     disable()            unsubscribe this device
     sync()               call on every page load once signed in: re-registers this
                          device (the server forgets everyone when it restarts)
-    logoutCleanup()      call right BEFORE fetch("/api/logout"); returns the body to send
+    logoutCleanup()      (not needed anymore - logging out through Planora.logout() cleans up by itself)
     sendTest()           asks the server to push a test notification to your devices
 
   Events on window:
@@ -137,6 +137,30 @@
     return {};
   }
 
+  // Runs automatically before every log out (see the wrap below): this device stops
+  // receiving the signed-out person's notifications.
+  async function beforeLogout() {
+    try {
+      const sub = await currentSubscription();
+      if (sub) {
+        try { await post("/api/push/unsubscribe", { endpoint: sub.endpoint }); } catch (e) {}
+        await sub.unsubscribe();
+      }
+    } catch (e) { /* never block a logout */ }
+  }
+
+  // Every logout button calls Planora.logout(), so wrapping it once here covers all of them.
+  try {
+    if (typeof Planora !== "undefined" && typeof Planora.logout === "function" && !Planora.logout.__push) {
+      const originalLogout = Planora.logout;
+      Planora.logout = async function () {
+        await beforeLogout();
+        return originalLogout.apply(this, arguments);
+      };
+      Planora.logout.__push = true;
+    }
+  } catch (e) { /* Planora not loaded on this page - nothing to wrap */ }
+
   async function sendTest() {
     return post("/api/push/test", {});
   }
@@ -149,5 +173,5 @@
     });
   }
 
-  window.PlanoraPush = { supported, needsInstall, status, enable, disable, sync, logoutCleanup, sendTest };
+  window.PlanoraPush = { supported, needsInstall, status, enable, disable, sync, logoutCleanup, beforeLogout, sendTest };
 })();
