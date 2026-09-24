@@ -97,6 +97,7 @@
         { key: "timeline", label: "Timeline" },
         { divider: true },
         { key: "discover", label: "Discover" },
+        { key: "friends", label: "Friends" },
         { key: "notifications", label: "Notifications" },
         { key: "profile", label: "My profile" }
     ];
