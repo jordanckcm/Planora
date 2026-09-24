@@ -1274,7 +1274,8 @@ async function buildEventCard(event) {
     avatar.className = "event-avatar";
     const ownerInitial = (event.ownerDisplayName || event.owner || "?").charAt(0).toUpperCase();
     if (event.ownerAvatarImage) {
-        avatar.style.background = `center / cover no-repeat url("${event.ownerAvatarImage}")`;
+        const pos = event.ownerAvatarPosition || { x: 50, y: 50 };
+        avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${event.ownerAvatarImage}")`;
     } else {
         avatar.style.background = `linear-gradient(135deg, ${event.ownerAvatarColor || EVENT_COLORS[0]}, #1b1b1b)`;
         avatar.textContent = ownerInitial;
@@ -1442,7 +1443,8 @@ async function buildComments(event) {
         avatar.title = displayName;
         avatar.setAttribute("aria-label", `View @${comment.author}'s profile`);
         if (comment.authorAvatarImage) {
-            avatar.style.background = `center / cover no-repeat url("${comment.authorAvatarImage}")`;
+            const pos = comment.authorAvatarPosition || { x: 50, y: 50 };
+            avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${comment.authorAvatarImage}")`;
         } else {
             avatar.style.background = `linear-gradient(135deg, ${comment.authorAvatarColor || EVENT_COLORS[0]}, #1b1b1b)`;
             avatar.textContent = displayName.charAt(0).toUpperCase();
