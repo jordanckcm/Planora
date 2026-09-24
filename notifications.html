@@ -1,20 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Notifications · Planora</title>
 <meta name="color-scheme" content="dark">
+<title>Notifications · Planora</title>
+<script>
+    // force dark, and undo anything that tries to change it later
+    (function () {
+        const root = document.documentElement;
+        const force = () => { if (root.getAttribute("data-theme") !== "dark") root.setAttribute("data-theme", "dark"); };
+        force();
+        new MutationObserver(force).observe(root, { attributes: true, attributeFilter: ["data-theme"] });
+    })();
+</script>
 <style>
-    :root { color-scheme: dark; --nt-bg:#131313; --nt-card:#1b1b1b; --nt-text:#f2f2f2; --nt-dim:rgba(255,255,255,.6); --nt-line:rgba(255,255,255,.1); --nt-accent:#c9a227; }
-    body { margin:0; background:var(--nt-bg); color:var(--nt-text); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
-    /* ...rest of your existing rules (.nt-wrap, .nt-top, etc.) stay exactly the same... */
-</style>
-<style>
-    :root { --nt-bg:#131313; --nt-card:#1b1b1b; --nt-text:#f2f2f2; --nt-dim:rgba(255,255,255,.6); --nt-line:rgba(255,255,255,.1); --nt-accent:#c9a227; }
-    @media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) { --nt-bg:#f5f5f5; --nt-card:#fff; --nt-text:#161616; --nt-dim:rgba(0,0,0,.6); --nt-line:rgba(0,0,0,.1); } }
-    :root[data-theme="light"] { --nt-bg:#f5f5f5; --nt-card:#fff; --nt-text:#161616; --nt-dim:rgba(0,0,0,.6); --nt-line:rgba(0,0,0,.1); }
-    body { margin:0; background:var(--nt-bg); color:var(--nt-text); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+    :root, :root[data-theme="light"], :root[data-theme="dark"] {
+        color-scheme: dark;
+        --nt-bg:#131313; --nt-card:#1b1b1b; --nt-text:#f2f2f2;
+        --nt-dim:rgba(255,255,255,.6); --nt-line:rgba(255,255,255,.1); --nt-accent:#c9a227;
+    }
+    html, body { background:var(--nt-bg) !important; color:var(--nt-text); }
+    body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
     .nt-wrap { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
     .nt-top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
     .nt-top h1 { margin:0; font-size:24px; }
