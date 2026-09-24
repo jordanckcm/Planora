@@ -26,10 +26,23 @@
         })();
     </script>
 
+    <!-- FIX: base.css was never loaded on this page. It's where --panel,
+         --border, --text, --text-dim, --text-faint, --gold, --green, --red
+         etc. are actually DEFINED for dark mode — theme.css only overrides
+         them for light mode and assumes base.css already ran first. Without
+         it, every var() that settings.css/settings.js relies on was
+         undefined here, which is why the Settings overlay only rendered
+         correctly from profile.html (which does load base.css) and looked
+         broken/washed-out when opened from the homepage. -->
+    <link rel="stylesheet" href="base.css">
     <link rel="stylesheet" href="theme.css">
     <link rel="stylesheet" href="homepage.css">
     <link rel="stylesheet" href="homepage-extra.css">
     <link rel="stylesheet" href="planora-ui.css">
+    <!-- FIX: this file existed on disk but was never linked anywhere, so
+         none of its rules — including the scroll-to-top button's actual
+         look (the chevron with no styling you saw) — ever applied. -->
+    <link rel="stylesheet" href="homepage-readability-qol.css">
     <link rel="stylesheet" href="settings.css">
 </head>
 
@@ -83,10 +96,6 @@
 
     </div>
 
-    <!-- Was a 5th button crammed into .topbar (profile, Local, Global,
-         Timeline, Today) — on narrow screens that row ran wider than the
-         viewport and became horizontally drag-scrollable. Docked here
-         instead, in normal flow, so it can't cause that again. -->
     <div class="today-row">
         <button class="today-pill" id="todayButton">
             Today
