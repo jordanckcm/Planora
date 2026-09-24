@@ -131,7 +131,7 @@ from functools import wraps
 from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, available_timezones
 
-from flask import Flask, request, jsonify, session, Response, has_request_context
+from flask import Flask, request, jsonify, session, Response, has_request_context, redirect, make_response
 from itsdangerous import URLSafeTimedSerializer, BadSignature
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -1096,7 +1096,24 @@ def get_feed():
 
 @app.route("/")
 def serve_home_page():
-    return app.send_static_file("index.html")
+    """
+    The front door. index.html is the onboarding page, which only makes sense
+    the first time someone sees Planora:
+        signed in                     -> straight to the homepage
+        seen onboarding before        -> straight to login
+        brand-new visitor             -> onboarding (and we remember they saw it)
+    Visit /?intro=1 any time to see the onboarding again.
+    """
+    if get_logged_in_user():
+        return redirect("/homepage.html")
+
+    if request.args.get("intro") is None and request.cookies.get("planora_seen_intro"):
+        return redirect("/login.html")
+
+    response = make_response(app.send_static_file("index.html"))
+    response.set_cookie("planora_seen_intro", "1", max_age=365 * 24 * 3600, samesite="Lax")
+    response.headers["Cache-Control"] = "no-cache"   # never let the browser skip this check
+    return response
 
 
 @app.route("/api/signup", methods=["POST"])
