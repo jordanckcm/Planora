@@ -1,34 +1,8 @@
 /* =========================================================
    PLANORA — READABILITY + QOL PASS
-   Paste at the very bottom of homepage-extra.css, AFTER the
-   "homepage-social-additions.css" block you pasted last time.
-
-   WHAT THIS DOES
-   1. Swaps the decorative VHS font out of anything you have to
-      actually read at length — comments, replies, descriptions,
-      buttons, inputs — for a clean system UI font, the same
-      family Discord/Instagram fall back to on every platform.
-      VHS/Gotham/StarShield stay exactly where they add
-      personality: the giant year, month headers, stat numbers,
-      the "Create event" title.
-   2. Restyles comments Discord-style: bigger avatar, name +
-      timestamp on their own line, message text below it, a
-      hover highlight per row, and a left rule marking replies
-      instead of just an indent.
-   3. Small QoL touches to match: a growing comment box, a
-      character counter, a "scroll to top" button, and a
-      posting/creating disabled state on the two forms
-      (homepage.js already drives these — this just styles them).
 ========================================================= */
 
 :root {
-    /* Same stack planora-ui.css already imports and loads (Noto Sans /
-       Open Sans, the free faces closest to Discord's own gg sans) —
-       reusing --font-discord here instead of a second, unloaded stack
-       means this actually renders the intended look instead of quietly
-       falling back to whatever generic font the OS picks. Falls back to
-       the plain system stack only if planora-ui.css isn't loaded on a
-       given page. */
     --font-ui: var(--font-discord, "gg sans", "Noto Sans", "Open Sans",
                     -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
                     Helvetica, Arial, sans-serif,
@@ -38,26 +12,12 @@
 
 /* =========================
    1. FONT SWAP
-   Same selectors homepage.css / homepage-extra.css / the social
-   additions used to set font-family: "VHS" (or nothing, inheriting
-   it from the page-wide `* { font-family: "VHS" }`). Redeclaring
-   them here — after those files load — wins on source order.
-   Gotham/StarShield selectors are deliberately left out, so
-   headings and the year keep their look.
 ========================= */
 
 * {
     font-family: var(--font-ui);
 }
 
-/* FIX: the blanket `* { font-family: var(--font-ui); }` reset above has
-   ZERO specificity (the universal selector always does), so base.css's
-   plain `button { font-family: "VHS"; }` — an element selector, which
-   carries real specificity — always won regardless of load order. That's
-   why the topbar (← Calendar / Discover / Settings / Log out, and the
-   Local/Global/Timeline pills, all real <button> elements) stayed in the
-   pixel font. These class selectors carry more specificity than a bare
-   `button`, so they actually take effect. */
 .custom-button,
 .back-button,
 .logout-button,
@@ -112,10 +72,6 @@
     font-family: var(--font-ui);
 }
 
-/* A clean UI font reads fine several sizes smaller than a display
-   font does, but VHS was being propped up with slightly larger
-   sizes to stay legible. A couple of spots can come back down/up
-   to what actually looks balanced now. */
 .event-title {
     font-size: 15px;
     font-weight: 600;
@@ -133,8 +89,6 @@
 
 /* =========================
    2. COMMENTS — DISCORD LAYOUT
-   Avatar left, a name+timestamp row, message text on its own
-   line below. Replaces the previous single inline line.
 ========================= */
 
 .comment-list {
@@ -156,11 +110,10 @@
 }
 
 .comment:hover {
-    background: rgba(255, 255, 255, 0.035);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.035). */
+    background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
-/* the ⋮ menu was positioned by normal flow before; now that .comment
-   hover has padding of its own, nudge it back to align with the text */
 .comment-menu-button-wrap {
     order: 3;
     margin-left: auto;
@@ -181,29 +134,34 @@
     font-size: 10.5px;
 }
 
-/* everything after the avatar stacks into two lines instead of one */
 .comment-body {
     display: block;
     flex: 1;
     min-width: 0;
 }
 
+/* FIX: this was hardcoded to white, overriding the theme-aware color
+   homepage-extra.css sets — since this file loads after that one, this
+   was the copy actually reaching the page, and it broke comment author
+   names in light mode. */
 .comment-author {
     font-size: 13px;
     font-weight: 600;
-    color: white;
+    color: var(--text);
     margin-right: 8px;
 }
 
+/* FIX: was hardcoded rgba(255, 255, 255, 0.38), same override problem. */
 .comment-time {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.38);
+    color: var(--text-faint);
 }
 
 .comment-text {
     display: block;
     margin-top: 2px;
-    color: rgba(255, 255, 255, 0.82);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.82). */
+    color: var(--text-dim);
 }
 
 .comment-edited {
@@ -223,9 +181,6 @@
     opacity: 1;
 }
 
-/* replies get a connecting rule instead of relying on indent alone —
-   easier to trace which top-level comment a reply belongs to at a
-   glance, the same trick Discord/Slack threads use */
 .comment.comment-reply {
     margin-left: 0;
     padding-left: 46px;
@@ -239,17 +194,13 @@
     top: 0;
     bottom: 0;
     width: 2px;
-    background: rgba(255, 255, 255, 0.08);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.08). */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 
 /* =========================
    3. COMMENT COMPOSER
-   Same idle size and pill shape as the old single-line input
-   (34px tall, 20px radius) — it just also grows automatically
-   once what you're typing needs more than one line.
-   homepage.js drives the actual resizing; this sets the numbers
-   it's resizing between.
 ========================= */
 
 .comment-form {
@@ -270,8 +221,6 @@ textarea.comment-input {
     min-height: 34px;
     max-height: 120px;
 
-    /* 7px top/bottom + a 20px line-height = 34px total on one line,
-       matching the old input's fixed height exactly at rest */
     padding: 7px 44px 7px 14px;
 
     border-radius: 20px;
@@ -289,7 +238,8 @@ textarea.comment-input {
     bottom: 8px;
 
     font-size: 9.5px;
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
 
     pointer-events: none;
 }
@@ -310,8 +260,6 @@ textarea.comment-input {
 
 /* =========================
    SCROLL-TO-TOP BUTTON
-   Mirrors the + button on the opposite corner, only shows once
-   you've scrolled down a bit.
 ========================= */
 
 .scroll-top-button {
@@ -327,11 +275,12 @@ textarea.comment-input {
     width: 48px;
     height: 48px;
 
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
     border-radius: 50%;
 
-    background: rgb(30, 30, 30);
-    color: rgba(255, 255, 255, 0.85);
+    /* FIX: was hardcoded rgb(30, 30, 30) / rgba(255, 255, 255, 0.85). */
+    background: var(--panel-raised, rgb(30, 30, 30));
+    color: var(--text-dim);
 
     cursor: pointer;
 
@@ -356,9 +305,10 @@ textarea.comment-input {
 }
 
 .scroll-top-button:hover {
-    background: rgb(38, 38, 38);
+    /* FIX: was hardcoded rgb(38, 38, 38) / white. */
+    background: var(--bg-surface, rgb(38, 38, 38));
     border-color: rgba(var(--accent), 0.55);
-    color: white;
+    color: var(--text);
 
     box-shadow:
         0 8px 26px rgba(0, 0, 0, 0.45),
@@ -372,8 +322,6 @@ textarea.comment-input {
 }
 
 .scroll-top-button svg {
-    /* a hair off-center optically without this — the chevron's own
-       stroke width reads as sitting slightly low otherwise */
     transform: translateY(-1px);
 }
 
@@ -405,15 +353,12 @@ textarea.comment-input {
 
 /* =========================================================
    CONFIRM DIALOG
-   Add on to the bottom of homepage-extra.css, same as the rest
-   of this file. A themed "are you sure?" prompt used before any
-   destructive action — removing an event, a comment, a reply.
 ========================================================= */
 
 .confirm-overlay {
     position: fixed;
     inset: 0;
-    z-index: 400; /* above the event-form's 300 */
+    z-index: 400;
 
     display: flex;
     align-items: center;
@@ -438,8 +383,9 @@ textarea.comment-input {
 
     padding: 22px;
 
-    background: rgb(27, 27, 27);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    /* FIX: was hardcoded rgb(27, 27, 27) / rgba(255, 255, 255, 0.15). */
+    background: var(--panel, rgb(27, 27, 27));
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 14px;
 
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
@@ -457,13 +403,15 @@ textarea.comment-input {
 
     font-family: "Gotham";
     font-size: 15px;
-    color: white;
+    /* FIX: was hardcoded white. */
+    color: var(--text);
 }
 
 .confirm-message {
     font-size: 12.5px;
     line-height: 1.55;
-    color: rgba(255, 255, 255, 0.65);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.65). */
+    color: var(--text-dim);
 }
 
 .confirm-buttons {
@@ -487,8 +435,9 @@ textarea.comment-input {
 }
 
 .confirm-cancel {
-    background: rgb(45, 45, 45);
-    color: white;
+    /* FIX: was hardcoded rgb(45, 45, 45) / white. */
+    background: var(--bg-input-alt, rgb(45, 45, 45));
+    color: var(--text);
 }
 
 .confirm-cancel:hover {
@@ -514,17 +463,6 @@ textarea.comment-input {
 
 /* =========================================================
    CREATE-EVENT FORM — LAYOUT + LIVE PREVIEW
-   Add on to the bottom of homepage-extra.css, same as the rest
-   of this file.
-
-   1. Levels the Name and Date fields — both now have a label
-      above the input, so their inputs sit at the same height.
-   2. Description moved out of "More options" to its own spot,
-      directly under the Name/Date row.
-   3. A live preview card at the very top of the form, updating
-      as you fill things in — no CSS existed for
-      .event-primary-row/.event-primary-field before this, so
-      the two fields were never actually aligned.
 ========================================================= */
 
 .event-primary-row {
@@ -539,9 +477,6 @@ textarea.comment-input {
     min-width: 0;
 }
 
-/* both fields' inputs now start right under a label of the same
-   size, so they land on the same line regardless of which field
-   has more going on above it */
 .event-primary-field .field-label {
     margin-top: 0;
 }
@@ -554,18 +489,14 @@ textarea.comment-input {
     margin-left: 4px;
 
     font-size: 9.5px;
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
 
 
-/* --- Live preview ---
-   The preview is built from the SAME classes buildEventCard() uses for
-   a real card (.event, .event-cover, .event-avatar, .event-title, etc)
-   — see buildPreviewCard() in homepage.js — so it already looks right
-   without redeclaring any of that here. This just labels it and marks
-   it as not-yet-posted. */
+/* --- Live preview --- */
 
 .preview-toggle-button {
     display: flex;
@@ -577,11 +508,12 @@ textarea.comment-input {
     margin-bottom: 12px;
     padding: 0 14px;
 
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
     border-radius: 8px;
 
-    background: rgb(19, 19, 19);
-    color: rgba(255, 255, 255, 0.75);
+    /* FIX: was hardcoded rgb(19, 19, 19) / rgba(255, 255, 255, 0.75). */
+    background: var(--bg-input, rgb(19, 19, 19));
+    color: var(--text-dim);
 
     font-size: 11.5px;
     font-weight: 600;
@@ -593,9 +525,10 @@ textarea.comment-input {
 }
 
 .preview-toggle-button:hover {
-    background: rgba(255, 255, 255, 0.06);
-    border-color: rgba(255, 255, 255, 0.22);
-    color: white;
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.06) / white. */
+    background: color-mix(in srgb, var(--text) 6%, transparent);
+    border-color: color-mix(in srgb, var(--text) 22%, transparent);
+    color: var(--text);
 }
 
 .preview-toggle-icon {
@@ -605,7 +538,7 @@ textarea.comment-input {
 
 .preview-toggle-button.open {
     border-color: rgba(var(--accent), 0.45);
-    color: white;
+    color: var(--text);
 }
 
 .preview-toggle-button.open .preview-toggle-icon {
@@ -616,23 +549,25 @@ textarea.comment-input {
     margin-bottom: 18px;
 }
 
-/* .event's own background is the same color as the modal behind it, so
-   without this the card would be nearly invisible in here - a dashed
-   border also makes it obvious this is a preview, not something already
-   posted. */
 .event-preview-card {
-    background: rgb(22, 22, 22);
-    border: 1px dashed rgba(255, 255, 255, 0.22);
+    /* FIX: was hardcoded rgb(22, 22, 22) / rgba(255, 255, 255, 0.22) —
+       needs to stay visually distinct from a real .event card, which now
+       tracks var(--panel); using --bg-input keeps that same contrast in
+       either theme. */
+    background: var(--bg-input, rgb(22, 22, 22));
+    border: 1px dashed color-mix(in srgb, var(--text) 22%, transparent);
     margin-bottom: 0;
 }
 
 .event-title.placeholder {
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
     font-weight: 400;
 }
 
 .event-date.placeholder {
-    color: rgba(255, 255, 255, 0.3);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.3). */
+    color: var(--text-faint);
 }
 
 @media (max-width: 420px) {
@@ -645,28 +580,20 @@ textarea.comment-input {
 
 /* =========================================================
    EDIT EVENTS + IMAGE REPOSITIONING + GIF SUPPORT
-   Add on to the bottom of homepage-extra.css, same as the rest
-   of this file.
 ========================================================= */
-
-/* --- "EDITED" badge, same shape as the existing NEW badge --- */
 
 .event-edited-badge {
     padding: 2px 7px;
 
     border-radius: 20px;
 
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.5);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.08) / rgba(255,255,255,0.5). */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-dim);
 
     font-size: 8.5px;
     letter-spacing: 0.06em;
 }
-
-/* --- cover image now honors a per-image focal point instead of always
-   cropping dead center — homepage.js sets --cover-position/--tl-position
-   from the event's saved position (or the live drag position in the
-   create/edit form's own preview) --- */
 
 .event-cover.has-image {
     background-position: var(--cover-position, center);
@@ -677,10 +604,7 @@ textarea.comment-input {
 }
 
 
-/* --- drag-to-reposition control ---
-   Sits under the image picker once an image is chosen. Dragging
-   anywhere on the frame moves the focal point; a small crosshair
-   marks exactly where it's currently set to. */
+/* --- drag-to-reposition control --- */
 
 .image-reposition {
     margin-top: 10px;
@@ -694,7 +618,7 @@ textarea.comment-input {
     width: 100%;
     height: 130px;
 
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 8px;
 
     cursor: grab;
@@ -711,7 +635,6 @@ textarea.comment-input {
     inset: 0;
 
     background-size: cover;
-    /* background-position is set inline from JS as the drag moves */
 
     pointer-events: none;
 }
@@ -736,6 +659,7 @@ textarea.comment-input {
     margin-top: 6px;
 
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.4);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.4). */
+    color: var(--text-faint);
     text-align: center;
 }
