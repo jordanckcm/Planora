@@ -8,9 +8,11 @@ made (accounts, events, comments) gets wiped and you start over.
 That's fine for now, it's just for learning / testing.
 
 How to run this:
-    1. pip install -r requirements.txt
-    2. python app.py
-    3. open http://127.0.0.1:5000 in your browser
+    1. pip install -r requirements.txt      (needs flask and pywebpush)
+    2. set SECRET_KEY, PLANORA_ADMIN_PASSWORD, VAPID_PRIVATE_KEY,
+       VAPID_PUBLIC_KEY in your environment (see PUSH below for the keys)
+    3. python app.py
+    4. open http://127.0.0.1:5000 in your browser
 
 ROLES
     community       - default role. Can create local events, up to a cap.
@@ -65,6 +67,39 @@ MENTIONS + NOTIFICATIONS
     up automatically when the event/comment/person they point at is gone.
     A "message" type can be added later the same way.
 
+PUSH NOTIFICATIONS (Web Push)
+    Every in-app notification above can also arrive as a real push on
+    the person's phone / desktop, and events with a start time send a
+    reminder shortly before they begin.
+
+    Keys: run `npx web-push generate-vapid-keys` once, then set
+        VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY (and optionally VAPID_SUBJECT,
+        e.g. "mailto:you@yourdomain.com") in the environment.
+
+    How a push is decided (push_to_user):
+        1. push is on for this person, and this kind (mention / reply /
+           comment / reminder) is on
+        2. not inside their quiet hours (reminders ignore quiet hours -
+           they asked for those)
+        3. under the hourly cap (reminders ignore the cap too)
+        4. they have at least one subscribed device
+    Sending happens on a background thread so a slow push service can
+    never slow down or break a comment request.
+
+    What a push says:
+        mention   "Sam mentioned you in Movie Night"   + comment preview
+        reply     "Sam replied to you in Movie Night"  + comment preview
+        comment   "Sam commented on Movie Night"       + comment preview
+        reminder  "🎉 Movie Night"  /  "Starts in 30 min · 19:00"
+    Previews can be switched off per person ("Tap to open" instead).
+    Pushes about the same event share a tag, so the service worker can
+    collapse a burst into "3 new notifications in Movie Night".
+
+    Per-person settings live in GET/PUT /api/push/preferences.
+    Devices register with POST /api/push/subscribe. Subscriptions are
+    checked so they can only point at real push services (otherwise the
+    server could be tricked into calling arbitrary URLs).
+
 PREFERENCES
     Each account also carries a couple of small client-preference
     fields - theme_preference ("system" | "light" | "dark") and
@@ -77,8 +112,10 @@ import json as json_lib
 import re
 import time
 import os
-from datetime import timedelta
+import threading
+from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse
 from zoneinfo import ZoneInfo, available_timezones
 
 from flask import Flask, request, jsonify, session
@@ -127,11 +164,51 @@ MAX_DIRECTORY_RESULTS = 100
 MAX_NOTIFICATIONS_PER_USER = 100
 MAX_MENTIONS_PER_TEXT = 5
 NOTIFICATION_SNIPPET = 80
-VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
-VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
-VAPID_CLAIMS = {"sub": "mailto:admin@planora.app"}
 # "@name" that isn't glued to a word, "@" or "." - so emails (a@b.com) don't count
 MENTION_PATTERN = re.compile(r"(?<![\w@.])@([A-Za-z0-9_.]{3,40})")
+
+# ---- web push settings ----
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY", "")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY", "")
+VAPID_CLAIMS = {"sub": os.environ.get("VAPID_SUBJECT", "mailto:admin@planora.app")}
+
+# The page a tapped notification opens. "?post=<id>" (and "&comment=<id>")
+# get added. Change this if your feed page has a different name.
+POST_URL = "/homepage.html"
+
+# A subscription's endpoint is a URL the SERVER will POST to, so it must be a
+# real push service. Anything else is rejected (otherwise a signed-in user could
+# make the server call any address they like).
+PUSH_HOSTS = (
+    "fcm.googleapis.com",             # Chrome / Edge / Android / Brave
+    "push.services.mozilla.com",      # Firefox
+    "push.apple.com",                 # Safari / iOS home-screen apps
+    "notify.windows.com",             # legacy Edge
+)
+MAX_PUSH_ENDPOINT = 1000
+MAX_PUSH_KEY = 200
+MAX_DEVICES_PER_USER = 10             # phone + laptop + tablet + a few spares
+MAX_PUSH_PER_HOUR = 30                # comment/mention/reply pushes per person
+PUSH_TTL_SECONDS = 3600               # if their device is offline, drop it after an hour
+PUSH_TIMEOUT_SECONDS = 10
+REMINDER_LEADS = (10, 30, 60, 120)    # minutes before an event starts
+REMINDER_CHECK_SECONDS = 30
+MAX_PUSH_TITLE = 50                   # event titles get shortened in push headlines
+
+DEFAULT_PUSH_PREFS = {
+    "enabled": True,        # master switch
+    "mention": True,
+    "reply": True,
+    "comment": True,
+    "previews": True,       # show comment text on the lock screen
+    "reminders": True,      # "starts in 30 min" pushes
+    "reminderLead": 30,     # minutes, one of REMINDER_LEADS
+    "quietEnabled": False,  # mute mention/reply/comment pushes overnight
+    "quietStart": "22:00",
+    "quietEnd": "07:00",
+    "timezone": "",         # needed for quiet hours (and reminders on events with no zone)
+}
+PUSH_BOOL_KEYS = ("enabled", "mention", "reply", "comment", "previews", "reminders", "quietEnabled")
 
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_PATTERN = re.compile(r"^\d{2}:\d{2}$")
@@ -170,7 +247,9 @@ users = []
 events = []
 comments = []
 notifications = []
-push_subscriptions = []  # [{"username": ..., "subscription": {...}}, ...]
+push_subscriptions = []  # [{"username", "subscription": {endpoint, keys}, "created_at"}, ...]
+push_history = {}        # username (lowercase) -> [timestamps of recent pushes]
+push_lock = threading.Lock()
 
 next_event_id = 1
 next_comment_id = 1
@@ -204,6 +283,11 @@ def clean_text(value, limit):
     if not isinstance(value, str):
         return ""
     return value.strip()[:limit]
+
+
+def shorten(text, limit):
+    text = text or ""
+    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
 GIF_PATTERN = re.compile(r"^data:image/gif;base64,[A-Za-z0-9+/=]+$")
@@ -275,6 +359,9 @@ def pick_avatar_color(username):
 
 
 def user_public_info(user):
+    # Note: push preferences are deliberately NOT in here. This shape is
+    # shown to other people (profiles, directory), and a person's push
+    # settings and timezone are private. See GET /api/push/preferences.
     return {
         "username": user["username"],
         "displayName": user["display_name"],
@@ -417,6 +504,318 @@ def extract_mentions(text):
     return found
 
 
+# ---------------------------------------------------------------------------
+# WEB PUSH
+# ---------------------------------------------------------------------------
+
+def get_push_prefs(user):
+    """A person's push settings, with defaults filled in for anything unset."""
+    prefs = dict(DEFAULT_PUSH_PREFS)
+    prefs.update(user.get("push_prefs") or {})
+    return prefs
+
+
+def valid_clock(value):
+    try:
+        datetime.strptime(value, "%H:%M")
+        return True
+    except (TypeError, ValueError):
+        return False
+
+
+def clean_push_prefs(data, current):
+    """Returns (prefs, error). Only known keys are read; anything the request
+    leaves out keeps its current value."""
+    if not isinstance(data, dict):
+        return None, "Invalid preferences."
+
+    prefs = dict(current)
+
+    for key in PUSH_BOOL_KEYS:
+        if key in data:
+            if not isinstance(data[key], bool):
+                return None, "Invalid preferences."
+            prefs[key] = data[key]
+
+    if "reminderLead" in data:
+        if data["reminderLead"] not in REMINDER_LEADS:
+            return None, "Reminders can be 10, 30, 60 or 120 minutes before."
+        prefs["reminderLead"] = data["reminderLead"]
+
+    for key in ("quietStart", "quietEnd"):
+        if key in data:
+            value = clean_time(data[key])
+            if not valid_clock(value):
+                return None, "Quiet hours need a real time like 22:00."
+            prefs[key] = value
+
+    if "timezone" in data:
+        zone = clean_timezone(data["timezone"])
+        if data["timezone"] and not zone:
+            return None, "That isn't a real time zone."
+        prefs["timezone"] = zone
+
+    return prefs, None
+
+
+def in_quiet_hours(prefs):
+    """True if it's currently inside the person's quiet window. Needs their
+    time zone; without one, quiet hours can't be judged so nothing is muted."""
+    if not prefs["quietEnabled"] or not prefs["timezone"]:
+        return False
+    try:
+        now = datetime.now(ZoneInfo(prefs["timezone"])).strftime("%H:%M")
+    except Exception:
+        return False
+    start, end = prefs["quietStart"], prefs["quietEnd"]
+    if start == end:
+        return False
+    if start < end:
+        return start <= now < end
+    return now >= start or now < end   # window crosses midnight, e.g. 22:00-07:00
+
+
+def push_allowed(username):
+    """Hourly cap so a busy thread can't turn someone's phone into a buzzer.
+    Counts the push if it's allowed."""
+    now = time.time()
+    key = username.lower()
+    recent = [t for t in push_history.get(key, []) if now - t < 3600]
+    if len(recent) >= MAX_PUSH_PER_HOUR:
+        push_history[key] = recent
+        return False
+    recent.append(now)
+    push_history[key] = recent
+    return True
+
+
+def clean_push_subscription(sub):
+    """Returns a trimmed {endpoint, keys} or None. The endpoint is a URL this
+    server will POST to, so only real HTTPS push services are accepted."""
+    if not isinstance(sub, dict):
+        return None
+
+    endpoint = sub.get("endpoint")
+    keys = sub.get("keys")
+    if not isinstance(endpoint, str) or len(endpoint) > MAX_PUSH_ENDPOINT or not isinstance(keys, dict):
+        return None
+
+    p256dh, auth = keys.get("p256dh"), keys.get("auth")
+    for key in (p256dh, auth):
+        if not isinstance(key, str) or not key or len(key) > MAX_PUSH_KEY:
+            return None
+
+    try:
+        url = urlparse(endpoint)
+        port = url.port
+    except ValueError:
+        return None
+
+    host = (url.hostname or "").lower()
+    if url.scheme != "https" or port not in (None, 443) or url.username or url.password:
+        return None
+    if not any(host == h or host.endswith("." + h) for h in PUSH_HOSTS):
+        return None
+
+    return {"endpoint": endpoint, "keys": {"p256dh": p256dh, "auth": auth}}
+
+
+def user_subscriptions(username):
+    return [e for e in push_subscriptions if e["username"].lower() == username.lower()]
+
+
+def remove_subscription(username, endpoint):
+    with push_lock:
+        push_subscriptions[:] = [
+            e for e in push_subscriptions
+            if not (e["username"].lower() == username.lower() and e["subscription"]["endpoint"] == endpoint)
+        ]
+
+
+def drop_user_push_data(username):
+    """Account deleted: their devices stop receiving anything, and a future
+    account that reuses the name doesn't inherit them."""
+    with push_lock:
+        push_subscriptions[:] = [e for e in push_subscriptions if e["username"].lower() != username.lower()]
+    push_history.pop(username.lower(), None)
+
+
+def _deliver(subs, payload):
+    """Sends one payload to a list of subscriptions. Never raises. A device is
+    only forgotten when the push service says it's gone for good (404/410);
+    a temporary failure just gets logged and retried on the next push."""
+    stats = {"sent": 0, "failed": 0, "removed": 0}
+
+    for entry in subs:
+        try:
+            webpush(
+                subscription_info=entry["subscription"],
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims=dict(VAPID_CLAIMS),   # pywebpush edits this dict, so pass a copy
+                ttl=PUSH_TTL_SECONDS,
+                timeout=PUSH_TIMEOUT_SECONDS,
+            )
+            stats["sent"] += 1
+        except WebPushException as e:
+            status = getattr(getattr(e, "response", None), "status_code", None)
+            if status in (404, 410):
+                with push_lock:
+                    if entry in push_subscriptions:
+                        push_subscriptions.remove(entry)
+                stats["removed"] += 1
+            else:
+                stats["failed"] += 1
+                print(f"[push] delivery failed for {entry['username']} (status {status}): {e}")
+        except Exception as e:
+            stats["failed"] += 1
+            print(f"[push] unexpected error for {entry['username']}: {e}")
+
+    return stats
+
+
+def push_to_user(username, kind, title, snippet="", fallback_body="Tap to open",
+                 url="/", tag="", event_id=None, event_title="", urgent=False):
+    """
+    Decides whether a push goes out and, if so, sends it in the background.
+    kind: "mention" | "reply" | "comment" | "reminder"
+    urgent: reminders skip quiet hours and the hourly cap.
+    """
+    if not VAPID_PRIVATE_KEY:
+        return
+
+    user = find_user(username)
+    if not user:
+        return
+
+    prefs = get_push_prefs(user)
+    if not prefs["enabled"]:
+        return
+    if kind == "reminder":
+        if not prefs["reminders"]:
+            return
+    elif not prefs.get(kind, True):
+        return
+
+    if not urgent:
+        if in_quiet_hours(prefs):
+            return
+        if not push_allowed(user["username"]):
+            return
+
+    subs = user_subscriptions(user["username"])
+    if not subs:
+        return
+
+    payload = json_lib.dumps({
+        "title": title,
+        # the previews setting hides other people's words; a reminder's
+        # "Starts in 20 min" isn't private, so it always shows
+        "body": snippet if (snippet and (prefs["previews"] or kind == "reminder")) else fallback_body,
+        "url": url,
+        "tag": tag,
+        "kind": kind,
+        "eventId": event_id,
+        "eventTitle": event_title,
+        "badge": unread_count(user),   # the app-icon badge number
+        "ts": now_in_ms(),
+    })
+    threading.Thread(target=_deliver, args=(subs, payload), daemon=True).start()
+
+
+# ---- event reminders ----
+
+def humanize_minutes(minutes):
+    minutes = max(1, int(round(minutes)))
+    if minutes >= 60 and minutes % 60 == 0:
+        hours = minutes // 60
+        return f"{hours} hr"
+    return f"{minutes} min"
+
+
+def check_reminders():
+    """Sends 'starts in N min' pushes for calendar events. Runs every
+    REMINDER_CHECK_SECONDS. Each event is reminded once per start time (the
+    marker resets by itself if the date or time is edited)."""
+    now = datetime.now(ZoneInfo("UTC"))
+
+    for event in list(events):
+        if event["visibility"] not in CALENDAR_VISIBILITIES or not event.get("start_time"):
+            continue
+
+        owner = find_user(event["owner"])
+        if not owner:
+            continue
+
+        prefs = get_push_prefs(owner)
+        if not (prefs["enabled"] and prefs["reminders"]):
+            continue
+
+        # an event's own zone wins; otherwise fall back to the person's zone
+        zone = event.get("timezone") or prefs["timezone"]
+        if not zone:
+            continue
+
+        try:
+            start = datetime.strptime(
+                f'{event["date"]} {event["start_time"]}', "%Y-%m-%d %H:%M"
+            ).replace(tzinfo=ZoneInfo(zone))
+        except Exception:
+            continue
+
+        minutes_left = (start - now).total_seconds() / 60
+        if not (0 < minutes_left <= prefs["reminderLead"]):
+            continue
+
+        marker = f'{event["date"]} {event["start_time"]} {zone}'
+        if event.get("reminded_for") == marker:
+            continue
+        event["reminded_for"] = marker
+
+        push_to_user(
+            owner["username"], "reminder",
+            title=f'{event.get("icon", "")} {shorten(event["title"], MAX_PUSH_TITLE)}'.strip(),
+            snippet=f'Starts in {humanize_minutes(minutes_left)} · {event["start_time"]}',
+            url=f'{POST_URL}?post={event["id"]}',
+            tag=f'reminder-{event["id"]}',
+            event_id=event["id"],
+            event_title=event["title"],
+            urgent=True,
+        )
+
+
+_scheduler_started = False
+
+
+def start_reminder_scheduler():
+    """One background thread, started once. Set DISABLE_REMINDERS=1 to turn it off."""
+    global _scheduler_started
+    if _scheduler_started or os.environ.get("DISABLE_REMINDERS"):
+        return
+    _scheduler_started = True
+
+    def loop():
+        while True:
+            try:
+                check_reminders()
+            except Exception as e:
+                print(f"[reminders] error: {e}")
+            time.sleep(REMINDER_CHECK_SECONDS)
+
+    threading.Thread(target=loop, daemon=True, name="planora-reminders").start()
+
+
+# ---------------------------------------------------------------------------
+# IN-APP NOTIFICATIONS (each one also fires a push)
+# ---------------------------------------------------------------------------
+
+PUSH_VERBS = {
+    "mention": "mentioned you in",
+    "reply": "replied to you in",
+    "comment": "commented on",
+}
+
+
 def create_notification(recipient, actor, kind, event, comment=None, text=""):
     """kind: "mention" | "reply" | "comment". Never notifies you about yourself."""
     global next_notification_id
@@ -443,45 +842,22 @@ def create_notification(recipient, actor, kind, event, comment=None, text=""):
         drop = {n["id"] for n in mine[:overflow]}
         notifications[:] = [n for n in notifications if n["id"] not in drop]
 
-    # NEW: fire a real push alongside the in-app notification
-    verb = {"mention": "mentioned you", "reply": "replied to you", "comment": "commented"}
-    send_push(
-        recipient,
-        title=f"@{actor} {verb.get(kind, 'notified you')}",
-        body=(comment["text"] if comment else text)[:120] or event.get("title", ""),
-        url=f"/homepage.html?post={event['id']}" + (f"&comment={comment['id']}" if comment else "")
+    # Also send a real push. Headline names WHO and WHERE, the body is a
+    # short preview. The badge number in the payload is read AFTER the
+    # notification above was added, so it already counts this one.
+    actor_user = find_user(actor)
+    actor_name = actor_user["display_name"] if actor_user else actor
+    event_title = event.get("title", "")
+    push_to_user(
+        recipient, kind,
+        title=f'{actor_name} {PUSH_VERBS.get(kind, "notified you about")} {shorten(event_title, MAX_PUSH_TITLE) or "a post"}',
+        snippet=(comment["text"] if comment else text)[:120],
+        url=f"{POST_URL}?post={event['id']}" + (f"&comment={comment['id']}" if comment else ""),
+        tag=f"event-{event['id']}",
+        event_id=event["id"],
+        event_title=event_title,
     )
 
-def send_push(username, title, body, url="/"):
-    if not VAPID_PRIVATE_KEY:
-        print(f"[push] VAPID_PRIVATE_KEY not set, skipping push to {username}")
-        return
-
-    payload = json_lib.dumps({"title": title, "body": body, "url": url})
-    stale = []
-    matched = 0
-
-    for entry in push_subscriptions:
-        if entry["username"].lower() != username.lower():
-            continue
-        matched += 1
-        try:
-            webpush(
-                subscription_info=entry["subscription"],
-                data=payload,
-                vapid_private_key=VAPID_PRIVATE_KEY,
-                vapid_claims=dict(VAPID_CLAIMS),
-            )
-            print(f"[push] sent to {username}")
-        except WebPushException as e:
-            print(f"[push] FAILED for {username}: {e}")
-            stale.append(entry)
-
-    if matched == 0:
-        print(f"[push] no subscription found for {username}")
-
-    for entry in stale:
-        push_subscriptions.remove(entry)
 
 def notify_comment(event, comment):
     """Event owner -> "comment", person replied to -> "reply", @mentioned ->
@@ -738,6 +1114,14 @@ def login():
 
 @app.route("/api/logout", methods=["POST"])
 def logout():
+    """The frontend should send {"pushEndpoint": "<this device's endpoint>"}
+    so this browser stops receiving the signed-out person's notifications
+    (PlanoraPush.logoutCleanup() in push.js does this for you)."""
+    username = get_logged_in_username()
+    endpoint = body().get("pushEndpoint")
+    if username and isinstance(endpoint, str):
+        remove_subscription(username, endpoint)
+
     session.pop("username", None)
     return jsonify({"ok": True})
 
@@ -884,6 +1268,7 @@ def delete_me():
 
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
     prune_orphan_replies()
+    drop_user_push_data(username)
 
     session.pop("username", None)
     return jsonify({"ok": True})
@@ -1002,6 +1387,7 @@ def get_events():
     result = []
     for event in matching_events:
         event_copy = dict(event)
+        event_copy.pop("reminded_for", None)   # internal bookkeeping for reminders
         event_copy.setdefault("color", EVENT_COLORS[0])
         event_copy.setdefault("icon", EVENT_ICONS[0])
         event_copy.setdefault("end_date", event_copy["date"])
@@ -1308,6 +1694,7 @@ def edit_event(event_id):
     notify_event_mentions(event, user["username"], old_description)
 
     response = dict(event)
+    response.pop("reminded_for", None)
     response["isMine"] = True
     response["mentions"] = extract_mentions(event["description"])
     return jsonify(response)
@@ -1631,6 +2018,125 @@ def get_stats():
     return jsonify({"events": event_count, "publicEvents": public_count, "comments": comment_count})
 
 
+# ---------------------------------------------------------------------------
+# PUSH ROUTES
+# ---------------------------------------------------------------------------
+
+@app.route("/api/push/vapid-public-key", methods=["GET"])
+def get_vapid_public_key():
+    return jsonify({"key": VAPID_PUBLIC_KEY})
+
+
+@app.route("/api/push/subscribe", methods=["POST"])
+def push_subscribe():
+    """Registers this browser/device for the signed-in person. Safe to call on
+    every page load - the same endpoint just replaces its old entry."""
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    subscription = clean_push_subscription(body().get("subscription"))
+    if not subscription:
+        return jsonify({"error": "That doesn't look like a valid push subscription."}), 400
+
+    with push_lock:
+        # same device re-subscribing (or a device switching accounts)
+        push_subscriptions[:] = [
+            e for e in push_subscriptions if e["subscription"]["endpoint"] != subscription["endpoint"]
+        ]
+        push_subscriptions.append({
+            "username": user["username"],
+            "subscription": subscription,
+            "created_at": now_in_ms(),
+        })
+
+        # keep the number of devices per person bounded - oldest fall off first
+        mine = user_subscriptions(user["username"])
+        overflow = len(mine) - MAX_DEVICES_PER_USER
+        if overflow > 0:
+            drop_ids = {id(e) for e in mine[:overflow]}
+            push_subscriptions[:] = [e for e in push_subscriptions if id(e) not in drop_ids]
+
+    return jsonify({"ok": True})
+
+
+@app.route("/api/push/unsubscribe", methods=["POST"])
+def push_unsubscribe():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    endpoint = body().get("endpoint")
+    if isinstance(endpoint, str):
+        remove_subscription(user["username"], endpoint)
+    return jsonify({"ok": True})
+
+
+def push_settings_response(user):
+    return jsonify({
+        "prefs": get_push_prefs(user),
+        "devices": len(user_subscriptions(user["username"])),
+        "configured": bool(VAPID_PRIVATE_KEY and VAPID_PUBLIC_KEY),
+        "reminderLeads": list(REMINDER_LEADS),
+    })
+
+
+@app.route("/api/push/preferences", methods=["GET"])
+def get_push_preferences():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+    return push_settings_response(user)
+
+
+@app.route("/api/push/preferences", methods=["PUT"])
+def update_push_preferences():
+    """Send any subset of: enabled, mention, reply, comment, previews,
+    reminders, reminderLead (10|30|60|120), quietEnabled, quietStart,
+    quietEnd ("HH:MM"), timezone (IANA name)."""
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    prefs, error = clean_push_prefs(body(), get_push_prefs(user))
+    if error:
+        return jsonify({"error": error}), 400
+
+    user["push_prefs"] = prefs
+    return push_settings_response(user)
+
+
+@app.route("/api/push/test", methods=["POST"])
+def push_test():
+    """Sends a test push to YOUR devices right now and reports what happened.
+    Ignores your notification settings - it's for checking the setup works."""
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    if not VAPID_PRIVATE_KEY:
+        return jsonify({"error": "Push isn't set up on the server (missing VAPID keys)."}), 503
+
+    subs = user_subscriptions(user["username"])
+    if not subs:
+        return jsonify({"error": "No device is subscribed yet. Turn notifications on first."}), 400
+
+    payload = json_lib.dumps({
+        "title": "Planora notifications are on",
+        "body": "This is what a notification looks like.",
+        "url": "/",
+        "tag": "test",
+        "kind": "test",
+        "eventId": None,
+        "eventTitle": "",
+        "badge": unread_count(user),
+        "ts": now_in_ms(),
+    })
+    stats = _deliver(subs, payload)
+    stats["devices"] = len(subs)
+    return jsonify(stats)
+
+
 @app.route("/api/admin/users", methods=["GET"])
 @require_role("admin")
 def admin_list_users(current_user):
@@ -1677,6 +2183,7 @@ def admin_delete_user(current_user, username):
 
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
     prune_orphan_replies()
+    drop_user_push_data(username)
 
     return jsonify({"ok": True})
 
@@ -1685,42 +2192,6 @@ def admin_delete_user(current_user, username):
 @require_role("admin")
 def admin_list_events(current_user):
     return jsonify(events)
-
-@app.route("/api/push/vapid-public-key", methods=["GET"])
-def get_vapid_public_key():
-    return jsonify({"key": VAPID_PUBLIC_KEY})
-
-
-@app.route("/api/push/subscribe", methods=["POST"])
-def push_subscribe():
-    user = get_logged_in_user()
-    if not user:
-        return jsonify({"error": "Not signed in."}), 401
-
-    subscription = body().get("subscription")
-    if not isinstance(subscription, dict) or "endpoint" not in subscription:
-        return jsonify({"error": "Invalid subscription."}), 400
-
-    # replace any existing subscription with the same endpoint (re-subscribing)
-    push_subscriptions[:] = [
-        e for e in push_subscriptions if e["subscription"].get("endpoint") != subscription["endpoint"]
-    ]
-    push_subscriptions.append({"username": user["username"], "subscription": subscription})
-    return jsonify({"ok": True})
-
-
-@app.route("/api/push/unsubscribe", methods=["POST"])
-def push_unsubscribe():
-    user = get_logged_in_user()
-    if not user:
-        return jsonify({"error": "Not signed in."}), 401
-
-    endpoint = body().get("endpoint")
-    push_subscriptions[:] = [
-        e for e in push_subscriptions
-        if not (e["username"].lower() == user["username"].lower() and e["subscription"].get("endpoint") == endpoint)
-    ]
-    return jsonify({"ok": True})
 
 
 @app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
@@ -1738,6 +2209,10 @@ def admin_delete_event(current_user, event_id):
     events.remove(event)
     cascade_delete_event(event)
     return jsonify({"ok": True})
+
+
+# starts the "event starts soon" reminder checker (also when run by gunicorn)
+start_reminder_scheduler()
 
 
 if __name__ == "__main__":
