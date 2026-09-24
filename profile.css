@@ -332,6 +332,41 @@ select {
     border-radius: var(--radius-lg);
 }
 
+.events-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+}
+
+.events-tab {
+    flex: 1;
+    padding: 10px 4px 12px;
+
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px; /* sits on top of the container's border */
+
+    background: transparent;
+    color: var(--text-faint);
+
+    font-family: var(--font-display);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.1px;
+
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.events-tab:hover {
+    color: var(--text-dim);
+}
+
+.events-tab.active {
+    color: var(--text);
+    border-bottom-color: var(--text);
+}
+
 .tile-cover {
     position: relative;
 
