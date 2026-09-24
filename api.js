@@ -517,7 +517,11 @@ const PlanoraData = (() => {
         markNotificationRead,
         markAllNotificationsRead,
         deleteNotification,
-        clearNotifications
+        clearNotifications,
+        getFriends,
+        sendFriendRequest,
+        acceptFriendRequest,
+        removeFriendship
     };
 
 })();
