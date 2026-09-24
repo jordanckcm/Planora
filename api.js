@@ -71,6 +71,8 @@ async function apiRequest(url, options = {}) {
         throw offlineError;
     }
 
+   
+
     // Read the body as text first instead of calling response.json()
     // directly. Most responses are valid JSON, but if the server ever
     // sends back something that isn't — an unhandled error slipping
@@ -482,6 +484,19 @@ const PlanoraData = (() => {
 
     async function clearNotifications() {
         return apiRequest("/api/notifications", { method: "DELETE" });
+    }
+
+    async function getFriends() {
+        return apiRequest("/api/friends");
+    }
+    async function sendFriendRequest(username) {
+        return apiRequest(`/api/friends/request/${encodeURIComponent(username)}`, { method: "POST" });
+    }
+    async function acceptFriendRequest(username) {
+        return apiRequest(`/api/friends/accept/${encodeURIComponent(username)}`, { method: "POST" });
+    }
+    async function removeFriendship(username) {
+        return apiRequest(`/api/friends/${encodeURIComponent(username)}`, { method: "DELETE" });
     }
 
     return {
