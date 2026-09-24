@@ -4,6 +4,17 @@
    everywhere else they link to homepage.html?view=... */
 
 (function () {
+    // Load the shared stylesheet from the same folder as this script, so one
+    // <script> tag is enough on any page (profile, directory, admin, ...).
+    if (!document.querySelector('link[href*="planora-shell.css"]')) {
+        const link = document.createElement("link");
+        link.rel = "stylesheet";
+        link.href = document.currentScript
+            ? document.currentScript.src.replace(/planora-nav\.js.*$/, "planora-shell.css")
+            : "planora-shell.css";
+        document.head.appendChild(link);
+    }
+
     const onHome = Boolean(document.getElementById("timelineContainer"));
     const page = location.pathname.split("/").pop();
     const params = new URLSearchParams(location.search);
@@ -104,6 +115,22 @@
             addItem({ key: "admin", label: "Admin panel" }, logout.previousElementSibling);
         }
     });
+
+    // Old top bars (directory, admin, ...) may not use the .topbar class.
+    // Hide any other sticky/fixed bar pinned to the top of the page.
+    function hideLegacyBars() {
+        Array.from(document.body.children).forEach((n) => {
+            if (n === bar || n === overlay || n === drawer || n.tagName === "SCRIPT") return;
+            const cs = getComputedStyle(n);
+            const pinned = (cs.position === "sticky" || cs.position === "fixed") && parseFloat(cs.top) === 0;
+            const looksLikeBar = n.tagName === "HEADER" || /top-?bar|header|navbar/i.test(n.className);
+            if ((pinned || looksLikeBar) && n.offsetHeight > 0 && n.offsetHeight < 110) {
+                n.style.display = "none";
+            }
+        });
+    }
+    hideLegacyBars();
+    setTimeout(hideLegacyBars, 500); // in case a page builds its bar after load
 
     window.PlanoraNav = { setActive };
 })();
