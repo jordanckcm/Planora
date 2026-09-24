@@ -39,12 +39,15 @@ body {
     width: 100%;
     min-height: 100%;
 
-    /* FIX: was hardcoded rgb(19, 19, 19) — always dark regardless of
-       theme. var(--bg) is base.css's token for this, which theme.css
-       flips to a light color in light mode. */
+    /* var(--bg) is base.css's token, flipped by theme.css in light mode */
     background: var(--bg, #131313);
 
     transition: background 0.4s ease;
+}
+
+/* room at the bottom so the + button never sits on top of the last card */
+body {
+    padding-bottom: 100px;
 }
 
 
@@ -68,9 +71,6 @@ body {
 
     padding: 0 15px;
 
-    /* FIX: was rgba(27, 27, 27, 0.9) — hardcoded dark. color-mix against
-       var(--panel) keeps the translucency but resolves to the right
-       shade in either theme. */
     background: color-mix(in srgb, var(--panel) 90%, transparent);
 
     backdrop-filter: blur(10px);
@@ -93,9 +93,8 @@ body {
 
     border-radius: 50%;
 
-    /* Placeholder gradient — homepage.js immediately overrides this
-       with the user's real avatar color/image inline, so it's never
-       actually seen for long. Left as-is intentionally. */
+    /* Placeholder gradient — homepage.js overrides this inline with the
+       user's real avatar color/image. */
     background: linear-gradient(
         135deg,
         #555,
@@ -129,55 +128,23 @@ body {
 
     background: transparent;
 
-    /* FIX: was hardcoded white. */
     color: var(--text);
 
-    font-size: 10px;
+    font-size: 12px;
 
     cursor: pointer;
 
     transition: 0.25s ease;
 }
 
-
 .custom-button:hover {
-    /* FIX: both were hardcoded to white-based translucency, which reads
-       as a near-invisible tint against a light panel. color-mix against
-       var(--text) keeps a highlight that reads in either theme. */
     background: color-mix(in srgb, var(--text) 8%, transparent);
 
     border-color: color-mix(in srgb, var(--text) 15%, transparent);
 }
 
-
 .global-button {
-    width: 65px;
-}
-
-
-/* =========================
-   YEAR
-========================= */
-
-.year {
-    position: absolute;
-
-    top: 5vh;
-    left: 50%;
-
-    transform: translateX(-50%);
-
-    font-size: clamp(160px, 18vw, 360px);
-
-    font-family: "StarShield";
-
-    color: rgba(255, 255, 255, 0.151);
-
-    pointer-events: none;
-
-    user-select: none;
-
-    z-index: 0;
+    min-width: 65px;
 }
 
 
@@ -207,11 +174,10 @@ body {
     align-items: center;
 
     width: 100%;
-    height: 90px;
+    height: 80px;
 
     padding: 0 25px;
 
-    /* FIX: was hardcoded white. */
     color: var(--text);
 
     border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
@@ -222,8 +188,6 @@ body {
 
     font-size: 25px;
 
-    /* FIX: was rgba(30, 30, 30, 0.8) — always a dark card, even in
-       light mode. */
     background: var(--panel-soft);
 
     cursor: pointer;
@@ -234,11 +198,9 @@ body {
         border 0.25s ease;
 }
 
-
 .month-events-container:hover {
     transform: translateX(8px);
 
-    /* FIX: was hardcoded rgb(38, 38, 38). */
     background: var(--panel-raised);
 
     border-color: color-mix(in srgb, var(--text) 40%, transparent);
@@ -252,9 +214,9 @@ body {
 .event-count {
     font-family: "VHS";
 
-    font-size: 11px;
+    font-size: 12px;
 
-    opacity: 0.5;
+    opacity: 0.65;
 }
 
 
@@ -300,10 +262,8 @@ body {
 
     padding: 12px 20px;
 
-    /* FIX: was hardcoded white. */
     color: var(--text);
 
-    /* FIX: was hardcoded rgb(27, 27, 27). */
     background: var(--panel);
 
     border: 1px solid var(--border);
@@ -312,7 +272,6 @@ body {
 
     animation: eventAppear 0.25s ease;
 }
-
 
 @keyframes eventAppear {
 
@@ -359,20 +318,18 @@ body {
     gap: 5px;
 }
 
-
 .event-title {
     font-family: "VHS";
 
     font-size: 16px;
 }
 
-
 .event-date {
     font-family: "VHS";
 
-    font-size: 10px;
+    font-size: 12px;
 
-    opacity: 0.5;
+    opacity: 0.65;
 }
 
 
@@ -385,8 +342,6 @@ body {
 
     text-align: center;
 
-    /* FIX: was hardcoded white — this is the "No events yet" bar that
-       stayed a dark island in light mode. */
     color: var(--text);
 
     background: var(--panel-soft);
@@ -395,58 +350,11 @@ body {
 
     border-radius: 10px;
 
-    font-size: 12px;
+    font-size: 13px;
 
-    opacity: 0.5;
+    opacity: 0.6;
 }
 
-
-/* =========================
-   MOBILE
-========================= */
-
-@media (max-width: 600px) {
-
-    .year {
-        top: 7vh;
-
-        font-size: 150px;
-    }
-
-
-    .month-events-container {
-        height: 75px;
-
-        padding: 0 18px;
-
-        font-size: 20px;
-    }
-
-
-    .event-count {
-        font-size: 9px;
-    }
-
-
-    .event {
-        min-height: 65px;
-
-        padding: 10px 15px;
-    }
-
-
-    .event-day {
-        width: 45px;
-
-        font-size: 28px;
-    }
-
-
-    .event-title {
-        font-size: 13px;
-    }
-
-}
 
 /* =========================
    ADD EVENT BUTTON
@@ -467,11 +375,7 @@ body {
     border: none;
     border-radius: 50%;
 
-    /* FIX: was hardcoded white bg / black text — in light mode that's a
-       near-invisible white circle sitting on a near-white page. Same
-       inverse-of-text trick base.css's .btn-solid uses: var(--text) is
-       white in dark mode / near-black in light mode, var(--panel) flips
-       the opposite way, so the button always contrasts against the page. */
+    /* inverse of the page: white in dark mode, dark in light mode */
     background: var(--text);
     color: var(--panel);
 
@@ -522,8 +426,7 @@ body {
     justify-content: center;
     align-items: center;
 
-    /* Scrim — deliberately left as a plain dark overlay regardless of
-       theme, same as every other modal backdrop in the app. */
+    /* plain dark scrim in every theme, like the other modals */
     background: rgba(0, 0, 0, 0.65);
 
     backdrop-filter: blur(8px);
@@ -535,9 +438,6 @@ body {
 
     transition: opacity 0.25s ease;
 }
-
-
-/* SHOW FORM */
 
 .event-form.show {
 
@@ -557,7 +457,6 @@ body {
 
     padding: 25px;
 
-    /* FIX: was hardcoded rgb(27, 27, 27). */
     background: var(--panel);
 
     border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
@@ -585,7 +484,6 @@ body {
 
 .form-title {
 
-    /* FIX: was hardcoded white. */
     color: var(--text);
 
     font-family: "Gotham";
@@ -617,7 +515,6 @@ body {
 
     outline: none;
 
-    /* FIX: was hardcoded rgb(19, 19, 19) / white. */
     background: var(--bg-input, rgb(19, 19, 19));
 
     color: var(--text);
@@ -628,7 +525,6 @@ body {
 
 .event-form input::placeholder {
 
-    /* FIX: was hardcoded rgba(255, 255, 255, 0.4). */
     color: var(--text-faint);
 
 }
@@ -666,7 +562,6 @@ body {
 
 #cancelEvent {
 
-    /* FIX: was hardcoded rgb(45, 45, 45) / white. */
     background: var(--bg-input-alt, rgb(45, 45, 45));
 
     color: var(--text);
@@ -675,12 +570,13 @@ body {
 
 #saveEvent {
 
-    /* Green works fine as-is against either theme. */
+    /* Green works fine against either theme. */
     background: rgb(72, 156, 72);
 
     color: white;
 
 }
+
 
 /* =========================
    DESCRIPTION INPUT
@@ -701,7 +597,6 @@ body {
 
     outline: none;
 
-    /* FIX: was hardcoded rgb(19, 19, 19) / white. */
     background: var(--bg-input, rgb(19, 19, 19));
 
     color: var(--text);
@@ -712,7 +607,6 @@ body {
 
 .event-form textarea::placeholder {
 
-    /* FIX: was hardcoded rgba(255, 255, 255, 0.4). */
     color: var(--text-faint);
 
 }
@@ -726,9 +620,8 @@ body {
 
     font-family: "VHS";
 
-    font-size: 11px;
+    font-size: 13px;
 
-    /* FIX: was hardcoded rgba(255, 255, 255, 0.6). */
     color: var(--text-dim);
 
     line-height: 1.4;
@@ -736,6 +629,7 @@ body {
     max-width: 600px;
 
 }
+
 
 /* =========================
    YEAR SELECTOR
@@ -760,13 +654,9 @@ body {
 
 
 /* YEAR
-   NOTE: this second .year rule loads after the first one above and wins
-   on every shared property (position/transform/font-size/etc). Its own
-   `color` here is in turn overridden by homepage-extra.css's
-   `.year { color: rgba(var(--accent), 0.17); }` (loaded later still),
-   which is already theme-aware via --accent — so no change is needed
-   here specifically, this comment is just so future-you isn't confused
-   about why .year's color still looks right. */
+   This is the two old .year rules merged into one; the result is the
+   same as before, minus the bottom fade mask (removed on purpose).
+   homepage-extra.css still sets the final color from --accent. */
 .year {
     position: static;
 
@@ -780,9 +670,6 @@ body {
 
     pointer-events: none;
     user-select: none;
-
-    -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 95%);
-    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 1) 40%, rgba(0, 0, 0, 0) 95%);
 }
 
 
@@ -797,7 +684,6 @@ body {
 
     border-radius: 50%;
 
-    /* FIX: was hardcoded rgba(30, 30, 30, 0.8) / white. */
     background: var(--panel-soft);
 
     color: var(--text);
@@ -813,7 +699,6 @@ body {
 
 .year-selector button:hover {
 
-    /* FIX: was hardcoded rgba(255, 255, 255, 0.12). */
     background: color-mix(in srgb, var(--text) 12%, transparent);
 
     transform: scale(1.1);
@@ -827,9 +712,35 @@ body {
 }
 
 
-/* MOBILE */
+/* =========================
+   MOBILE
+========================= */
 
 @media (max-width: 600px) {
+
+    .month-events-container {
+        height: 68px;
+
+        padding: 0 18px;
+
+        font-size: 20px;
+    }
+
+    .event {
+        min-height: 65px;
+
+        padding: 10px 15px;
+    }
+
+    .event-day {
+        width: 45px;
+
+        font-size: 28px;
+    }
+
+    .event-title {
+        font-size: 14px;
+    }
 
     .year-selector {
 
