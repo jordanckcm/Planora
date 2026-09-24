@@ -26,6 +26,8 @@
     }
 
     function verb(n) {
+        if (n.type === "friend_request") return "sent you a friend request";
+        if (n.type === "friend_accept") return "accepted your friend request";
         if (n.type === "mention") return n.commentId ? "mentioned you in a comment on" : "mentioned you in the description of";
         if (n.type === "reply") return "replied to your comment on";
         return "commented on your event";
@@ -70,9 +72,14 @@
         line.className = "nt-line";
         const who = document.createElement("strong");
         who.textContent = actor.displayName || n.actor;
-        const title = document.createElement("em");
-        title.textContent = n.type === "comment" ? ": " + (n.eventTitle || "") : " " + (n.eventTitle || "an event");
-        line.append(who, " " + verb(n), title);
+
+        if (n.type === "friend_request" || n.type === "friend_accept") {
+            line.append(who, " " + verb(n));
+        } else {
+            const title = document.createElement("em");
+            title.textContent = n.type === "comment" ? ": " + (n.eventTitle || "") : " " + (n.eventTitle || "an event");
+            line.append(who, " " + verb(n), title);
+        }
 
         const time = document.createElement("div");
         time.className = "nt-time";
@@ -129,6 +136,12 @@
 
     async function open(n) {
         if (!n.read) { try { await PlanoraData.markNotificationRead(n.id); } catch (e) { /* still navigate */ } }
+
+        if (n.type === "friend_request" || n.type === "friend_accept") {
+            location.href = "profile.html?u=" + encodeURIComponent(n.actor);
+            return;
+        }
+
         const p = new URLSearchParams({ post: n.eventId });
         if (n.commentId) p.set("comment", n.commentId);
         location.href = "homepage.html?" + p.toString();
