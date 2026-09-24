@@ -66,11 +66,20 @@
             avatar.style.background = `linear-gradient(135deg, ${p.ownerAvatarColor}, #1b1b1b)`;
             avatar.textContent = (p.ownerDisplayName || p.owner).charAt(0).toUpperCase();
         }
-        const who = el("a", "post-who", p.isMine ? "You" : "@" + p.owner);
+        const names = el("div", "post-names");
+        const who = el("a", "post-who", p.ownerDisplayName || p.owner);
         who.href = profileUrl(p.owner);
-        head.append(avatar, who, el("span", "post-tag", p.visibility === "global" ? "Global" : "Public"),
+        names.append(who, el("span", "post-handle", "@" + p.owner));
+        head.append(avatar, names, el("span", "post-tag", p.visibility === "global" ? "Global" : "Public"),
                     el("span", "post-time", formatRelativeShort(p.created_at)));
         post.appendChild(head);
+
+        // title + description sit right under the profile row
+        const body = el("div", "post-body");
+        body.appendChild(el("div", "post-title", p.title));
+        if (p.description) body.appendChild(el("div", "post-desc", p.description));
+        body.appendChild(el("div", "post-when", formatEventWhen(p)));
+        post.appendChild(body);
 
         // media
         const media = el("div", "post-media");
@@ -108,13 +117,6 @@
         count.type = "button";
         actions.appendChild(count);
         post.appendChild(actions);
-
-        // caption
-        const body = el("div", "post-body");
-        body.appendChild(el("b", "", p.title));
-        if (p.description) body.appendChild(document.createTextNode(p.description));
-        body.appendChild(el("div", "post-when", formatEventWhen(p)));
-        post.appendChild(body);
 
         // comments (opens on demand)
         let panel = null;
