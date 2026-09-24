@@ -47,30 +47,53 @@ async function showPush(d) {
 
   // Collapse a burst about the same post into one notification:
   // "3 new notifications in Movie Night" instead of three buzzes.
-  let title = d.title || "Planora";
+  // The event's own emoji in front of the headline ("🎉 Sam commented on Movie Night").
+  // Reminders already carry it in their title.
+  const lead = d.eventIcon && d.kind !== "reminder" && d.kind !== "test" ? `${d.eventIcon} ` : "";
+  let title = lead + (d.title || "Planora");
   let body = d.body || "";
   let count = 1;
+  let kinds = [d.kind];
+  let actors = [d.actor];
   const groupable = d.tag && d.kind !== "reminder" && d.kind !== "test";
 
   if (groupable) {
     const existing = await self.registration.getNotifications({ tag: d.tag });
     if (existing.length) {
-      count = ((existing[0].data && existing[0].data.count) || 1) + 1;
+      const prev = existing[0].data || {};
+      count = (prev.count || 1) + 1;
+      kinds = Array.from(new Set([...(prev.kinds || []), d.kind]));
+      actors = Array.from(new Set([...(prev.actors || []), d.actor]));
       existing.forEach((n) => n.close());
-      title = `${count} new notifications in ${d.eventTitle || "Planora"}`;
-      body = d.body ? `Latest: ${d.body}` : "";
+
+      // "3 new comments on Movie Night" when they're all the same kind,
+      // "3 new notifications in Movie Night" when they're mixed.
+      const where = d.eventTitle || "Planora";
+      if (kinds.length === 1 && d.kind === "comment") title = `${lead}${count} new comments on ${where}`;
+      else if (kinds.length === 1 && d.kind === "reply") title = `${lead}${count} new replies in ${where}`;
+      else if (kinds.length === 1 && d.kind === "mention") title = `${lead}${count} new mentions in ${where}`;
+      else title = `${lead}${count} new notifications in ${where}`;
+
+      // "Sam: okay" - who said the latest one, and what
+      if (d.preview && d.actor) body = `${d.actor}: ${d.body}`;
+      else if (d.actor) body = `Latest from ${d.actor}`;
     }
   }
 
+  // The sender's profile picture when it's one person; the app icon when it's
+  // several people, a reminder, or someone without a picture.
+  const people = actors.filter(Boolean);
+  const icon = people.length === 1 && d.avatarUrl ? d.avatarUrl : ICON;
+
   const options = {
     body,
-    icon: ICON,
+    icon,
     badge: BADGE_ICON,
     tag: d.tag || undefined,
     renotify: !!d.tag,               // a new push on the same tag still alerts
     timestamp: d.ts || Date.now(),
     silent: looking,
-    data: { url: d.url || "/", count, kind: d.kind },
+    data: { url: d.url || "/", count, kind: d.kind, kinds, actors },
   };
 
   await self.registration.showNotification(title, options);
