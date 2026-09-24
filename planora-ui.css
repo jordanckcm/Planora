@@ -9,10 +9,6 @@
    homepage-extra.css needs editing.
 ========================================================= */
 
-/* Discord's own gg sans isn't licensed for outside use, so this asks for
-   it first (Discord users have it installed), then falls back to Noto
-   Sans / Open Sans — the faces Discord itself used before gg sans, and
-   the closest free match to its look. */
 @import url("https://fonts.googleapis.com/css2?family=Noto+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Open+Sans:wght@400;600;700&display=swap");
 
 :root {
@@ -35,7 +31,7 @@ body {
 .timeline-body .event-description {
     font-family: var(--font-discord);
     font-weight: 400;
-    line-height: 1.375;      /* Discord's message line-height */
+    line-height: 1.375;
     letter-spacing: 0;
 }
 
@@ -45,14 +41,14 @@ body {
 ========================= */
 
 .event {
-    position: relative;   /* anchors the ⋮ to the card's corner */
+    position: relative;
 }
 
 .event-menu-button-wrap {
     position: absolute;
     top: 8px;
     right: 8px;
-    z-index: 3;           /* above the cover image */
+    z-index: 3;
 }
 
 .event-menu-button {
@@ -64,12 +60,15 @@ body {
     padding: 0;
     border: none;
     border-radius: 6px;
+    /* Sits on top of the cover image/card corner — kept as a fixed dark
+       scrim on purpose, same as the ⋮ buttons elsewhere; a themed
+       version would disappear against its own busy backdrop. */
     background: rgba(0, 0, 0, 0.45);
     color: #cfcfcf;
     font-size: 17px;
     line-height: 1;
     cursor: pointer;
-    opacity: 0;                       /* fades in on hover, always on touch */
+    opacity: 0;
     transition: opacity .15s ease, background .15s ease, color .15s ease;
 }
 
@@ -84,7 +83,6 @@ body {
     color: #fff;
 }
 
-/* no hover on touch screens, so never hide it there */
 @media (hover: none) {
     .event-menu-button { opacity: 1; }
 }
@@ -92,18 +90,18 @@ body {
 
 /* =========================
    EVENT DROPDOWN
-   Positioning is set inline by openDropdownMenu(); this is
-   just the look. .dropdown-portal is added while the menu is
-   parked on <body>.
 ========================= */
 
 .event-dropdown {
     display: none;
     min-width: 168px;
     padding: 6px;
-    border: 1px solid #2c2c2c;
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 8px;
-    background: #1b1b1b;
+    /* FIX: was hardcoded #1b1b1b — this dropdown floats over the whole
+       page (not over an image, unlike the ⋮ button itself), so it needs
+       to actually flip with the theme. */
+    background: var(--bg-surface, #1b1b1b);
     box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
 }
 
@@ -122,7 +120,8 @@ body {
     border: none;
     border-radius: 5px;
     background: none;
-    color: #dcdcdc;
+    /* FIX: was hardcoded #dcdcdc. */
+    color: var(--text);
     font: inherit;
     font-size: 13px;
     text-align: left;
@@ -130,8 +129,9 @@ body {
 }
 
 .event-dropdown-item:hover {
-    background: #2a2a2a;
-    color: #fff;
+    /* FIX: was hardcoded #2a2a2a / #fff. */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
 }
 
 .event-dropdown-item.danger {
@@ -143,9 +143,6 @@ body {
     color: #ff8a82;
 }
 
-/* The comment menus share the same portal class now — keep whatever
-   your existing .comment-dropdown rules do, this just makes sure the
-   portaled copy still paints above everything. */
 .comment-dropdown.dropdown-portal {
     z-index: 9999;
 }
@@ -153,11 +150,6 @@ body {
 
 /* =========================
    IMAGE PICKER
-   Shared shape for the event-cover picker (homepage.js) and the
-   new profile-picture picker (profile.js). If homepage.css already
-   styles .image-picker for the event form, these rules load after
-   it and may need trimming to avoid fighting your existing look —
-   they're written to be plain enough that shouldn't happen.
 ========================= */
 
 .image-picker {
@@ -169,22 +161,24 @@ body {
 
 .image-pick-button {
     padding: 8px 14px;
-    border: 1px solid #3a3a3a;
+    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
     border-radius: 6px;
-    background: #232323;
-    color: #ddd;
+    /* FIX: was hardcoded #232323 / #ddd. */
+    background: var(--bg-input, #232323);
+    color: var(--text-dim);
     font: inherit;
     font-size: 13px;
     cursor: pointer;
 }
 
 .image-pick-button:hover {
-    background: #2c2c2c;
+    /* FIX: was hardcoded #2c2c2c. */
+    background: var(--panel-raised, #2c2c2c);
 }
 
 .image-remove {
     padding: 8px 12px;
-    border: 1px solid #3a3a3a;
+    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
     border-radius: 6px;
     background: none;
     color: #e06a63;
@@ -201,14 +195,15 @@ body {
     width: 56px;
     height: 56px;
     border-radius: 8px;
-    background-color: #232323;
+    /* FIX: was hardcoded #232323. */
+    background-color: var(--bg-input, #232323);
     background-size: cover;
     background-position: center;
     flex-shrink: 0;
 }
 
-/* Profile pictures read as circular avatars, not rectangular covers,
-   and get a bit more room since it's the one photo that represents you. */
+/* Profile pictures/avatars always sit on their own colored gradient
+   background regardless of theme, so white stays correct here. */
 .avatar-preview {
     width: 72px;
     height: 72px;
@@ -232,8 +227,6 @@ body {
 
 /* =========================
    TODAY BUTTON
-   Moved out of .topbar (see homepage.html) so that row can't overflow
-   and become horizontally drag-scrollable on narrow screens.
 ========================= */
 
 .today-row {
@@ -244,10 +237,11 @@ body {
 
 .today-pill {
     padding: 6px 18px;
-    border: 1px solid #3a3a3a;
+    border: 1px solid color-mix(in srgb, var(--text) 18%, transparent);
     border-radius: 999px;
-    background: #1e1e1e;
-    color: #ddd;
+    /* FIX: was hardcoded #1e1e1e / #ddd. */
+    background: var(--bg-input, #1e1e1e);
+    color: var(--text-dim);
     font: inherit;
     font-size: 13px;
     font-weight: 600;
@@ -256,19 +250,19 @@ body {
 }
 
 .today-pill:hover {
-    background: #272727;
-    border-color: #4a4a4a;
+    /* FIX: was hardcoded #272727 / #4a4a4a. */
+    background: var(--panel-raised, #272727);
+    border-color: color-mix(in srgb, var(--text) 30%, transparent);
 }
 
 .today-pill:active {
-    background: #2f2f2f;
+    /* FIX: was hardcoded #2f2f2f. */
+    background: color-mix(in srgb, var(--panel-raised, #2f2f2f) 80%, var(--text) 15%);
 }
 
 
 /* =========================
    EVENT HOST AVATAR
-   Replaces the old plain day-number tile. The day number survives as a
-   small badge on the avatar's corner instead of disappearing.
 ========================= */
 
 .event-avatar {
@@ -280,6 +274,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
+    /* Sits on its own colored gradient background regardless of theme. */
     color: #fff;
     font-weight: 700;
     font-size: 16px;
@@ -287,22 +282,17 @@ body {
 }
 
 .event-day-badge {
-    /* no longer used — the day number was removed from the avatar per
-       request, formatEventWhen's date line covers it */
     display: none;
 }
 
 .event-main {
-    gap: 16px;   /* was sitting too close to the avatar */
+    gap: 16px;
 }
 
 .event-info {
     margin-left: 2px;
 }
 
-/* Host's @username, mirrors the ⋮ menu on the opposite corner. Both
-   float above the cover/avatar, so the card gets extra top padding to
-   keep the avatar from sitting underneath them. */
 .event {
     padding-top: 34px;
 }
@@ -314,6 +304,9 @@ body {
     z-index: 3;
     padding: 4px 9px;
     border-radius: 6px;
+    /* Fixed dark scrim on purpose — sits over the cover image/card
+       corner the same way .event-menu-button does, and needs its own
+       guaranteed-dark background/light text regardless of theme. */
     background: rgba(0, 0, 0, 0.45);
     color: #ddd;
     font-size: 12px;
@@ -323,17 +316,14 @@ body {
 
 /* =========================
    SIMPLER "CREATE EVENT" FORM
-   Title, date and the Global toggle are the only things visible by
-   default — everything else (description, end date, time, cover image,
-   icon, color) lives behind a native <details> disclosure, so a first
-   event takes three taps instead of ten decisions.
 ========================= */
 
 .event-more {
     margin: 4px 0 14px;
-    border: 1px solid #2c2c2c;
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 8px;
-    background: #1a1a1a;
+    /* FIX: was hardcoded #1a1a1a. */
+    background: var(--bg-input, #1a1a1a);
     overflow: hidden;
 }
 
@@ -341,17 +331,18 @@ body {
     display: flex;
     align-items: baseline;
     gap: 8px;
-    padding: 12px 14px;     /* generous tap target for mobile */
-    color: #ddd;
+    padding: 12px 14px;
+    /* FIX: was hardcoded #ddd. */
+    color: var(--text-dim);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    list-style: none;              /* hide the default triangle marker... */
+    list-style: none;
     -webkit-tap-highlight-color: transparent;
 }
 
 .event-more summary::-webkit-details-marker {
-    display: none;                 /* ...in Safari/Chrome too */
+    display: none;
 }
 
 .event-more summary::before {
@@ -359,7 +350,8 @@ body {
     display: inline-block;
     font-size: 16px;
     font-weight: 700;
-    color: #888;
+    /* FIX: was hardcoded #888. */
+    color: var(--text-faint);
     transition: transform .15s ease;
 }
 
@@ -368,7 +360,8 @@ body {
 }
 
 .event-more-hint {
-    color: #777;
+    /* FIX: was hardcoded #777. */
+    color: var(--text-faint);
     font-size: 12px;
     font-weight: 400;
 }
@@ -380,16 +373,14 @@ body {
     gap: 2px;
 }
 
-/* Everything below keeps the app usable on narrow phones regardless of
-   what homepage.css already does for these elements. */
 @media (max-width: 480px) {
     .event-form-box {
         max-width: 100%;
     }
 
     .time-grid {
-        grid-template-columns: 1fr;   /* stack start/end time if it's a grid... */
-        flex-direction: column;       /* ...or a flex row - whichever homepage.css uses */
+        grid-template-columns: 1fr;
+        flex-direction: column;
         gap: 8px;
     }
 
@@ -404,16 +395,13 @@ body {
 }
 
 .event-primary-row {
-    display: block;   /* stacked on mobile - same order as before */
+    display: block;
 }
 
 .event-primary-field {
     display: block;
 }
 
-/* On anything roomier than a phone, the create-event modal shouldn't be
-   a tall mobile sheet stretched vertically — wider and shorter instead,
-   with title/date side by side. */
 @media (min-width: 768px) {
     .event-form-box {
         max-width: 620px;
@@ -440,7 +428,6 @@ body {
         gap: 4px 20px;
     }
 
-    /* full-width inside the 2-column grid rather than one per cell */
     .event-more-body textarea,
     .event-more-body .field-label,
     .event-more-body .time-grid,
