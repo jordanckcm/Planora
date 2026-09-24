@@ -246,7 +246,7 @@
                 delBtn.addEventListener("click", async () => {
                     if (!confirm("Delete this comment?")) return;
                     try {
-                        await PlanoraData.deleteComment(c.id);
+                        await PlanoraData.deleteComment(post.id, c.id);
                         await refresh(null);
                     } catch (err) {
                         toast(err.message, "error");
@@ -316,7 +316,7 @@
             send.disabled = true;
             try {
                 if (mode && mode.type === "edit") {
-                    await PlanoraData.editComment(mode.comment.id, text);
+                    await PlanoraData.editComment(post.id, mode.comment.id, text);
                     await refresh(null);
                 } else {
                     const created = await PlanoraData.addComment(post.id, text, mode && mode.type === "reply" ? mode.comment.id : null);
