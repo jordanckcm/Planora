@@ -114,3 +114,37 @@ self.addEventListener("fetch", (event) => {
             .catch(() => caches.match(request))
     );
 });
+
+self.addEventListener("push", (event) => {
+    let data = { title: "Planora", body: "You have a new notification.", url: "/" };
+    try {
+        if (event.data) data = event.data.json();
+    } catch (e) { /* fall back to defaults above */ }
+
+    event.waitUntil(
+        self.registration.showNotification(data.title, {
+            body: data.body,
+            icon: "/icon-192.png",
+            badge: "/icon-192.png",
+            data: { url: data.url || "/" }
+        })
+    );
+});
+
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+    const targetUrl = event.notification.data && event.notification.data.url
+        ? event.notification.data.url
+        : "/";
+
+    event.waitUntil(
+        clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+            for (const client of windowClients) {
+                if (client.url.includes(targetUrl.split("?")[0]) && "focus" in client) {
+                    return client.focus();
+                }
+            }
+            if (clients.openWindow) return clients.openWindow(targetUrl);
+        })
+    );
+});
