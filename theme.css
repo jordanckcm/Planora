@@ -13,23 +13,25 @@
      2. "System": no data-theme attribute at all — follows the OS's
         prefers-color-scheme automatically.
 
-   Redefines the SAME custom property names base.css already defines
-   (--panel, --border, --border-strong, --text, --text-dim,
-   --text-faint) rather than inventing new ones, so every page that
-   already styles itself with var(--panel) etc. repaints for free —
-   nothing needs to know a theme system exists.
+   ---------------------------------------------------------
+   TEMP — SETTINGS HIDDEN, DARK FORCED ACROSS THE WHOLE APP
+   Every rule below that could produce a light theme (the explicit
+   data-theme="light" block AND the prefers-color-scheme system
+   fallback) is commented out. This means EVERY page that loads
+   theme.css stays dark now, regardless of:
+     - a cached themePreference of "light" from before Settings
+       was hidden,
+     - the visitor's OS/browser being set to light mode,
+     - whether that particular page's own inline bootstrap script
+       was updated to force data-theme="dark" or not.
+   This was done here (once, in the shared file) instead of in each
+   page's inline script, since some pages (login, discover, admin,
+   etc.) hadn't been individually patched yet and were still going
+   light off the system preference.
 
-   A few surfaces (profile.css's editor drawer, form inputs, the
-   comment box) used literal dark colors instead of variables before
-   this existed. Those have been converted to var(--bg-surface) /
-   var(--bg-input) / var(--bg-input-alt), defined here with dark
-   defaults matching what they used to be, so this is additive and
-   nothing breaks if theme.css isn't loaded on some page.
-
-   Backdrop/scrim colors (modal overlays, ⋮ menu buttons sitting on
-   top of photos) are deliberately left alone — a translucent dark
-   scrim reads fine over either theme, same as Discord's own light
-   mode still dims the backdrop behind a modal.
+   TO RESTORE LIGHT MODE / SETTINGS LATER: uncomment the two blocks
+   below (marked with "UNCOMMENT TO RESTORE").
+   ---------------------------------------------------------
 ========================================================= */
 
 :root {
@@ -38,6 +40,7 @@
     --bg-input-alt: rgb(15, 15, 15);
 }
 
+/* UNCOMMENT TO RESTORE — explicit light theme via data-theme="light"
 :root[data-theme="light"] {
     --panel: #ffffff;
     --border: #e3e3e7;
@@ -50,15 +53,22 @@
     --bg-input: #f1f1f4;
     --bg-input-alt: #e9e9ee;
 }
+*/
 
 body {
     background: #131313;
 }
 
+/* UNCOMMENT TO RESTORE — paired with the data-theme="light" block above
 :root[data-theme="light"] body {
     background: #f3f3f5;
 }
+*/
 
+/* UNCOMMENT TO RESTORE — "System" theme following the OS/browser's own
+   light/dark setting when no data-theme attribute is present at all.
+   This is the block that was pulling pages without a forced-dark inline
+   script into light mode.
 @media (prefers-color-scheme: light) {
     :root:not([data-theme]) {
         --panel: #ffffff;
@@ -77,10 +87,13 @@ body {
         background: #f3f3f5;
     }
 }
+*/
 
 /* "Reduce motion" setting — a broader kill switch than
    prefers-reduced-motion alone, for people who want animations off in
-   Planora specifically regardless of their OS-wide setting. */
+   Planora specifically regardless of their OS-wide setting. Left active
+   — unrelated to the theme, and Settings' motion toggle should keep
+   working even while the theme toggle is hidden. */
 :root[data-reduce-motion] *,
 :root[data-reduce-motion] *::before,
 :root[data-reduce-motion] *::after {
