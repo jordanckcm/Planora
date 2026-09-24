@@ -196,6 +196,7 @@
 
     const burgerDot = bar.querySelector(".pl-dot");
 
+
     function setUnread(n) {
         const badge = drawer.querySelector('[data-key="notifications"] .pl-badge');
         if (badge) {
@@ -211,6 +212,22 @@
         if (document.hidden) return;
         try { setUnread(await PlanoraData.getUnreadCount()); }
         catch (e) { /* offline or signed out - leave the badge as it was */ }
+    }
+
+    function setFriendRequests(n) {
+        const badge = drawer.querySelector('[data-key="friends"] .pl-badge');
+        if (badge) {
+            badge.textContent = n > 99 ? "99+" : String(n);
+            badge.hidden = n === 0;
+        }
+    }
+   
+    async function refreshFriendRequests() {
+        if (document.hidden) return;
+        try {
+            const data = await PlanoraData.getFriends();
+            setFriendRequests(data.incoming.length);
+        } catch (e) { /* offline or signed out - leave the badge as it was */ }
     }
 
     async function go(key) {
