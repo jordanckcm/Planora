@@ -51,6 +51,20 @@ REPLIES
     replying to a reply attaches it to the same top-level comment and
     remembers who you were answering (reply_to).
 
+MENTIONS + NOTIFICATIONS
+    Typing @username in a comment, a reply, or a public/global event
+    description is a mention. The server works out which usernames are
+    real (comment["mentions"], and "mentions" on event views) so the
+    frontend only links real people.
+    Notifications are created for:
+        mention - you were @mentioned
+        reply   - someone replied to your comment
+        comment - someone commented on your event
+    One notification per person per comment (mention beats reply beats
+    comment), never for your own actions, capped per person, and cleaned
+    up automatically when the event/comment/person they point at is gone.
+    A "message" type can be added later the same way.
+
 PREFERENCES
     Each account also carries a couple of small client-preference
     fields - theme_preference ("system" | "light" | "dark") and
@@ -108,6 +122,13 @@ MAX_INTEREST_LENGTH = 20
 # just a defensive cap so a search with no filters can't return everything
 MAX_DIRECTORY_RESULTS = 100
 
+# notifications / mentions
+MAX_NOTIFICATIONS_PER_USER = 100
+MAX_MENTIONS_PER_TEXT = 5
+NOTIFICATION_SNIPPET = 80
+# "@name" that isn't glued to a word, "@" or "." - so emails (a@b.com) don't count
+MENTION_PATTERN = re.compile(r"(?<![\w@.])@([A-Za-z0-9_.]{3,40})")
+
 DATE_PATTERN = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 TIME_PATTERN = re.compile(r"^\d{2}:\d{2}$")
 LINK_PATTERN = re.compile(r"^https?://[^\s<>\"']+$")
@@ -144,9 +165,11 @@ def handle_too_large(e):
 users = []
 events = []
 comments = []
+notifications = []
 
 next_event_id = 1
 next_comment_id = 1
+next_notification_id = 1
 
 login_attempts = {}
 
@@ -340,6 +363,7 @@ def cascade_delete_event(deleted_event):
         removed_ids |= {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
         events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
     comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
+    prune_notifications()
 
 
 def prune_orphan_replies():
@@ -347,6 +371,7 @@ def prune_orphan_replies():
     replies hanging off it go with it."""
     alive = {c["id"] for c in comments}
     comments[:] = [c for c in comments if c.get("parent_id") is None or c["parent_id"] in alive]
+    prune_notifications()
 
 
 def make_local_copy(source_event, username):
@@ -377,6 +402,119 @@ def make_local_copy(source_event, username):
     return copy
 
 
+def extract_mentions(text):
+    """Real usernames @-mentioned in text (canonical spelling, no dupes)."""
+    found = []
+    for match in MENTION_PATTERN.finditer(text or ""):
+        raw = match.group(1)
+        user = find_user(raw) or find_user(raw.rstrip("."))  # "@bob." at end of a sentence
+        if user and user["username"] not in found:
+            found.append(user["username"])
+        if len(found) >= MAX_MENTIONS_PER_TEXT:
+            break
+    return found
+
+
+def create_notification(recipient, actor, kind, event, comment=None, text=""):
+    """kind: "mention" | "reply" | "comment". Never notifies you about yourself."""
+    global next_notification_id
+    if recipient.lower() == actor.lower():
+        return
+
+    notifications.append({
+        "id": next_notification_id,
+        "recipient": recipient,
+        "actor": actor,
+        "type": kind,
+        "event_id": event["id"],
+        "comment_id": comment["id"] if comment else None,
+        "text": (comment["text"] if comment else text)[:NOTIFICATION_SNIPPET],
+        "read": False,
+        "created_at": now_in_ms(),
+    })
+    next_notification_id += 1
+
+    # keep each person's inbox bounded - oldest fall off first
+    mine = [n for n in notifications if n["recipient"].lower() == recipient.lower()]
+    overflow = len(mine) - MAX_NOTIFICATIONS_PER_USER
+    if overflow > 0:
+        drop = {n["id"] for n in mine[:overflow]}
+        notifications[:] = [n for n in notifications if n["id"] not in drop]
+
+
+def notify_comment(event, comment):
+    """Event owner -> "comment", person replied to -> "reply", @mentioned ->
+    "mention". One notification per person; the strongest type wins."""
+    priority = {"comment": 1, "reply": 2, "mention": 3}
+    targets = {}
+
+    def want(username, kind):
+        person = find_user(username)
+        if not person or person["username"].lower() == comment["author"].lower():
+            return
+        if not can_see_event(person, event):  # don't leak private events via @mention
+            return
+        key = person["username"].lower()
+        if key not in targets or priority[kind] > priority[targets[key][1]]:
+            targets[key] = (person["username"], kind)
+
+    want(event["owner"], "comment")
+    if comment.get("reply_to"):
+        want(comment["reply_to"], "reply")
+    for name in comment.get("mentions", []):
+        want(name, "mention")
+
+    for username, kind in targets.values():
+        create_notification(username, comment["author"], kind, event, comment)
+
+
+def notify_event_mentions(event, actor, old_description=""):
+    """@mentions in a public/global event's description. On an edit, only
+    people who weren't already mentioned get pinged."""
+    if event["visibility"] not in ("public", "global"):
+        return
+    already = {n.lower() for n in extract_mentions(old_description)}
+    for name in extract_mentions(event["description"]):
+        if name.lower() not in already:
+            create_notification(name, actor, "mention", event, None, event["description"])
+
+
+def prune_notifications():
+    """Drop notifications whose event, comment or people no longer exist."""
+    live_users = {u["username"].lower() for u in users}
+    live_events = {e["id"] for e in events}
+    live_comments = {c["id"] for c in comments}
+    notifications[:] = [
+        n for n in notifications
+        if n["recipient"].lower() in live_users
+        and n["actor"].lower() in live_users
+        and n["event_id"] in live_events
+        and (n["comment_id"] is None or n["comment_id"] in live_comments)
+    ]
+
+
+def unread_count(user):
+    return len([
+        n for n in notifications
+        if n["recipient"].lower() == user["username"].lower() and not n["read"]
+    ])
+
+
+def notification_view(n):
+    event = find_event(n["event_id"])
+    return {
+        "id": n["id"],
+        "type": n["type"],
+        "read": n["read"],
+        "actor": n["actor"],
+        "eventId": n["event_id"],
+        "eventTitle": event["title"] if event else "",
+        "commentId": n["comment_id"],
+        "text": n["text"],
+        "createdAt": n["created_at"],
+    }
+
+
 def profile_event_view(event):
     """The trimmed-down shape of an event shown on a profile page - enough
     to render it as a post (banner, caption, comments) if the viewer
@@ -386,6 +524,7 @@ def profile_event_view(event):
         "owner": event["owner"],
         "title": event["title"],
         "description": event["description"],
+        "mentions": extract_mentions(event["description"]),
         "date": event["date"],
         "end_date": event.get("end_date", event["date"]),
         "start_time": event.get("start_time", ""),
@@ -401,6 +540,19 @@ def profile_event_view(event):
     }
 
 
+def feed_item(e, me):
+    """One event shaped for the feed / a single-post view."""
+    owner = find_user(e["owner"])
+    item = profile_event_view(e)
+    item["ownerDisplayName"] = owner["display_name"] if owner else e["owner"]
+    item["ownerAvatarColor"] = owner["avatar_color"] if owner else EVENT_COLORS[0]
+    item["ownerAvatarImage"] = owner.get("avatar_image", "") if owner else ""
+    item["isMine"] = e["owner"].lower() == me
+    item["addedByMe"] = any(
+        o["owner"].lower() == me and o.get("cloned_from") == e["id"] for o in events
+    )
+    item["commentCount"] = len([c for c in comments if c["event_id"] == e["id"]])
+    return item
 
 
 def comment_view(comment):
@@ -409,6 +561,7 @@ def comment_view(comment):
     out = dict(comment)
     out.setdefault("parent_id", None)
     out.setdefault("reply_to", None)
+    out.setdefault("mentions", [])
     author = find_user(comment["author"])
     out["authorDisplayName"] = author["display_name"] if author else comment["author"]
     out["authorAvatarColor"] = author["avatar_color"] if author else AVATAR_COLORS[0]
@@ -454,20 +607,8 @@ def get_feed():
     posts = [e for e in events if e["visibility"] in ("global", "public")]
     posts.sort(key=lambda e: e.get("created_at", 0), reverse=True)
 
-    out = []
-    for e in posts[:20]:  # images are base64, so keep this small until there's pagination
-        owner = find_user(e["owner"])
-        item = profile_event_view(e)
-        item["ownerDisplayName"] = owner["display_name"] if owner else e["owner"]
-        item["ownerAvatarColor"] = owner["avatar_color"] if owner else EVENT_COLORS[0]
-        item["ownerAvatarImage"] = owner.get("avatar_image", "") if owner else ""
-        item["isMine"] = e["owner"].lower() == me
-        item["addedByMe"] = any(
-            o["owner"].lower() == me and o.get("cloned_from") == e["id"] for o in events
-        )
-        item["commentCount"] = len([c for c in comments if c["event_id"] == e["id"]])
-        out.append(item)
-    return jsonify(out)
+    # images are base64, so keep this small until there's pagination
+    return jsonify([feed_item(e, me) for e in posts[:20]])
 
 @app.route("/")
 def serve_home_page():
@@ -712,7 +853,7 @@ def list_users():
     a text search (matches username or display name) and/or a single
     interest tag (exact match, case-insensitive). Powers directory.html,
     including the "click an interest chip on a profile" path, which
-    links here with ?interest=<tag>.
+    links here with ?interest=<tag>. Also powers @mention autocomplete.
 
     Distinct from GET /api/users/<username> below - that one is a single
     person's full profile (with their public events); this one is a
@@ -828,6 +969,7 @@ def get_events():
         event_copy.setdefault("image_position", dict(DEFAULT_IMAGE_POSITION))
         event_copy.setdefault("edited", False)
         event_copy.setdefault("edited_at", None)
+        event_copy["mentions"] = extract_mentions(event.get("description", ""))
         event_copy["isMine"] = event["owner"].lower() == username.lower()
 
         # so the card can show the host's face instead of a bare day
@@ -864,6 +1006,21 @@ def get_events():
         result.append(event_copy)
 
     return jsonify(result)
+
+
+@app.route("/api/events/<int:event_id>", methods=["GET"])
+def get_event(event_id):
+    """A single event, if the viewer is allowed to see it. Notifications use
+    this to open the post they point at."""
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    event = find_event(event_id)
+    if not event or not can_see_event(user, event):
+        return jsonify({"error": "Event not found."}), 404
+
+    return jsonify(feed_item(event, user["username"].lower()))
 
 
 @app.route("/api/events", methods=["POST"])
@@ -970,6 +1127,9 @@ def add_event():
     # Deliberately exempt from the local cap - you didn't ask for it.
     if visibility == "global":
         events.append(make_local_copy(new_event, user["username"]))
+
+    # ping anyone @mentioned in a public/global description
+    notify_event_mentions(new_event, user["username"])
 
     response = dict(new_event)
     response["isMine"] = True
@@ -1089,6 +1249,7 @@ def edit_event(event_id):
         "edited": True,
         "edited_at": edited_at,
     }
+    old_description = event["description"]
     event.update(changes)
 
     # A Global post's clones mirror its content - an edit here should
@@ -1099,8 +1260,12 @@ def edit_event(event_id):
             if clone.get("cloned_from") == event["id"]:
                 clone.update(changes)
 
+    # only people newly @mentioned in the description get pinged
+    notify_event_mentions(event, user["username"], old_description)
+
     response = dict(event)
     response["isMine"] = True
+    response["mentions"] = extract_mentions(event["description"])
     return jsonify(response)
 
 
@@ -1228,11 +1393,13 @@ def add_comment(event_id):
         "edited": False,
         "parent_id": parent_id,
         "reply_to": reply_to,
+        "mentions": extract_mentions(text),
         "created_at": now_in_ms(),
     }
     next_comment_id += 1
 
     comments.append(new_comment)
+    notify_comment(event, new_comment)
     return jsonify(comment_view(new_comment))
 
 
@@ -1254,8 +1421,19 @@ def edit_comment(event_id, comment_id):
     if not text:
         return jsonify({"error": "Comment can't be empty."}), 400
 
+    event = find_event(event_id)
+    old_mentions = {m.lower() for m in comment.get("mentions", [])}
+
     comment["text"] = text
     comment["edited"] = True
+    comment["mentions"] = extract_mentions(text)
+
+    # only people newly @mentioned by this edit get pinged
+    if event:
+        for name in comment["mentions"]:
+            person = find_user(name)
+            if name.lower() not in old_mentions and person and can_see_event(person, event):
+                create_notification(person["username"], comment["author"], "mention", event, comment)
 
     return jsonify(comment_view(comment))
 
@@ -1290,7 +1468,99 @@ def delete_comment(event_id, comment_id):
         c for c in comments
         if c["id"] != comment["id"] and c.get("parent_id") != comment["id"]
     ]
+    prune_notifications()
     return jsonify({"ok": True})
+
+
+@app.route("/api/notifications", methods=["GET"])
+def get_notifications():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    mine = [n for n in notifications if n["recipient"].lower() == user["username"].lower()]
+    mine.sort(key=lambda n: n["id"], reverse=True)
+    shown = mine[:50]
+
+    # avatars can be ~1MB base64, so send each person once instead of per row
+    actors = {}
+    for n in shown:
+        if n["actor"] in actors:
+            continue
+        actor = find_user(n["actor"])
+        if actor:
+            actors[n["actor"]] = {
+                "displayName": actor["display_name"],
+                "avatarColor": actor["avatar_color"],
+                "avatarImage": actor.get("avatar_image", ""),
+                "avatarPosition": actor.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION),
+            }
+
+    return jsonify({
+        "notifications": [notification_view(n) for n in shown],
+        "actors": actors,
+        "unreadCount": len([n for n in mine if not n["read"]]),
+    })
+
+
+@app.route("/api/notifications/unread-count", methods=["GET"])
+def get_unread_count():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+    return jsonify({"unreadCount": unread_count(user)})
+
+
+@app.route("/api/notifications/<int:notification_id>/read", methods=["POST"])
+def read_notification(notification_id):
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    n = next((n for n in notifications
+              if n["id"] == notification_id and n["recipient"].lower() == user["username"].lower()), None)
+    if not n:
+        return jsonify({"error": "Notification not found."}), 404
+
+    n["read"] = True
+    return jsonify({"ok": True, "unreadCount": unread_count(user)})
+
+
+@app.route("/api/notifications/read-all", methods=["POST"])
+def read_all_notifications():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    for n in notifications:
+        if n["recipient"].lower() == user["username"].lower():
+            n["read"] = True
+    return jsonify({"ok": True, "unreadCount": 0})
+
+
+@app.route("/api/notifications/<int:notification_id>", methods=["DELETE"])
+def delete_notification(notification_id):
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    n = next((n for n in notifications
+              if n["id"] == notification_id and n["recipient"].lower() == user["username"].lower()), None)
+    if not n:
+        return jsonify({"error": "Notification not found."}), 404
+
+    notifications.remove(n)
+    return jsonify({"ok": True, "unreadCount": unread_count(user)})
+
+
+@app.route("/api/notifications", methods=["DELETE"])
+def clear_notifications():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    notifications[:] = [n for n in notifications if n["recipient"].lower() != user["username"].lower()]
+    return jsonify({"ok": True, "unreadCount": 0})
 
 
 @app.route("/api/stats", methods=["GET"])
