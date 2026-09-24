@@ -2642,6 +2642,7 @@ def admin_delete_user(current_user, username):
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
     prune_orphan_replies()
     drop_user_push_data(username)
+    drop_user_friendships(username)
     log_change("profile", username=target["username"])
     log_change("comments", event_id=None)
 
