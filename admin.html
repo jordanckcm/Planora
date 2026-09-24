@@ -15,7 +15,8 @@
 
 <body>
 
-    <!-- TOP BAR -->
+    <!-- TOP BAR (hidden by planora-shell.css; admin.js still looks up
+         .profile and #backButton, so they stay in the page) -->
     <div class="topbar">
         <div class="profile"></div>
         <button class="custom-button" id="backButton">← Back</button>
@@ -97,6 +98,7 @@
 
     <script src="api.js"></script>
     <script src="admin.js"></script>
+    <script src="planora-nav.js"></script>
 
 </body>
 
