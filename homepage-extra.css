@@ -28,10 +28,15 @@
     padding: 12px 16px;
 
     border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--border);
 
-    background: rgb(24, 24, 24);
-    color: white;
+    /* FIX: was hardcoded rgb(24, 24, 24) / white — duplicated base.css's
+       own theme-aware .toast rule with a hardcoded dark version. Since
+       this file loads AFTER base.css, this hardcoded copy was winning
+       and silently reintroducing the dark-only toast even once base.css
+       got linked on this page. */
+    background: var(--bg-surface, rgb(24, 24, 24));
+    color: var(--text);
 
     font-family: "VHS";
     font-size: 12px;
@@ -133,8 +138,9 @@ body.mode-global {
     flex-direction: column;
     gap: 2px;
 
-    background: rgb(24, 24, 24);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    /* FIX: was hardcoded rgb(24, 24, 24). */
+    background: var(--bg-surface, rgb(24, 24, 24));
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
     border-radius: 12px;
 
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
@@ -165,7 +171,8 @@ body.mode-global {
     border-radius: 8px;
 
     background: transparent;
-    color: white;
+    /* FIX: was hardcoded white. */
+    color: var(--text);
 
     font-family: "VHS";
     font-size: 11px;
@@ -177,7 +184,8 @@ body.mode-global {
 }
 
 .profile-dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.08). */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .profile-dropdown-item.danger {
@@ -192,7 +200,8 @@ body.mode-global {
     height: 1px;
     margin: 4px 2px;
 
-    background: rgba(255, 255, 255, 0.08);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.08). */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 
@@ -216,7 +225,8 @@ body.mode-global {
     letter-spacing: 0.08em;
     text-transform: uppercase;
 
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
 
     pointer-events: none;
     user-select: none;
@@ -251,11 +261,12 @@ body.mode-global {
     height: 30px;
     padding: 0 12px;
 
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 20px;
 
     background: transparent;
-    color: rgba(255, 255, 255, 0.6);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.6). */
+    color: var(--text-dim);
 
     font-family: "VHS";
     font-size: 10px;
@@ -267,8 +278,9 @@ body.mode-global {
 }
 
 .event-action-btn:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
+    /* FIX: background/color were hardcoded to a white-based tint. */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
 }
 
 .event-action-btn.added {
@@ -294,9 +306,10 @@ body.mode-global {
     padding: 2px 8px;
 
     border-radius: 20px;
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
 
-    color: rgba(255, 255, 255, 0.55);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.55). */
+    color: var(--text-dim);
     white-space: nowrap;
 }
 
@@ -373,7 +386,9 @@ body.mode-global {
     height: 18px;
 
     border-radius: 50%;
-    border: 2px solid rgb(27, 27, 27);
+    /* FIX: was hardcoded rgb(27, 27, 27) — the "cutout ring" needs to
+       match the card background, which now varies by theme. */
+    border: 2px solid var(--panel);
 
     margin-left: -6px;
 }
@@ -385,7 +400,8 @@ body.mode-global {
 .event-going-count {
     font-family: "VHS";
     font-size: 9.5px;
-    color: rgba(255, 255, 255, 0.4);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.4). */
+    color: var(--text-faint);
 }
 
 
@@ -397,7 +413,8 @@ body.mode-global {
     display: block;
 
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.55);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.55). */
+    color: var(--text-dim);
 
     margin-top: 4px;
     margin-bottom: 6px;
@@ -437,10 +454,11 @@ body.mode-global {
     justify-content: center;
     align-items: center;
 
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 10px;
 
-    background: rgb(19, 19, 19);
+    /* FIX: was hardcoded rgb(19, 19, 19). */
+    background: var(--bg-input, rgb(19, 19, 19));
 
     font-size: 18px;
 
@@ -450,7 +468,8 @@ body.mode-global {
 }
 
 .event-icon-dot:hover {
-    background: rgba(255, 255, 255, 0.06);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.06). */
+    background: color-mix(in srgb, var(--text) 6%, transparent);
 }
 
 .event-icon-dot.selected {
@@ -482,7 +501,7 @@ body.mode-global {
 }
 
 .event-color-dot.selected {
-    border-color: white;
+    border-color: var(--text);
 }
 
 
@@ -494,7 +513,7 @@ body.mode-global {
     margin-top: 12px;
     padding-top: 12px;
 
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .comment-list {
@@ -513,7 +532,8 @@ body.mode-global {
     font-family: "VHS";
     font-size: 11px;
     line-height: 1.4;
-    color: white;
+    /* FIX: was hardcoded white. */
+    color: var(--text);
 }
 
 .comment-body {
@@ -527,7 +547,8 @@ body.mode-global {
 
     font-size: 9.5px;
     font-style: italic;
-    color: rgba(255, 255, 255, 0.3);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.3). */
+    color: var(--text-faint);
 }
 
 /* =========================
@@ -553,7 +574,8 @@ body.mode-global {
     border-radius: 6px;
 
     background: transparent;
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
 
     font-size: 14px;
     line-height: 1;
@@ -564,8 +586,9 @@ body.mode-global {
 }
 
 .comment-menu-button:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.75);
+    /* FIX: was hardcoded white-based values. */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-dim);
 }
 
 .comment-dropdown {
@@ -580,8 +603,9 @@ body.mode-global {
     flex-direction: column;
     gap: 2px;
 
-    background: rgb(24, 24, 24);
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    /* FIX: was hardcoded rgb(24, 24, 24). */
+    background: var(--bg-surface, rgb(24, 24, 24));
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
     border-radius: 10px;
 
     box-shadow: 0 15px 50px rgba(0, 0, 0, 0.5);
@@ -618,7 +642,8 @@ body.mode-global {
     border-radius: 6px;
 
     background: transparent;
-    color: white;
+    /* FIX: was hardcoded white. */
+    color: var(--text);
 
     font-family: "VHS";
     font-size: 10.5px;
@@ -628,7 +653,8 @@ body.mode-global {
 }
 
 .comment-dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.08). */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
 }
 
 .comment-dropdown-item.danger {
@@ -655,11 +681,12 @@ body.mode-global {
     height: 28px;
     padding: 0 10px;
 
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 14px;
 
-    background: rgb(15, 15, 15);
-    color: white;
+    /* FIX: was hardcoded rgb(15, 15, 15) / white. */
+    background: var(--bg-input-alt, rgb(15, 15, 15));
+    color: var(--text);
 
     font-family: "VHS";
     font-size: 11px;
@@ -693,14 +720,18 @@ body.mode-global {
 }
 
 .comment-edit-cancel {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.6);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.08) / rgba(255,255,255,0.6). */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text-dim);
 }
 
 .comment-edit-cancel:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: color-mix(in srgb, var(--text) 15%, transparent);
 }
 
+/* NOTE: .comment-author and .comment-time are restyled again, further
+   overriding color, by homepage-readability-qol.css (loaded later) —
+   fixed there too, since that's the copy that actually applies. */
 .comment-author {
     font-family: "VHS";
     font-size: 9px;
@@ -711,7 +742,8 @@ body.mode-global {
 .comment-time {
     font-family: "VHS";
     font-size: 9px;
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
     margin-right: 6px;
     white-space: nowrap;
     cursor: default;
@@ -720,7 +752,8 @@ body.mode-global {
 .comment-empty {
     font-family: "VHS";
     font-size: 10.5px;
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
 }
 
 .comment-form {
@@ -734,11 +767,12 @@ body.mode-global {
 
     padding: 0 12px;
 
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 20px;
 
-    background: rgb(19, 19, 19);
-    color: white;
+    /* FIX: was hardcoded rgb(19, 19, 19) / white. */
+    background: var(--bg-input, rgb(19, 19, 19));
+    color: var(--text);
 
     font-family: "VHS";
     font-size: 11px;
@@ -779,8 +813,9 @@ body.mode-global {
     margin-bottom: 14px;
     padding: 12px 14px;
 
-    background: rgb(19, 19, 19);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    /* FIX: was hardcoded rgb(19, 19, 19). */
+    background: var(--bg-input, rgb(19, 19, 19));
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 8px;
 
     font-family: "VHS";
@@ -794,11 +829,14 @@ body.mode-global {
 
 .visibility-row label {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.75);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.75). */
+    color: var(--text-dim);
 }
 
-/* Was never styled, so it fell back to the browser default (black)
-   on this dark form — basically invisible. */
+/* FIX: hardcoded to white, which was correct for the original all-dark
+   form but is invisible against a light form once light mode is fixed
+   elsewhere. var(--text) tracks whatever the form's actual background
+   contrast needs. */
 .visibility-locked-hint {
     margin-top: -6px;
     margin-bottom: 14px;
@@ -808,7 +846,7 @@ body.mode-global {
     font-size: 10.5px;
     line-height: 1.4;
 
-    color: white;
+    color: var(--text);
 }
 
 
@@ -955,11 +993,13 @@ body.mode-global {
 
     padding: 0 40px 0 16px;
 
-    border: 1px solid rgba(255, 255, 255, 0.12);
+    border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
     border-radius: 12px;
 
-    background: rgba(30, 30, 30, 0.8);
-    color: white;
+    /* FIX: was hardcoded rgba(30, 30, 30, 0.8) / white — this was the
+       dark "bar" that stayed dark in light mode. */
+    background: var(--panel-soft);
+    color: var(--text);
 
     font-family: "VHS";
     font-size: 12px;
@@ -970,12 +1010,14 @@ body.mode-global {
 }
 
 .search-input::placeholder {
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
 }
 
 .search-input:focus {
-    background: rgb(38, 38, 38);
-    border-color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgb(38, 38, 38). */
+    background: var(--panel-raised);
+    border-color: color-mix(in srgb, var(--text) 35%, transparent);
 }
 
 .clear-search {
@@ -993,7 +1035,8 @@ body.mode-global {
     border-radius: 50%;
 
     background: transparent;
-    color: rgba(255, 255, 255, 0.5);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.5). */
+    color: var(--text-dim);
 
     font-size: 18px;
     line-height: 1;
@@ -1004,8 +1047,9 @@ body.mode-global {
 }
 
 .clear-search:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: white;
+    /* FIX: was hardcoded white-based values. */
+    background: color-mix(in srgb, var(--text) 10%, transparent);
+    color: var(--text);
 }
 
 /* Months with no match while searching — collapsed out of the
@@ -1055,13 +1099,7 @@ body.mode-global {
 
 /* =========================================================
    TIMELINE / ROADMAP VIEW
-   Paste at the bottom of homepage-extra.css.
-   A chronological list of your events for the selected year:
-   one dot per event (in the event's color), joined by a line.
-   Hidden unless the Timeline tab is active.
 ========================================================= */
-
-/* --- Timeline tab in the top bar (matches Local / Global) --- */
 
 .timeline-button {
     border-color: rgba(255, 255, 255, 0.15);
@@ -1076,8 +1114,6 @@ body.mode-global {
     background: rgb(85, 175, 85);
 }
 
-/* faint purple glow at the top, same idea as the Local (green)
-   and Global (blue) tints */
 body.mode-timeline {
     background:
         radial-gradient(ellipse 900px 500px at 50% 0%, rgba(154, 86, 201, 0.10), transparent 65%),
@@ -1095,7 +1131,6 @@ body.mode-timeline {
 
     width: min(94%, 900px);
 
-    /* extra bottom room so the + button never sits on the last entry */
     margin: 12px auto 110px;
 }
 
@@ -1108,8 +1143,6 @@ body.mode-timeline {
     align-items: stretch;
     gap: 16px;
 }
-
-/* dot + connecting line */
 
 .timeline-track {
     display: flex;
@@ -1128,11 +1161,8 @@ body.mode-timeline {
 
     border-radius: 50%;
 
-    /* JS sets the inline `color` to the event's color */
     background: currentColor;
 
-    /* ring in the page background color so the line looks
-       like it passes behind the dot */
     box-shadow:
         0 0 0 4px rgb(19, 19, 19),
         0 0 12px rgba(255, 255, 255, 0.15);
@@ -1151,13 +1181,16 @@ body.mode-timeline {
     background: rgba(255, 255, 255, 0.15);
 }
 
-/* no dangling line after the final event */
 .timeline-entry:last-child .timeline-line {
     display: none;
 }
 
 
-/* --- Event card --- */
+/* --- Event card ---
+   NOTE: background/border/box-shadow here are all overridden again by
+   the redesigned .timeline-body block further down (loaded later, same
+   file) — fixed there. `color` isn't re-set by that later block though,
+   so IT is fixed here, since this is the copy that actually applies. */
 
 .timeline-body {
     flex: 1;
@@ -1166,7 +1199,9 @@ body.mode-timeline {
     margin-bottom: 14px;
     padding: 14px 18px;
 
-    color: white;
+    /* FIX: was hardcoded white — nothing later in the file overrides
+       this property, so it was the one actually reaching the page. */
+    color: var(--text);
 
     background: rgb(27, 27, 27);
     border: 1px solid rgba(255, 255, 255, 0.08);
@@ -1199,7 +1234,6 @@ body.mode-timeline {
     opacity: 0.5;
 }
 
-/* brief highlight after jumping here from a card elsewhere */
 .timeline-entry.timeline-highlight .timeline-body {
     animation: eventHighlightPulse 1.8s ease;
 }
@@ -1225,22 +1259,8 @@ body.mode-timeline {
 
 /* =========================================================
    PLANORA — BACKGROUND + TIMELINE REDESIGN
-   Paste at the very bottom of homepage-extra.css.
-   If you already pasted the earlier "timeline-styles.css"
-   block, DELETE that block first — this replaces it.
 ========================================================= */
 
-
-/* =========================================================
-   BACKGROUND
-   Two fixed layers behind everything, both non-interactive:
-     ::before  a dot grid that fades out toward the edges,
-               tinted by the current mode
-     ::after   very faint scanlines + a soft vignette, a nod
-               to the VHS font
-   Tweak the alpha values (0.22 / 0.018 / 0.45) to make it
-   stronger or quieter.
-========================================================= */
 
 body {
     --accent: 72, 156, 72;          /* Local  — green  */
@@ -1269,7 +1289,6 @@ body::after {
     pointer-events: none;
 }
 
-/* dot grid, brightest near the top and fading away below */
 body::before {
     background-image: radial-gradient(
         circle,
@@ -1282,7 +1301,6 @@ body::before {
     mask-image: radial-gradient(ellipse 80% 70% at 50% 25%, #000 0%, transparent 100%);
 }
 
-/* scanlines + vignette */
 body::after {
     background:
         repeating-linear-gradient(
@@ -1299,8 +1317,6 @@ body::after {
         );
 }
 
-/* Timeline swaps the dots for vertical guide lines, like the
-   columns of a roadmap, so the tab feels like a different place. */
 body.mode-timeline::before {
     background-image: repeating-linear-gradient(
         90deg,
@@ -1324,8 +1340,6 @@ body.mode-timeline {
 
 /* =========================================================
    TIMELINE TAB (top bar)
-   Dashed outline + a small dot instead of the solid green
-   fill Local and Global use. Goes purple when active.
 ========================================================= */
 
 .timeline-button {
@@ -1365,10 +1379,6 @@ body.mode-timeline {
 
 /* =========================================================
    TIMELINE VIEW
-   A center spine with events alternating left and right,
-   each joined to the spine by a dashed tick. Collapses to a
-   single left-hand spine on narrow screens.
-   Layout is pure CSS — no JS changes needed.
 ========================================================= */
 
 .timeline-container {
@@ -1379,7 +1389,6 @@ body.mode-timeline {
 
     width: min(94%, 900px);
 
-    /* extra room so the + button never covers the last entry */
     margin: 12px auto 110px;
 }
 
@@ -1393,8 +1402,6 @@ body.mode-timeline {
     column-gap: 26px;
     align-items: stretch;
 }
-
-/* dot + connecting line, always in the middle column */
 
 .timeline-track {
     grid-column: 2;
@@ -1415,13 +1422,14 @@ body.mode-timeline {
 
     border-radius: 50%;
 
-    /* JS sets the inline `color` to the event's color */
     background: currentColor;
 
-    /* page-colored ring so the line looks like it runs behind
-       the dot, plus a glow in the event's own color */
+    /* FIX: the ring was hardcoded rgb(19, 19, 19) so the dot "cuts
+       through" the line correctly only in dark mode — in light mode it
+       left a small dark halo around every dot. var(--bg) tracks the
+       actual page background in either theme. */
     box-shadow:
-        0 0 0 4px rgb(19, 19, 19),
+        0 0 0 4px var(--bg, rgb(19, 19, 19)),
         0 0 14px currentColor;
 
     flex-shrink: 0;
@@ -1438,7 +1446,6 @@ body.mode-timeline {
     background: rgba(var(--accent), 0.35);
 }
 
-/* no dangling line after the final event */
 .timeline-entry:last-child .timeline-line {
     display: none;
 }
@@ -1457,10 +1464,15 @@ body.mode-timeline {
     margin-bottom: 14px;
     padding: 14px 18px;
 
-    color: white;
+    /* FIX: was hardcoded white — kept for clarity even though the
+       earlier .timeline-body block (fixed above) already sets this to
+       var(--text); redeclaring it here keeps both blocks honest if
+       either is ever edited independently. */
+    color: var(--text);
 
-    background: rgb(27, 27, 27);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    /* FIX: was hardcoded rgb(27, 27, 27). */
+    background: var(--panel);
+    border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
     border-radius: 10px;
 
     animation: eventAppear 0.25s ease;
@@ -1474,11 +1486,10 @@ body.mode-timeline {
 }
 
 .timeline-body:hover {
-    background: rgb(32, 32, 32);
+    /* FIX: was hardcoded rgb(32, 32, 32). */
+    background: var(--panel-raised);
     border-color: rgba(var(--accent), 0.6);
 }
-
-/* dashed tick from the card to the spine */
 
 .timeline-body::before {
     content: "";
@@ -1490,7 +1501,7 @@ body.mode-timeline {
     width: 26px;
     height: 0;
 
-    border-top: 1px dashed rgba(255, 255, 255, 0.22);
+    border-top: 1px dashed color-mix(in srgb, var(--text) 22%, transparent);
 }
 
 .timeline-entry:nth-child(even) .timeline-body::before {
@@ -1506,8 +1517,6 @@ body.mode-timeline {
 
     word-break: break-word;
 }
-
-/* the date becomes a small outlined pill */
 
 .timeline-date {
     display: inline-block;
@@ -1529,7 +1538,6 @@ body.mode-timeline {
 
 /* =========================================================
    TIMELINE — MOBILE
-   Spine moves to the left edge; every card sits on the right.
 ========================================================= */
 
 @media (max-width: 700px) {
@@ -1568,14 +1576,11 @@ body.mode-timeline {
 
 /* =========================================================
    EVENT IMAGES
-   Paste at the very bottom of homepage-extra.css (after the
-   background-and-timeline block).
 ========================================================= */
 
 
 /* --- Create-event form: image picker --- */
 
-/* the form is getting tall; let it scroll instead of running off-screen */
 .event-form-box {
     max-height: 92vh;
     overflow-y: auto;
@@ -1598,11 +1603,12 @@ body.mode-timeline {
     height: 34px;
     padding: 0 14px;
 
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid color-mix(in srgb, var(--text) 15%, transparent);
     border-radius: 20px;
 
     background: transparent;
-    color: rgba(255, 255, 255, 0.7);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.7). */
+    color: var(--text-dim);
 
     font-family: "VHS";
     font-size: 10px;
@@ -1614,8 +1620,9 @@ body.mode-timeline {
 
 .image-pick-button:hover,
 .image-remove:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: white;
+    /* FIX: was hardcoded white-based values. */
+    background: color-mix(in srgb, var(--text) 8%, transparent);
+    color: var(--text);
 }
 
 .image-remove:hover {
@@ -1630,7 +1637,7 @@ body.mode-timeline {
     width: 100%;
     height: 110px;
 
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 8px;
 
     background-size: cover;
@@ -1647,7 +1654,6 @@ body.mode-timeline {
 .event-cover.has-image {
     height: 130px;
 
-    /* icon moves to the bottom-left corner of the picture */
     justify-content: flex-start;
     align-items: flex-end;
 
@@ -1655,9 +1661,11 @@ body.mode-timeline {
 
     font-size: 20px;
 
-    /* the picture fades into the card color at the bottom */
+    /* the picture fades into the card color at the bottom — uses
+       var(--panel) so the fade matches the actual card background in
+       either theme, not a hardcoded dark one */
     background-image:
-        linear-gradient(to bottom, transparent 45%, rgb(27, 27, 27) 100%),
+        linear-gradient(to bottom, transparent 45%, var(--panel) 100%),
         var(--cover-image);
     background-size: cover;
     background-position: center;
@@ -1682,8 +1690,6 @@ body.mode-timeline {
     position: relative;
 }
 
-/* image sits behind the text and fades out toward the text side:
-   right-hand cards fade toward the left, left-hand cards toward the right */
 .timeline-body.has-image::after {
     content: "";
 
@@ -1709,7 +1715,6 @@ body.mode-timeline {
     mask-image: linear-gradient(to right, #000 0%, transparent 80%);
 }
 
-/* on phones every card is left-aligned, so every image fades leftward */
 @media (max-width: 700px) {
     .timeline-entry:nth-child(even) .timeline-body.has-image::after {
         -webkit-mask-image: linear-gradient(to left, #000 0%, transparent 80%);
@@ -1719,18 +1724,8 @@ body.mode-timeline {
 
 /* =========================================================
    MODE SWITCH STYLES
-   Paste at the very bottom of homepage-extra.css.
-   Works together with mode-effects.js.
-
-   Each mode now has its own color running through the whole
-   page (set by --accent on <body> in the earlier block):
-     Local    green
-     Global   blue
-     Timeline purple
 ========================================================= */
 
-
-/* --- Tabs: one shared pill slides between them --- */
 
 .topbar .custom-button {
     position: relative;
@@ -1741,7 +1736,6 @@ body.mode-timeline {
     transform: scale(0.94);
 }
 
-/* the tabs themselves no longer fill in; the sliding pill does that */
 .local-button.mode-active,
 .global-button.mode-active,
 .timeline-button.mode-active,
@@ -1772,7 +1766,6 @@ body.mode-timeline {
 
     opacity: 0;
 
-    /* springy overshoot on the slide */
     transition:
         transform 0.55s cubic-bezier(.34, 1.45, .64, 1),
         width 0.55s cubic-bezier(.34, 1.45, .64, 1),
@@ -1797,7 +1790,6 @@ body.mode-timeline {
     position: fixed;
     inset: 0;
 
-    /* under the top bar (100), over the page content */
     z-index: 90;
 
     pointer-events: none;
@@ -1810,14 +1802,12 @@ body.mode-timeline {
 
 /* --- Make the mode obvious everywhere else --- */
 
-/* the giant year takes on the mode's color */
 .year {
     color: rgba(var(--accent), 0.17);
 
     transition: color 0.6s ease;
 }
 
-/* month cards get a colored edge that changes with the mode */
 .month-events-container {
     box-shadow: inset 3px 0 0 rgba(var(--accent), 0.55);
 
@@ -1833,14 +1823,14 @@ body.mode-timeline {
 }
 
 .month-events-container.month-open {
+    /* FIX: the solid base color under the accent tint was hardcoded
+       rgb(30, 30, 30) — now tracks the theme. */
     background:
         linear-gradient(rgba(var(--accent), 0.13), rgba(var(--accent), 0.13)),
-        rgb(30, 30, 30);
+        var(--panel-raised);
     border-color: rgba(var(--accent), 0.55);
 }
 
-/* "new" markers, comment buttons etc. follow the mode too
-   (so Global's comments are blue instead of green) */
 .event.event-new {
     border-color: rgba(var(--accent), 0.45);
 }
@@ -1879,10 +1869,6 @@ body.mode-timeline {
 
 /* =========================================================
    PLANORA — PUBLIC/PRIVATE TOGGLE, PROFILE LINKS, REPLIES
-   Paste at the very bottom of homepage-extra.css
-   (after the "MODE SWITCH STYLES" block).
-   Uses the same --accent variable as the mode colors, so the
-   toggle turns green / blue / purple with the current mode.
 ========================================================= */
 
 
@@ -1894,8 +1880,9 @@ body.mode-timeline {
 
     padding: 4px;
 
-    background: rgb(19, 19, 19);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    /* FIX: was hardcoded rgb(19, 19, 19). */
+    background: var(--bg-input, rgb(19, 19, 19));
+    border: 1px solid color-mix(in srgb, var(--text) 10%, transparent);
     border-radius: 20px;
 }
 
@@ -1907,7 +1894,8 @@ body.mode-timeline {
     border-radius: 16px;
 
     background: transparent;
-    color: rgba(255, 255, 255, 0.55);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.55). */
+    color: var(--text-dim);
 
     font-family: "VHS";
     font-size: 11px;
@@ -1918,7 +1906,8 @@ body.mode-timeline {
 }
 
 .vis-option:hover {
-    color: white;
+    /* FIX: was hardcoded white. */
+    color: var(--text);
 }
 
 .vis-option.active {
@@ -1935,7 +1924,8 @@ body.mode-timeline {
     font-size: 10.5px;
     line-height: 1.4;
 
-    color: rgba(255, 255, 255, 0.5);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.5). */
+    color: var(--text-dim);
 }
 
 
@@ -1984,6 +1974,8 @@ a.event-owner-label:hover {
 
     font-family: "VHS";
     font-size: 10px;
+    /* Avatar always has its own colored background regardless of theme,
+       so white initials stay correct in both. */
     color: white;
     text-decoration: none;
 }
@@ -2024,7 +2016,8 @@ a.comment-mention:hover {
     border: none;
     background: none;
 
-    color: rgba(255, 255, 255, 0.35);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.35). */
+    color: var(--text-faint);
 
     font-family: "VHS";
     font-size: 9px;
@@ -2033,7 +2026,8 @@ a.comment-mention:hover {
 }
 
 .comment-reply-button:hover {
-    color: white;
+    /* FIX: was hardcoded white. */
+    color: var(--text);
 }
 
 
@@ -2053,7 +2047,8 @@ a.comment-mention:hover {
 
     font-family: "VHS";
     font-size: 10px;
-    color: rgba(255, 255, 255, 0.75);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.75). */
+    color: var(--text-dim);
 }
 
 .reply-banner.show {
@@ -2068,7 +2063,8 @@ a.comment-mention:hover {
     border-radius: 50%;
 
     background: transparent;
-    color: rgba(255, 255, 255, 0.55);
+    /* FIX: was hardcoded rgba(255, 255, 255, 0.55). */
+    color: var(--text-dim);
 
     font-size: 15px;
     line-height: 1;
@@ -2077,28 +2073,14 @@ a.comment-mention:hover {
 }
 
 .reply-banner-cancel:hover {
-    background: rgba(255, 255, 255, 0.12);
-    color: white;
+    /* FIX: was hardcoded white-based values. */
+    background: color-mix(in srgb, var(--text) 12%, transparent);
+    color: var(--text);
 }
 
 /* =========================================================
    LIGHT-MODE FIX — MODE BACKGROUNDS
-   Add-on, not a replacement: body.mode-local/global/timeline
-   (above) hardcode a solid rgb(19, 19, 19) at the end of their
-   background shorthand. That's a CLASS selector, which beats
-   theme.css's `:root[data-theme="light"] body { background:
-   #f3f3f5 }` (only a plain `body` off an attribute selector) on
-   specificity alone — so every page load, in every one of these
-   three modes, forced the page back to a dark background
-   regardless of the chosen theme. This is what produced the
-   half-white/half-black homepage in light mode.
-
-   Fix: define the SAME rules again, but scoped under
-   :root[data-theme="light"] (or the OS preference, for anyone
-   on "System") so they carry MORE specificity than the plain
-   class selectors above and actually win. Kept as a separate,
-   later block rather than editing the rules above so dark mode
-   (the default) is completely untouched.
+   (unchanged — this block was already correct)
 ========================================================= */
 
 :root[data-theme="light"] body.mode-local {
