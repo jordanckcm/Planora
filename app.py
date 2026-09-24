@@ -100,6 +100,21 @@ PUSH NOTIFICATIONS (Web Push)
     checked so they can only point at real push services (otherwise the
     server could be tricked into calling arbitrary URLs).
 
+FEED RANKING
+    GET /api/feed orders Global + Public posts by how useful they are to the
+    person looking, not just by when they were posted (see rank_feed):
+        just posted (last 15 min)   always at the very top
+        recently posted             fresher scores higher, fading over ~a day
+        event happening soon        today / this week gets a big boost
+        event already over          sinks, and drops off after two weeks
+        popular                     comments and "going" count
+        people you interact with    posts from people whose events you've
+                                    commented on or added
+        @mentions you               boosted
+        already on your calendar    lowered a little
+    A small spread rule stops one person's posts from clumping together.
+    ?sort=latest gives plain newest-first; ?offset=&limit= page through it.
+
 LIVE UPDATES
     Pages don't need a refresh to see new things. Whenever something changes
     (an event posted/edited/deleted, a comment, a profile, a notification) the
@@ -124,6 +139,7 @@ import json as json_lib
 import re
 import time
 import os
+import math
 import base64
 import threading
 from datetime import datetime, timedelta
@@ -177,6 +193,10 @@ MAX_DIRECTORY_RESULTS = 100
 # notifications / mentions
 MAX_NOTIFICATIONS_PER_USER = 100
 MAX_CHANGE_LOG = 500          # how many recent changes the server remembers
+FEED_PAGE_SIZE = 20           # posts per feed request (images are big, keep it modest)
+FEED_JUST_POSTED_MINUTES = 15 # a brand-new post always goes to the very top for this long
+FEED_STALE_DAYS = 14          # an event this long over drops out of the feed...
+FEED_STALE_AGE_HOURS = 72     # ...once the post itself is also older than this
 MAX_MENTIONS_PER_TEXT = 5
 NOTIFICATION_SNIPPET = 80
 # "@name" that isn't glued to a word, "@" or "." - so emails (a@b.com) don't count
@@ -1081,18 +1101,177 @@ def add_demo_data():
 
 add_demo_data()
 
+def _days_until_event(event, today):
+    """0 = happening today (or a multi-day event that's underway), positive =
+    days until it starts, negative = days since it ended. None if the date is odd."""
+    try:
+        start = datetime.strptime(event["date"], "%Y-%m-%d").date()
+        end = datetime.strptime(event.get("end_date") or event["date"], "%Y-%m-%d").date()
+    except (KeyError, ValueError):
+        return None
+    if start <= today <= end:
+        return 0
+    if start > today:
+        return (start - today).days
+    return (end - today).days
+
+
+def _feed_context(viewer):
+    """The counts the ranking needs, worked out once per request."""
+    me = viewer["username"].lower()
+    by_id = {e["id"]: e for e in events}
+
+    comment_counts = {}
+    for c in comments:
+        comment_counts[c["event_id"]] = comment_counts.get(c["event_id"], 0) + 1
+
+    going = {}
+    already_added = set()
+    affinity = set()   # people whose events this viewer has engaged with
+    for e in events:
+        source = by_id.get(e.get("cloned_from"))
+        if not source:
+            continue
+        if e["owner"].lower() != source["owner"].lower():
+            going[source["id"]] = going.get(source["id"], 0) + 1
+        if e["owner"].lower() == me:
+            already_added.add(source["id"])
+            if source["owner"].lower() != me:
+                affinity.add(source["owner"].lower())
+
+    for c in comments:
+        if c["author"].lower() == me and c["event_id"] in by_id:
+            owner = by_id[c["event_id"]]["owner"].lower()
+            if owner != me:
+                affinity.add(owner)
+
+    # "today" in the viewer's own time zone when they've told us one
+    zone = get_push_prefs(viewer).get("timezone") or "UTC"
+    try:
+        today = datetime.now(ZoneInfo(zone)).date()
+    except Exception:
+        today = datetime.now(ZoneInfo("UTC")).date()
+
+    return {"me": me, "comments": comment_counts, "going": going,
+            "added": already_added, "affinity": affinity, "today": today}
+
+
+def feed_score(event, viewer, ctx):
+    """Higher = nearer the top. Returns (score, why) where why is a short
+    label for the strongest reason, for the UI to show if it wants to."""
+    age_hours = max(0.0, (now_in_ms() - event.get("created_at", 0)) / 3600000)
+    why = ""
+
+    # 1. freshness: full marks when just posted, half every 18 hours
+    score = 100 * 0.5 ** (age_hours / 18)
+    if age_hours < 6:
+        why = "New"
+
+    # a post made this very moment always lands at the very top
+    if age_hours * 60 < FEED_JUST_POSTED_MINUTES:
+        score += 200
+        why = "Just posted"
+
+    # 2. when the event happens: soon is relevant, over is not
+    days = _days_until_event(event, ctx["today"])
+    if days is not None:
+        if 0 <= days <= 14:
+            score += 10 + 55 * (1 - days / 14)
+            if days == 0:
+                why = "Happening today"
+            elif days <= 3 and why != "Just posted":
+                why = "Coming up soon"
+        elif days > 14:
+            score += 3
+        else:
+            score -= min(60, 20 + 5 * -days)
+
+    # 3. popularity (log scale, so 40 comments isn't 40x better than 1)
+    engagement = (12 * math.log2(1 + ctx["comments"].get(event["id"], 0))
+                  + 10 * math.log2(1 + ctx["going"].get(event["id"], 0)))
+    score += engagement
+    if engagement >= 25 and not why:
+        why = "Popular"
+
+    # 4. people and relevance
+    owner = event["owner"].lower()
+    if owner == ctx["me"]:
+        score += 10
+    elif owner in ctx["affinity"]:
+        score += 20
+        if not why:
+            why = "From someone you know"
+    if viewer["username"] in extract_mentions(event.get("description", "")):
+        score += 40
+        why = "Mentions you"
+    if event["id"] in ctx["added"]:
+        score -= 25    # already on their calendar - less to act on
+
+    return score, why
+
+
+def rank_feed(viewer, posts):
+    """Orders posts for this viewer. Returns [(event, why), ...]."""
+    ctx = _feed_context(viewer)
+
+    scored = []
+    for e in posts:
+        age_hours = (now_in_ms() - e.get("created_at", 0)) / 3600000
+        days = _days_until_event(e, ctx["today"])
+        # long over AND an old post: nothing left to do with it (yours excepted)
+        if (days is not None and days < -FEED_STALE_DAYS
+                and age_hours > FEED_STALE_AGE_HOURS and e["owner"].lower() != ctx["me"]):
+            continue
+        score, why = feed_score(e, viewer, ctx)
+        scored.append([score, e, why])
+
+    # highest first, ties go to the newer post
+    scored.sort(key=lambda row: (row[0], row[1].get("created_at", 0), row[1]["id"]), reverse=True)
+
+    # spread: if the last few picks were all one person, nudge their next post
+    # down so the feed doesn't turn into one person's timeline
+    ordered = []
+    remaining = scored
+    while remaining:
+        recent_owners = [r[1]["owner"].lower() for r in ordered[-3:]]
+        best = max(
+            range(len(remaining)),
+            key=lambda i: (
+                remaining[i][0] - 20 * recent_owners.count(remaining[i][1]["owner"].lower()),
+                remaining[i][1].get("created_at", 0),
+            ),
+        )
+        ordered.append(remaining.pop(best))
+
+    return [(row[1], row[2]) for row in ordered]
+
+
 @app.route("/api/feed", methods=["GET"])
 def get_feed():
+    """The home feed. ?sort=latest for plain newest-first (default is the
+    ranked "top" order), ?offset= and ?limit= to page through it."""
     viewer = get_logged_in_user()
     if not viewer:
         return jsonify({"error": "Not signed in."}), 401
 
     me = viewer["username"].lower()
     posts = [e for e in events if e["visibility"] in ("global", "public")]
-    posts.sort(key=lambda e: e.get("created_at", 0), reverse=True)
 
-    # images are base64, so keep this small until there's pagination
-    return jsonify([feed_item(e, me) for e in posts[:20]])
+    if request.args.get("sort") == "latest":
+        posts.sort(key=lambda e: e.get("created_at", 0), reverse=True)
+        ordered = [(e, "") for e in posts]
+    else:
+        ordered = rank_feed(viewer, posts)
+
+    limit = min(max(request.args.get("limit", FEED_PAGE_SIZE, type=int), 1), FEED_PAGE_SIZE)
+    offset = max(request.args.get("offset", 0, type=int), 0)
+
+    result = []
+    for event, why in ordered[offset:offset + limit]:
+        item = feed_item(event, me)
+        item["why"] = why
+        result.append(item)
+    return jsonify(result)
 
 @app.route("/")
 def serve_home_page():
