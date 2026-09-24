@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" style="background:#131313;color-scheme:dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Friends · Planora</title>
+<style>
+    html, body { margin:0; background:#131313 !important; color:#f2f2f2 !important; color-scheme:dark; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .fr-wrap { max-width:680px; margin:0 auto; padding:24px 16px 64px; }
+    .fr-top { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+    .fr-top h1 { margin:0; font-size:24px; color:#f2f2f2 !important; }
+    .fr-back { font:inherit; font-size:13px; cursor:pointer; color:#f2f2f2 !important; background:transparent !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:999px; padding:6px 12px; }
+    .fr-tabs { display:flex; gap:8px; margin-bottom:14px; }
+    .fr-tabs button { font:inherit; font-size:13px; cursor:pointer; color:#f2f2f2 !important; background:transparent !important; border:1px solid rgba(255,255,255,.1) !important; border-radius:999px; padding:6px 12px; position:relative; }
+    .fr-tabs button.on { background:#c9a227 !important; border-color:#c9a227 !important; color:#111 !important; font-weight:600; }
+    .fr-count { margin-left:6px; opacity:.7; }
+    .fr-row { display:flex; gap:12px; align-items:center; padding:12px; margin-bottom:8px; background:#1b1b1b !important; color:#f2f2f2 !important; border:1px solid rgba(255,255,255,.1); border-radius:14px; }
+    .fr-avatar { width:44px; height:44px; border-radius:50%; flex:none; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; background-size:cover; background-position:center; text-decoration:none; }
+    .fr-body { flex:1; min-width:0; }
+    .fr-name { font-size:14px; font-weight:600; color:#f2f2f2 !important; text-decoration:none; }
+    .fr-name:hover { text-decoration:underline; }
+    .fr-handle { font-size:12px; color:rgba(255,255,255,.55) !important; margin-top:2px; }
+    .fr-actions { display:flex; gap:8px; flex:none; }
+    .fr-actions button { font:inherit; font-size:12px; cursor:pointer; border-radius:999px; padding:7px 13px; border:1px solid rgba(255,255,255,.15); background:transparent; color:#f2f2f2; }
+    .fr-actions button:hover { border-color:#c9a227; }
+    .fr-actions button.primary { background:#c9a227; border-color:#c9a227; color:#111; font-weight:600; }
+    .fr-actions button.danger:hover { border-color:#b6453f; color:#e08b86; }
+    .fr-actions button:disabled { opacity:.5; cursor:default; }
+    .fr-empty, .fr-error { text-align:center; color:rgba(255,255,255,.6) !important; padding:48px 0; }
+    [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main class="fr-wrap">
+    <div class="fr-top">
+        <h1>Friends</h1>
+        <button type="button" class="fr-back" id="frBack">← Back</button>
+    </div>
+    <div class="fr-tabs" id="frTabs">
+        <button type="button" data-tab="friends" class="on">Friends</button>
+        <button type="button" data-tab="incoming">Requests <span class="fr-count" id="frIncomingCount"></span></button>
+        <button type="button" data-tab="outgoing">Sent</button>
+    </div>
+    <div id="frList"></div>
+    <p class="fr-empty" id="frEmpty" hidden></p>
+    <p class="fr-error" id="frError" hidden></p>
+</main>
+
+<script src="api.js"></script>
+<script src="planora-nav.js"></script>
+<script src="friends.js"></script>
+
+<style>
+    html, body { background:#131313 !important; color:#f2f2f2 !important; }
+    .fr-row { background:#1b1b1b !important; }
+</style>
+</body>
+</html>
