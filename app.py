@@ -1615,6 +1615,20 @@ def get_user_profile(username):
         public_event_views.append(view)
     info["publicEvents"] = public_event_views
 
+    global_events = sorted(
+        [e for e in owned if e["visibility"] == "global"],
+        key=lambda e: (e["date"], e.get("start_time", "")),
+    )
+    global_event_views = []
+    for e in global_events:
+        view = profile_event_view(e)
+        view["addedByMe"] = (not is_self) and any(
+            other["owner"].lower() == viewer["username"].lower() and other.get("cloned_from") == e["id"]
+            for other in events
+        )
+        global_event_views.append(view)
+    info["globalEvents"] = global_event_views
+
     if is_self:
         private_events = sorted(
             # copies of Global posts you added are calendar bookkeeping,
