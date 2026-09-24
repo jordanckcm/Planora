@@ -401,6 +401,8 @@ def profile_event_view(event):
     }
 
 
+
+
 def comment_view(comment):
     """A comment plus enough about its author to draw a name, a face,
     and a link to their profile."""
@@ -442,6 +444,30 @@ def add_demo_data():
 
 add_demo_data()
 
+@app.route("/api/feed", methods=["GET"])
+def get_feed():
+    viewer = get_logged_in_user()
+    if not viewer:
+        return jsonify({"error": "Not signed in."}), 401
+
+    me = viewer["username"].lower()
+    posts = [e for e in events if e["visibility"] in ("global", "public")]
+    posts.sort(key=lambda e: e.get("created_at", 0), reverse=True)
+
+    out = []
+    for e in posts[:20]:  # images are base64, so keep this small until there's pagination
+        owner = find_user(e["owner"])
+        item = profile_event_view(e)
+        item["ownerDisplayName"] = owner["display_name"] if owner else e["owner"]
+        item["ownerAvatarColor"] = owner["avatar_color"] if owner else EVENT_COLORS[0]
+        item["ownerAvatarImage"] = owner.get("avatar_image", "") if owner else ""
+        item["isMine"] = e["owner"].lower() == me
+        item["addedByMe"] = any(
+            o["owner"].lower() == me and o.get("cloned_from") == e["id"] for o in events
+        )
+        item["commentCount"] = len([c for c in comments if c["event_id"] == e["id"]])
+        out.append(item)
+    return jsonify(out)
 
 @app.route("/")
 def serve_home_page():
