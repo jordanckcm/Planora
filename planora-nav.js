@@ -44,9 +44,24 @@
     drawer.className = "pl-drawer";
     drawer.setAttribute("aria-label", "Menu");
 
-    const userLine = document.createElement("div");
-    userLine.className = "pl-drawer-user";
-    drawer.appendChild(userLine);
+    // Discord-style profile card at the top of the drawer -> opens your profile
+    const card = document.createElement("button");
+    card.type = "button";
+    card.className = "pl-profile";
+    card.hidden = true; // shown once we know who's signed in
+    card.innerHTML = `
+        <span class="pl-profile-avatar"></span>
+        <span class="pl-profile-text">
+            <span class="pl-profile-name"></span>
+            <span class="pl-profile-sub">Edit profile
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                </svg>
+            </span>
+        </span>`;
+    card.addEventListener("click", () => go("profile"));
+    drawer.appendChild(card);
 
     function addItem(item, beforeNode) {
         if (item.divider) {
@@ -109,7 +124,19 @@
     // who's signed in + admin link
     Planora.getCurrentUser().then((u) => {
         if (!u) return;
-        userLine.textContent = "@" + u.username;
+        const name = u.displayName || u.username;
+        card.querySelector(".pl-profile-name").textContent = name;
+
+        const avatar = card.querySelector(".pl-profile-avatar");
+        const safeImg = /^data:image\/(jpeg|png|webp|gif);base64,[A-Za-z0-9+/=]+$/.test(u.avatarImage || "");
+        if (safeImg) {
+            const pos = u.avatarPosition || { x: 50, y: 50 };
+            avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${u.avatarImage}")`;
+        } else {
+            avatar.style.background = `linear-gradient(135deg, ${u.avatarColor || "#c9a227"}, #1b1b1b)`;
+            avatar.textContent = name.charAt(0).toUpperCase();
+        }
+        card.hidden = false;
         if (u.role === "admin") {
             const logout = drawer.querySelector('[data-key="logout"]');
             addItem({ key: "admin", label: "Admin panel" }, logout.previousElementSibling);
