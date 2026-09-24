@@ -146,8 +146,12 @@
         }
     }
 
+    // How many top-level comment threads show before "View more comments" is needed.
+    const TOP_LEVEL_PAGE_SIZE = 5;
+
     // Instagram-style comments: avatar + username, time / Reply underneath,
-    // replies tucked under their comment behind "View N replies".
+    // replies tucked under their comment behind "View N replies", and
+    // top-level comments themselves paginated behind "View more comments".
     async function fillComments(panel, p, countBtn, expandId) {
         panel.textContent = "";
         let list = [];
@@ -207,31 +211,72 @@
         }
 
         const listEl = el("div", "cm-list");
-        if (!list.length) listEl.appendChild(el("div", "cm-empty", "No comments yet. Start the conversation."));
 
         const known = new Set(list.map((c) => c.id));
-        list.filter((c) => !c.parent_id || !known.has(c.parent_id)).forEach((top) => {
-            const thread = el("div", "cm-thread");
-            thread.appendChild(row(top, false));
+        const topLevel = list.filter((c) => !c.parent_id || !known.has(c.parent_id));
 
-            const replies = list.filter((r) => r.parent_id === top.id);
-            if (replies.length) {
-                const box = el("div", "cm-replies");
-                replies.forEach((r) => box.appendChild(row(r, true)));
+        if (!topLevel.length) {
+            listEl.appendChild(el("div", "cm-empty", "No comments yet. Start the conversation."));
+        } else {
+            let expandedThreadIndex = -1;
 
-                const toggle = el("button", "cm-toggle");
-                toggle.type = "button";
-                let open = top.id === expandId;
-                const sync = () => {
-                    box.hidden = !open;
-                    toggle.textContent = open ? "Hide replies" : `View ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`;
+            const threads = topLevel.map((top, i) => {
+                const thread = el("div", "cm-thread");
+                thread.appendChild(row(top, false));
+
+                const replies = list.filter((r) => r.parent_id === top.id);
+                if (replies.length) {
+                    const box = el("div", "cm-replies");
+                    replies.forEach((r) => box.appendChild(row(r, true)));
+
+                    const toggle = el("button", "cm-toggle");
+                    toggle.type = "button";
+                    let open = top.id === expandId;
+                    if (open) expandedThreadIndex = i;
+                    const sync = () => {
+                        box.hidden = !open;
+                        toggle.textContent = open ? "Hide replies" : `View ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`;
+                    };
+                    toggle.addEventListener("click", () => { open = !open; sync(); });
+                    sync();
+                    thread.append(toggle, box);
+                }
+                listEl.appendChild(thread);
+                return thread;
+            });
+
+            if (threads.length > TOP_LEVEL_PAGE_SIZE) {
+                // Always reveal the thread whose reply was just posted/expanded,
+                // even if it would otherwise be hidden behind "View more".
+                let expanded = expandedThreadIndex >= TOP_LEVEL_PAGE_SIZE;
+
+                const applyVisibility = () => {
+                    threads.forEach((t, i) => {
+                        t.hidden = !expanded && i >= TOP_LEVEL_PAGE_SIZE;
+                    });
                 };
-                toggle.addEventListener("click", () => { open = !open; sync(); });
-                sync();
-                thread.append(toggle, box);
+                applyVisibility();
+
+                const hiddenCount = threads.length - TOP_LEVEL_PAGE_SIZE;
+                const moreBtn = el("button", "cm-toggle cm-more");
+                moreBtn.type = "button";
+                const syncMoreBtn = () => {
+                    moreBtn.textContent = expanded ? "Show less" : `View more comments (${hiddenCount})`;
+                };
+                syncMoreBtn();
+                moreBtn.addEventListener("click", () => {
+                    expanded = !expanded;
+                    applyVisibility();
+                    syncMoreBtn();
+                    if (!expanded) {
+                        // Bring the panel back into view when collapsing a long list.
+                        moreBtn.scrollIntoView({ block: "nearest" });
+                    }
+                });
+                listEl.appendChild(moreBtn);
             }
-            listEl.appendChild(thread);
-        });
+        }
+
         panel.appendChild(listEl);
         panel.appendChild(banner);
 
