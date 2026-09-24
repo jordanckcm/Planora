@@ -282,6 +282,8 @@ def handle_too_large(e):
 users = []
 events = []
 comments = []
+friendships = []  # [{"id", "requester", "recipient", "status", "created_at"}]
+next_friendship_id = 1
 notifications = []
 push_subscriptions = []  # [{"username", "subscription": {endpoint, keys}, "created_at"}, ...]
 push_history = {}        # username (lowercase) -> [timestamps of recent pushes]
@@ -383,6 +385,37 @@ def find_user(username):
             return user
     return None
 
+def find_friendship(a, b):
+    a, b = a.lower(), b.lower()
+    for f in friendships:
+        if {f["requester"].lower(), f["recipient"].lower()} == {a, b}:
+            return f
+    return None
+
+
+def friendship_status(viewer_username, other_username):
+    """From viewer's perspective: "self" | "friends" | "pending_outgoing" |
+    "pending_incoming" | "none"."""
+    if viewer_username.lower() == other_username.lower():
+        return "self"
+    f = find_friendship(viewer_username, other_username)
+    if not f:
+        return "none"
+    if f["status"] == "accepted":
+        return "friends"
+    return "pending_outgoing" if f["requester"].lower() == viewer_username.lower() else "pending_incoming"
+
+
+def are_friends(a, b):
+    f = find_friendship(a, b)
+    return bool(f and f["status"] == "accepted")
+
+
+def drop_user_friendships(username):
+    friendships[:] = [
+        f for f in friendships
+        if f["requester"].lower() != username.lower() and f["recipient"].lower() != username.lower()
+    ]
 
 def find_event(event_id):
     for event in events:
@@ -943,6 +976,44 @@ def create_notification(recipient, actor, kind, event, comment=None, text=""):
         actor_username=actor,
     )
 
+def create_friend_notification(recipient, actor, kind):
+    """kind: "friend_request" | "friend_accept". Not tied to an event."""
+    global next_notification_id
+    if recipient.lower() == actor.lower():
+        return
+
+    notifications.append({
+        "id": next_notification_id,
+        "recipient": recipient,
+        "actor": actor,
+        "type": kind,
+        "event_id": None,
+        "comment_id": None,
+        "text": "",
+        "read": False,
+        "created_at": now_in_ms(),
+    })
+    next_notification_id += 1
+    log_change("notifications", recipient=recipient)
+
+    mine = [n for n in notifications if n["recipient"].lower() == recipient.lower()]
+    overflow = len(mine) - MAX_NOTIFICATIONS_PER_USER
+    if overflow > 0:
+        drop = {n["id"] for n in mine[:overflow]}
+        notifications[:] = [n for n in notifications if n["id"] not in drop]
+
+    actor_user = find_user(actor)
+    actor_name = actor_user["display_name"] if actor_user else actor
+    verb = "sent you a friend request" if kind == "friend_request" else "accepted your friend request"
+    push_to_user(
+        recipient, kind,
+        title=f"{actor_name} {verb}",
+        snippet="",
+        url=f"/profile.html?u={actor}",
+        tag=f"friend-{actor.lower()}",
+        actor=actor_name,
+        actor_username=actor,
+    )
 
 def notify_comment(event, comment):
     """Event owner -> "comment", person replied to -> "reply", @mentioned ->
@@ -982,7 +1053,6 @@ def notify_event_mentions(event, actor, old_description=""):
 
 
 def prune_notifications():
-    """Drop notifications whose event, comment or people no longer exist."""
     live_users = {u["username"].lower() for u in users}
     live_events = {e["id"] for e in events}
     live_comments = {c["id"] for c in comments}
@@ -990,7 +1060,7 @@ def prune_notifications():
         n for n in notifications
         if n["recipient"].lower() in live_users
         and n["actor"].lower() in live_users
-        and n["event_id"] in live_events
+        and (n["event_id"] is None or n["event_id"] in live_events)   # changed
         and (n["comment_id"] is None or n["comment_id"] in live_comments)
     ]
 
@@ -1532,6 +1602,7 @@ def delete_me():
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
     prune_orphan_replies()
     drop_user_push_data(username)
+    drop_user_friendships(username)
     log_change("profile", username=username)
     log_change("comments", event_id=None)   # their comments vanished
 
@@ -1597,6 +1668,7 @@ def get_user_profile(username):
 
     info = user_public_info(target)
     info["isSelf"] = is_self
+    info["friendStatus"] = friendship_status(viewer["username"], target["username"])
     info["stats"] = {
         "events": len([e for e in owned if e.get("cloned_from") is None]),
         "publicEvents": len(public_events),
@@ -2581,6 +2653,111 @@ def admin_delete_user(current_user, username):
 def admin_list_events(current_user):
     return jsonify(events)
 
+@app.route("/api/friends", methods=["GET"])
+def get_friends():
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    me = user["username"].lower()
+    mine = [f for f in friendships if f["requester"].lower() == me or f["recipient"].lower() == me]
+
+    def other_username(f):
+        return f["recipient"] if f["requester"].lower() == me else f["requester"]
+
+    def friend_view(username):
+        person = find_user(username)
+        if not person:
+            return None
+        return {
+            "username": person["username"],
+            "displayName": person["display_name"],
+            "avatarColor": person["avatar_color"],
+            "avatarImage": person.get("avatar_image", ""),
+            "avatarPosition": person.get("avatar_position") or dict(DEFAULT_IMAGE_POSITION),
+        }
+
+    friends, incoming, outgoing = [], [], []
+    for f in mine:
+        view = friend_view(other_username(f))
+        if not view:
+            continue
+        if f["status"] == "accepted":
+            friends.append(view)
+        elif f["requester"].lower() == me:
+            outgoing.append(view)
+        else:
+            incoming.append(view)
+
+    return jsonify({"friends": friends, "incoming": incoming, "outgoing": outgoing})
+
+
+@app.route("/api/friends/request/<username>", methods=["POST"])
+def send_friend_request(username):
+    global next_friendship_id
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    target = find_user(username)
+    if not target:
+        return jsonify({"error": "User not found."}), 404
+    if target["username"].lower() == user["username"].lower():
+        return jsonify({"error": "You can't friend yourself."}), 400
+
+    existing = find_friendship(user["username"], target["username"])
+    if existing:
+        if existing["status"] == "accepted":
+            return jsonify({"error": "You're already friends."}), 400
+        if existing["requester"].lower() == target["username"].lower():
+            # they'd already sent one — accept it instead of duplicating
+            existing["status"] = "accepted"
+            create_friend_notification(target["username"], user["username"], "friend_accept")
+            return jsonify({"ok": True, "status": "friends"})
+        return jsonify({"error": "Friend request already sent."}), 400
+
+    friendships.append({
+        "id": next_friendship_id,
+        "requester": user["username"],
+        "recipient": target["username"],
+        "status": "pending",
+        "created_at": now_in_ms(),
+    })
+    next_friendship_id += 1
+
+    create_friend_notification(target["username"], user["username"], "friend_request")
+    return jsonify({"ok": True, "status": "pending_outgoing"})
+
+
+@app.route("/api/friends/accept/<username>", methods=["POST"])
+def accept_friend_request(username):
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    f = find_friendship(user["username"], username)
+    if not f or f["status"] != "pending" or f["recipient"].lower() != user["username"].lower():
+        return jsonify({"error": "No pending request from that person."}), 404
+
+    f["status"] = "accepted"
+    create_friend_notification(f["requester"], user["username"], "friend_accept")
+    return jsonify({"ok": True, "status": "friends"})
+
+
+@app.route("/api/friends/<username>", methods=["DELETE"])
+def remove_friendship(username):
+    """Covers declining a request you got, canceling one you sent, and
+    unfriending someone — same endpoint, whichever state it's in."""
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    f = find_friendship(user["username"], username)
+    if not f:
+        return jsonify({"error": "Not friends with that person."}), 404
+
+    friendships.remove(f)
+    return jsonify({"ok": True, "status": "none"})
 
 @app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
 @require_role("admin")
