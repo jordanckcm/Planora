@@ -1,7 +1,9 @@
 /* PLANORA — SHARED NAV
    Burger on the left, PLANORA on the right. Include on any page AFTER api.js.
    On the homepage, Local/Global/Timeline/Home switch views in place (via feed.js);
-   everywhere else they link to homepage.html?view=... */
+   everywhere else they link to homepage.html?view=...
+   Also shows an unread-notifications badge on the Notifications item
+   (and a dot on the burger while the menu is closed). */
 
 (function () {
     // Load the shared stylesheet from the same folder as this script, so one
@@ -95,6 +97,7 @@
         { key: "timeline", label: "Timeline" },
         { divider: true },
         { key: "discover", label: "Discover" },
+        { key: "notifications", label: "Notifications" },
         { key: "profile", label: "My profile" }
     ];
 
@@ -103,6 +106,7 @@
     bar.innerHTML = `
         <button class="pl-burger" type="button" aria-label="Open menu" aria-expanded="false">
             <span></span><span></span><span></span>
+            <i class="pl-dot" hidden></i>
         </button>
         <a class="pl-brand" href="homepage.html">PLANORA</a>`;
 
@@ -144,6 +148,12 @@
         b.className = "pl-item" + (item.danger ? " danger" : "");
         b.dataset.key = item.key;
         b.textContent = item.label;
+        if (item.key === "notifications") {
+            const badge = document.createElement("span");
+            badge.className = "pl-badge";
+            badge.hidden = true;
+            b.appendChild(badge);
+        }
         b.addEventListener("click", () => go(item.key));
         drawer.insertBefore(b, beforeNode || null);
     }
@@ -168,6 +178,34 @@
         drawer.querySelectorAll(".pl-item").forEach((el) => el.classList.toggle("active", el.dataset.key === key));
     }
 
+    /* ---- unread notifications badge ---- */
+    const notifStyle = document.createElement("style");
+    notifStyle.textContent =
+        ".pl-badge{display:inline-block;margin-left:8px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;" +
+        "background:#b6453f;color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;vertical-align:middle}" +
+        ".pl-dot{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#b6453f}" +
+        ".pl-badge[hidden],.pl-dot[hidden]{display:none}";
+    document.head.appendChild(notifStyle);
+
+    const burgerDot = bar.querySelector(".pl-dot");
+
+    function setUnread(n) {
+        const badge = drawer.querySelector('[data-key="notifications"] .pl-badge');
+        if (badge) {
+            badge.textContent = n > 99 ? "99+" : String(n);
+            badge.hidden = n === 0;
+        }
+        // the dot is absolutely positioned, so the burger has to be a positioning context
+        if (n > 0 && getComputedStyle(burger).position === "static") burger.style.position = "relative";
+        burgerDot.hidden = n === 0;
+    }
+
+    async function refreshUnread() {
+        if (document.hidden) return;
+        try { setUnread(await PlanoraData.getUnreadCount()); }
+        catch (e) { /* offline or signed out - leave the badge as it was */ }
+    }
+
     async function go(key) {
         setOpen(false);
         showLoader();
@@ -176,6 +214,8 @@
             location.href = "login.html";
         } else if (key === "discover") {
             location.href = "directory.html";
+        } else if (key === "notifications") {
+            location.href = "notifications.html";
         } else if (key === "profile") {
             location.href = "profile.html";
         } else if (key === "admin") {
@@ -190,11 +230,17 @@
 
     // initial highlight (feed.js updates it on the homepage)
     if (page === "directory.html") setActive("discover");
+    else if (page === "notifications.html") setActive("notifications");
     else if (page === "profile.html" && !params.get("u")) setActive("profile");
 
     // who's signed in + admin link
     Planora.getCurrentUser().then((u) => {
         if (!u) return;
+
+        refreshUnread();
+        setInterval(refreshUnread, 30000);
+        document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshUnread(); });
+
         const name = u.displayName || u.username;
         card.querySelector(".pl-profile-name").textContent = name;
 
@@ -230,5 +276,5 @@
     hideLegacyBars();
     setTimeout(hideLegacyBars, 500); // in case a page builds its bar after load
 
-    window.PlanoraNav = { setActive };
+    window.PlanoraNav = { setActive, setUnread, refreshUnread };
 })();
