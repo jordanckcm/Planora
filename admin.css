@@ -110,9 +110,12 @@
     overflow: hidden;
 }
 
+/* The last column is a fixed 84px in every row (header, your own row, rows with a
+   Delete button), so the columns line up whether or not a row has an action.
+   minmax(0, ...) stops long content from stretching a column. */
 .admin-row {
     display: grid;
-    grid-template-columns: 1.3fr 1.3fr 1fr 1fr auto;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) 84px;
     gap: 12px;
     padding: 10px 14px;
     align-items: center;
@@ -122,7 +125,12 @@
 }
 
 #eventsTable .admin-row {
-    grid-template-columns: 2fr 1fr 1fr 1fr auto;
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 84px;
+}
+
+/* keep the Delete button pinned to the right edge */
+.admin-row > :last-child {
+    justify-self: end;
 }
 
 .admin-row:last-child {
@@ -340,6 +348,11 @@
         border: 1px solid var(--admin-border-strong);
         border-radius: 8px;
         padding: 12px 14px;
+    }
+
+    /* undo the desktop right-pinning when rows are stacked */
+    .admin-row > :last-child {
+        justify-self: stretch;
     }
 
     .admin-row:not(:last-child) {
