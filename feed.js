@@ -2,7 +2,13 @@
    Load on homepage.html AFTER homepage.js and planora-nav.js.
    Home = scrollable feed of Global + Public events (GET /api/feed).
    Local / Global / Timeline still use homepage.js as-is; this file only
-   decides whether render() shows the feed or hands off to the original. */
+   decides whether render() shows the feed or hands off to the original.
+
+   Comments: the inline panel on a post shows just the first top-level
+   comment plus a "View all comments" link. Tapping that (or the post
+   image) opens a full-screen post-detail modal with every comment,
+   threaded replies, and Reply/Edit/Delete on your own comments —
+   mirroring an Instagram-style post lightbox. */
 
 (function () {
     const view = new URLSearchParams(location.search).get("view");
@@ -53,6 +59,15 @@
         return n;
     }
 
+    function paintAv(node, image, color, name) {
+        if (image) {
+            node.style.background = `center / cover no-repeat url("${image}")`;
+        } else {
+            node.style.background = `linear-gradient(135deg, ${color || EVENT_COLORS[0]}, #1b1b1b)`;
+            node.textContent = (name || "?").charAt(0).toUpperCase();
+        }
+    }
+
     function buildPost(p) {
         const post = el("article", "post");
 
@@ -88,8 +103,9 @@
         body.appendChild(el("div", "post-when", formatEventWhen(p)));
         post.appendChild(body);
 
-        // media
+        // media — tapping it opens the full post detail modal
         const media = el("div", "post-media");
+        media.style.cursor = "pointer";
         if (p.image) {
             const pos = p.image_position || { x: 50, y: 50 };
             media.style.backgroundImage = `url("${p.image}")`;
@@ -98,6 +114,7 @@
             media.style.background = `linear-gradient(135deg, ${p.color || EVENT_COLORS[0]}, #1b1b1b)`;
             media.textContent = p.icon || EVENT_ICONS[0];
         }
+        media.addEventListener("click", () => openPostDetail(p));
         post.appendChild(media);
 
         // actions
@@ -125,40 +142,33 @@
         actions.appendChild(count);
         post.appendChild(actions);
 
-        // comments (opens on demand)
+        // inline preview panel: just the first comment + "View all comments"
         let panel = null;
         count.addEventListener("click", async () => {
             if (panel) { panel.remove(); panel = null; return; }
             panel = el("div", "post-comments");
             post.appendChild(panel);
-            await fillComments(panel, p, count);
+            await renderComments(p, { full: false, focusId: null, listEl: panel, formEl: panel, countBtn: count });
         });
 
         return post;
     }
 
-    function paintAv(node, image, color, name) {
-        if (image) {
-            node.style.background = `center / cover no-repeat url("${image}")`;
-        } else {
-            node.style.background = `linear-gradient(135deg, ${color || EVENT_COLORS[0]}, #1b1b1b)`;
-            node.textContent = (name || "?").charAt(0).toUpperCase();
-        }
-    }
-
-    // How many top-level comment threads show before "View more comments" is needed.
-    const TOP_LEVEL_PAGE_SIZE = 5;
-
-    // Instagram-style comments: avatar + username, time / Reply underneath,
-    // replies tucked under their comment behind "View N replies", and
-    // top-level comments themselves paginated behind "View more comments".
-    async function fillComments(panel, p, countBtn, expandId) {
-        panel.textContent = "";
+    /* ---------- Shared comments renderer ----------
+       full=false  -> inline preview: first top-level comment + "View all comments"
+       full=true   -> full-screen modal: every comment, all threads open-able
+       Renders into listEl (comment list + reply banner) and formEl (composer).
+       For the inline panel these are the same node; for the modal they're
+       the scrolling body and the pinned footer, respectively. */
+    async function renderComments(post, { full, focusId, listEl: listContainer, formEl: composerContainer, countBtn }) {
         let list = [];
-        try { list = await PlanoraData.getComments(p.id); } catch (err) { /* show empty */ }
-        countBtn.textContent = `Comments (${list.length})`;
+        try { list = await PlanoraData.getComments(post.id); } catch (err) { /* show empty */ }
+        if (countBtn) countBtn.textContent = `Comments (${list.length})`;
 
-        let replyTo = null;
+        listContainer.textContent = "";
+        composerContainer.textContent = "";
+
+        let mode = null; // { type: "reply" | "edit", comment }
         const input = el("input");
         const banner = el("div", "cm-replying");
         const bannerText = el("span");
@@ -167,16 +177,35 @@
         banner.append(bannerText, bannerX);
         banner.hidden = true;
 
-        function setReply(c) {
-            replyTo = c;
-            banner.hidden = !c;
-            input.placeholder = c ? `Reply to @${c.author}...` : "Add a comment...";
-            if (c) {
-                bannerText.textContent = `Replying to @${c.author}`;
-                input.focus();
+        function setMode(next) {
+            mode = next;
+            banner.hidden = !mode;
+            if (!mode) {
+                input.value = "";
+                input.placeholder = "Add a comment...";
+                send.textContent = "Post";
+                return;
             }
+            if (mode.type === "reply") {
+                input.value = "";
+                input.placeholder = `Reply to @${mode.comment.author}...`;
+                bannerText.textContent = `Replying to @${mode.comment.author}`;
+                send.textContent = "Post";
+            } else {
+                input.value = mode.comment.text;
+                input.placeholder = "Edit comment...";
+                bannerText.textContent = "Editing comment";
+                send.textContent = "Save";
+            }
+            input.focus();
         }
-        bannerX.addEventListener("click", () => setReply(null));
+        bannerX.addEventListener("click", () => setMode(null));
+
+        function refresh(nextFocusId) {
+            return renderComments(post, {
+                full, focusId: nextFocusId, listEl: listContainer, formEl: composerContainer, countBtn,
+            });
+        }
 
         function row(c, isReply) {
             const r = el("div", "cm" + (isReply ? " cm-reply" : ""));
@@ -199,28 +228,48 @@
             const meta = el("div", "cm-meta");
             const when = el("span", "", formatRelativeShort(c.created_at));
             when.title = formatFullTimestamp(c.created_at);
+            meta.appendChild(when);
+
             const reply = el("button", "cm-reply-btn", "Reply");
             reply.type = "button";
-            reply.addEventListener("click", () => setReply(c));
-            meta.append(when, reply);
+            reply.addEventListener("click", () => setMode({ type: "reply", comment: c }));
+            meta.appendChild(reply);
 
-            const body = el("div", "cm-body");
-            body.append(line, meta);
-            r.append(av, body);
+            if (c.author === currentUser.username) {
+                const editBtn = el("button", "cm-reply-btn", "Edit");
+                editBtn.type = "button";
+                editBtn.addEventListener("click", () => setMode({ type: "edit", comment: c }));
+                meta.appendChild(editBtn);
+
+                const delBtn = el("button", "cm-reply-btn", "Delete");
+                delBtn.type = "button";
+                delBtn.addEventListener("click", async () => {
+                    if (!confirm("Delete this comment?")) return;
+                    try {
+                        await PlanoraData.deleteComment(c.id);
+                        await refresh(null);
+                    } catch (err) {
+                        toast(err.message, "error");
+                    }
+                });
+                meta.appendChild(delBtn);
+            }
+
+            const bodyEl = el("div", "cm-body");
+            bodyEl.append(line, meta);
+            r.append(av, bodyEl);
             return r;
         }
 
-        const listEl = el("div", "cm-list");
-
+        const listWrap = el("div", "cm-list");
         const known = new Set(list.map((c) => c.id));
         const topLevel = list.filter((c) => !c.parent_id || !known.has(c.parent_id));
 
         if (!topLevel.length) {
-            listEl.appendChild(el("div", "cm-empty", "No comments yet. Start the conversation."));
+            listWrap.appendChild(el("div", "cm-empty", "No comments yet. Start the conversation."));
         } else {
-            let expandedThreadIndex = -1;
-
-            const threads = topLevel.map((top, i) => {
+            const visibleTop = full ? topLevel : topLevel.slice(0, 1);
+            visibleTop.forEach((top) => {
                 const thread = el("div", "cm-thread");
                 thread.appendChild(row(top, false));
 
@@ -231,8 +280,7 @@
 
                     const toggle = el("button", "cm-toggle");
                     toggle.type = "button";
-                    let open = top.id === expandId;
-                    if (open) expandedThreadIndex = i;
+                    let open = top.id === focusId;
                     const sync = () => {
                         box.hidden = !open;
                         toggle.textContent = open ? "Hide replies" : `View ${replies.length} ${replies.length === 1 ? "reply" : "replies"}`;
@@ -241,44 +289,19 @@
                     sync();
                     thread.append(toggle, box);
                 }
-                listEl.appendChild(thread);
-                return thread;
+                listWrap.appendChild(thread);
             });
 
-            if (threads.length > TOP_LEVEL_PAGE_SIZE) {
-                // Always reveal the thread whose reply was just posted/expanded,
-                // even if it would otherwise be hidden behind "View more".
-                let expanded = expandedThreadIndex >= TOP_LEVEL_PAGE_SIZE;
-
-                const applyVisibility = () => {
-                    threads.forEach((t, i) => {
-                        t.hidden = !expanded && i >= TOP_LEVEL_PAGE_SIZE;
-                    });
-                };
-                applyVisibility();
-
-                const hiddenCount = threads.length - TOP_LEVEL_PAGE_SIZE;
-                const moreBtn = el("button", "cm-toggle cm-more");
-                moreBtn.type = "button";
-                const syncMoreBtn = () => {
-                    moreBtn.textContent = expanded ? "Show less" : `View more comments (${hiddenCount})`;
-                };
-                syncMoreBtn();
-                moreBtn.addEventListener("click", () => {
-                    expanded = !expanded;
-                    applyVisibility();
-                    syncMoreBtn();
-                    if (!expanded) {
-                        // Bring the panel back into view when collapsing a long list.
-                        moreBtn.scrollIntoView({ block: "nearest" });
-                    }
-                });
-                listEl.appendChild(moreBtn);
+            if (!full && topLevel.length > visibleTop.length) {
+                const viewAll = el("button", "cm-toggle cm-viewall", `View all ${list.length} comments`);
+                viewAll.type = "button";
+                viewAll.addEventListener("click", () => openPostDetail(post, focusId));
+                listWrap.appendChild(viewAll);
             }
         }
 
-        panel.appendChild(listEl);
-        panel.appendChild(banner);
+        listContainer.appendChild(listWrap);
+        listContainer.appendChild(banner);
 
         const form = el("div", "post-composer");
         const me = el("span", "cm-avatar");
@@ -288,11 +311,17 @@
         const send = el("button", "post-btn", "Post");
         send.type = "button";
         async function submit() {
-            if (!input.value.trim()) return;
+            const text = input.value.trim();
+            if (!text) return;
             send.disabled = true;
             try {
-                const created = await PlanoraData.addComment(p.id, input.value, replyTo ? replyTo.id : null);
-                await fillComments(panel, p, countBtn, created.parent_id);
+                if (mode && mode.type === "edit") {
+                    await PlanoraData.editComment(mode.comment.id, text);
+                    await refresh(null);
+                } else {
+                    const created = await PlanoraData.addComment(post.id, text, mode && mode.type === "reply" ? mode.comment.id : null);
+                    await refresh(created.parent_id);
+                }
             } catch (err) {
                 toast(err.message, "error");
                 send.disabled = false;
@@ -301,7 +330,87 @@
         send.addEventListener("click", submit);
         input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
         form.append(me, input, send);
-        panel.appendChild(form);
+        composerContainer.appendChild(form);
+    }
+
+    /* ---------- Post detail modal (Instagram-style lightbox) ---------- */
+    function openPostDetail(post, focusId) {
+        const overlay = el("div", "pd-overlay");
+        const box = el("div", "pd-box");
+        overlay.appendChild(box);
+
+        // media, with close + (if mine) edit menu overlaid top-right
+        const media = el("div", "pd-media");
+        if (post.image) {
+            const pos = post.image_position || { x: 50, y: 50 };
+            media.style.backgroundImage = `url("${post.image}")`;
+            media.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+        } else {
+            media.style.background = `linear-gradient(135deg, ${post.color || EVENT_COLORS[0]}, #1b1b1b)`;
+            media.textContent = post.icon || EVENT_ICONS[0];
+        }
+        if (post.isMine) {
+            const menu = buildDotsMenu(
+                [{ label: "Edit", run: () => { closeModal(); if (typeof openEventFormRef === "function") openEventFormRef(post); } }],
+                { buttonClass: "pd-icon-btn", dropdownClass: "event-dropdown", ariaLabel: "Post options" }
+            );
+            if (menu) {
+                const wrap = el("div", "pd-menu-wrap");
+                wrap.appendChild(menu);
+                media.appendChild(wrap);
+            }
+        }
+        const close = el("button", "pd-icon-btn pd-close", "×");
+        close.type = "button";
+        close.setAttribute("aria-label", "Close");
+        close.addEventListener("click", () => closeModal());
+        media.appendChild(close);
+        box.appendChild(media);
+
+        // scrolling body: owner + title/description, then every comment
+        const scroll = el("div", "pd-scroll");
+        const head = el("div", "pd-head");
+        const avatar = el("a", "post-avatar");
+        avatar.href = profileUrl(post.owner);
+        if (post.ownerAvatarImage) {
+            avatar.style.background = `center / cover no-repeat url("${post.ownerAvatarImage}")`;
+        } else {
+            avatar.style.background = `linear-gradient(135deg, ${post.ownerAvatarColor}, #1b1b1b)`;
+            avatar.textContent = (post.ownerDisplayName || post.owner).charAt(0).toUpperCase();
+        }
+        const names = el("div", "post-names");
+        const who = el("a", "post-who", post.ownerDisplayName || post.owner);
+        who.href = profileUrl(post.owner);
+        names.append(who, el("span", "pd-date", formatFullTimestamp(post.created_at)));
+        head.append(avatar, names);
+        scroll.appendChild(head);
+        scroll.appendChild(el("div", "pd-title", post.title));
+        if (post.description) scroll.appendChild(el("div", "pd-desc", post.description));
+        scroll.appendChild(el("hr", "pd-divider"));
+
+        const commentsHost = el("div");
+        scroll.appendChild(commentsHost);
+        box.appendChild(scroll);
+
+        // composer stays pinned at the bottom of the modal
+        const composer = el("div", "pd-composer");
+        box.appendChild(composer);
+
+        document.body.appendChild(overlay);
+        document.body.classList.add("pd-lock");
+        requestAnimationFrame(() => overlay.classList.add("show"));
+
+        function closeModal() {
+            overlay.classList.remove("show");
+            document.body.classList.remove("pd-lock");
+            document.removeEventListener("keydown", onKey);
+            setTimeout(() => overlay.remove(), 200);
+        }
+        function onKey(e) { if (e.key === "Escape") closeModal(); }
+        document.addEventListener("keydown", onKey);
+        overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+        renderComments(post, { full: true, focusId, listEl: commentsHost, formEl: composer, countBtn: null });
     }
 })();
 
