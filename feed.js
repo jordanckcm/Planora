@@ -113,6 +113,15 @@
             });
             actions.appendChild(add);
         }
+        if (p.isMine) {
+            // opens the same slide-in drawer as "+", filled in with this post
+            const edit = el("button", "post-btn", "Edit");
+            edit.type = "button";
+            edit.addEventListener("click", () => {
+                if (typeof openEventFormRef === "function") openEventFormRef(p);
+            });
+            actions.appendChild(edit);
+        }
         const count = el("button", "post-btn", `Comments (${p.commentCount})`);
         count.type = "button";
         actions.appendChild(count);
