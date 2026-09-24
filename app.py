@@ -453,17 +453,18 @@ def create_notification(recipient, actor, kind, event, comment=None, text=""):
     )
 
 def send_push(username, title, body, url="/"):
-    """Best-effort — a dead/expired subscription just gets dropped
-    silently, same spirit as everything else here being in-memory."""
     if not VAPID_PRIVATE_KEY:
-        return  # keys not configured yet — no-op instead of crashing
+        print(f"[push] VAPID_PRIVATE_KEY not set, skipping push to {username}")
+        return
 
     payload = json_lib.dumps({"title": title, "body": body, "url": url})
     stale = []
+    matched = 0
 
     for entry in push_subscriptions:
         if entry["username"].lower() != username.lower():
             continue
+        matched += 1
         try:
             webpush(
                 subscription_info=entry["subscription"],
@@ -471,8 +472,13 @@ def send_push(username, title, body, url="/"):
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims=dict(VAPID_CLAIMS),
             )
-        except WebPushException:
+            print(f"[push] sent to {username}")
+        except WebPushException as e:
+            print(f"[push] FAILED for {username}: {e}")
             stale.append(entry)
+
+    if matched == 0:
+        print(f"[push] no subscription found for {username}")
 
     for entry in stale:
         push_subscriptions.remove(entry)
