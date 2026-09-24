@@ -208,9 +208,9 @@ function render() {
         chips.appendChild(el);
     });
 
-    $("tabNote").textContent = p.isSelf
-        ? "Anyone who visits your profile can see these."
-        : "";
+   $("tabNote").textContent = p.isSelf
+       ? "Public and Global posts are visible to everyone. Private events are visible only to you."
+       : "";
 
     renderEvents();
 }
@@ -219,7 +219,11 @@ function renderEvents() {
     const grid = $("eventGrid");
     grid.textContent = "";
 
-    const list = profile.publicEvents || [];
+    const list = [
+        ...(profile.publicEvents || []),
+        ...(profile.globalEvents || []),
+        ...(profile.privateEvents || [])
+    ].sort((a, b) => (a.date + (a.start_time || "")).localeCompare(b.date + (b.start_time || "")));
 
     if (!list.length) {
         grid.appendChild(emptyState());
@@ -286,6 +290,15 @@ function eventTile(event) {
         addedMark.textContent = "✓";
         addedMark.title = "Already on your calendar";
         cover.appendChild(addedMark);
+    }
+   
+   // separate, unconditional on isSelf — this is what actually needs to run
+   // for private events, which only ever show up when profile.isSelf is true
+    if (event.visibility === "local") {
+        const lock = document.createElement("span");
+        lock.className = "tile-lock";
+        lock.textContent = "Private";
+        cover.appendChild(lock);
     }
 
     const body = document.createElement("div");
