@@ -256,6 +256,7 @@
 
     // initial highlight (feed.js updates it on the homepage)
     if (page === "directory.html") setActive("discover");
+    else if (page === "friends.html") setActive("friends");
     else if (page === "notifications.html") setActive("notifications");
     else if (page === "profile.html" && !params.get("u")) setActive("profile");
 
@@ -264,8 +265,12 @@
         if (!u) return;
 
         refreshUnread();
+        refreshFriendRequests();
         setInterval(refreshUnread, 30000);
-        document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshUnread(); });
+        setInterval(refreshFriendRequests, 30000);
+        document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) { refreshUnread(); refreshFriendRequests(); }
+        });
 
         const name = u.displayName || u.username;
         card.querySelector(".pl-profile-name").textContent = name;
@@ -302,5 +307,6 @@
     hideLegacyBars();
     setTimeout(hideLegacyBars, 500); // in case a page builds its bar after load
 
-    window.PlanoraNav = { setActive, setUnread, refreshUnread };
+    window.PlanoraNav = { setActive, setUnread, setFriendRequests, refreshUnread, refreshFriendRequests };
+   
 })();
