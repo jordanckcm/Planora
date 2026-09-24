@@ -228,12 +228,16 @@ function render() {
 
 function renderFriendButton() {
     const btn = $("friendButton");
+    const declineBtn = $("declineFriendButton");
+
     if (profile.isSelf) {
         btn.hidden = true;
+        declineBtn.hidden = true;
         return;
     }
     btn.hidden = false;
     btn.disabled = false;
+    declineBtn.hidden = true; // only shown for pending_incoming, below
 
     const status = profile.friendStatus;
 
@@ -271,6 +275,7 @@ function renderFriendButton() {
         btn.textContent = "Accept request";
         btn.onclick = async () => {
             btn.disabled = true;
+            declineBtn.disabled = true;
             try {
                 await api(`/api/friends/accept/${encodeURIComponent(profile.username)}`, { method: "POST" });
                 profile.friendStatus = "friends";
@@ -279,6 +284,25 @@ function renderFriendButton() {
             } catch (err) {
                 toast(err.message, "error");
                 btn.disabled = false;
+                declineBtn.disabled = false;
+            }
+        };
+
+        declineBtn.hidden = false;
+        declineBtn.disabled = false;
+        declineBtn.textContent = "Decline";
+        declineBtn.onclick = async () => {
+            btn.disabled = true;
+            declineBtn.disabled = true;
+            try {
+                await api(`/api/friends/${encodeURIComponent(profile.username)}`, { method: "DELETE" });
+                profile.friendStatus = "none";
+                renderFriendButton();
+                toast("Request declined.");
+            } catch (err) {
+                toast(err.message, "error");
+                btn.disabled = false;
+                declineBtn.disabled = false;
             }
         };
     } else {
