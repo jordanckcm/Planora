@@ -59,6 +59,39 @@
         return n;
     }
 
+    // True once a post or comment has been changed after it was created.
+    // Looks for either an explicit `edited` flag or an `updated_at` that
+    // differs from `created_at` — whichever the API actually provides.
+    function wasEdited(item) {
+        return Boolean(item.edited) ||
+            Boolean(item.updated_at && item.created_at && item.updated_at !== item.created_at);
+    }
+
+    // True once a post or comment has been changed after it was created.
+    // Looks for either an explicit `edited` flag or an `updated_at` that
+    // differs from `created_at` — whichever the API actually provides.
+    function wasEdited(item) {
+        return Boolean(item.edited) ||
+            Boolean(item.updated_at && item.created_at && item.updated_at !== item.created_at);
+    }
+
+    // Turns "@username" tokens in plain text into profile links (visual
+    // only — it doesn't validate the username exists, same as Twitter/IG
+    // client-side mention rendering). Appended into `container` in order,
+    // interleaved with the surrounding plain-text nodes.
+    function appendTextWithMentions(container, text) {
+        const re = /@([a-zA-Z0-9_]+)/g;
+        let last = 0, match;
+        while ((match = re.exec(text))) {
+            if (match.index > last) container.appendChild(document.createTextNode(text.slice(last, match.index)));
+            const a = el("a", "cm-mention", "@" + match[1]);
+            a.href = profileUrl(match[1]);
+            container.appendChild(a);
+            last = match.index + match[0].length;
+        }
+        if (last < text.length) container.appendChild(document.createTextNode(text.slice(last)));
+    }
+
     function paintAv(node, image, color, name) {
         if (image) {
             node.style.background = `center / cover no-repeat url("${image}")`;
@@ -87,6 +120,7 @@
         names.append(who, el("span", "post-handle", "@" + p.owner));
         head.append(avatar, names, el("span", "post-tag", p.visibility === "global" ? "Global" : "Public"),
                     el("span", "post-time", formatRelativeShort(p.created_at)));
+        if (wasEdited(p)) head.appendChild(el("span", "post-time", "Edited"));
         if (p.isMine) {
             const menu = buildDotsMenu(
                 [{ label: "Edit", run: () => { if (typeof openEventFormRef === "function") openEventFormRef(p); } }],
@@ -99,7 +133,11 @@
         // title + description sit right under the profile row
         const body = el("div", "post-body");
         body.appendChild(el("div", "post-title", p.title));
-        if (p.description) body.appendChild(el("div", "post-desc", p.description));
+        if (p.description) {
+            const desc = el("div", "post-desc");
+            appendTextWithMentions(desc, p.description);
+            body.appendChild(desc);
+        }
         body.appendChild(el("div", "post-when", formatEventWhen(p)));
         post.appendChild(body);
 
@@ -223,12 +261,13 @@
                 m.href = profileUrl(c.reply_to);
                 line.appendChild(m);
             }
-            line.appendChild(document.createTextNode(c.text));
+            appendTextWithMentions(line, c.text);
 
             const meta = el("div", "cm-meta");
             const when = el("span", "", formatRelativeShort(c.created_at));
             when.title = formatFullTimestamp(c.created_at);
             meta.appendChild(when);
+            if (wasEdited(c)) meta.appendChild(el("span", "", "Edited"));
 
             const reply = el("button", "cm-reply-btn", "Reply");
             reply.type = "button";
@@ -381,11 +420,16 @@
         const names = el("div", "post-names");
         const who = el("a", "post-who", post.ownerDisplayName || post.owner);
         who.href = profileUrl(post.owner);
-        names.append(who, el("span", "pd-date", formatFullTimestamp(post.created_at)));
+        const dateText = formatFullTimestamp(post.created_at) + (wasEdited(post) ? " · Edited" : "");
+        names.append(who, el("span", "pd-date", dateText));
         head.append(avatar, names);
         scroll.appendChild(head);
         scroll.appendChild(el("div", "pd-title", post.title));
-        if (post.description) scroll.appendChild(el("div", "pd-desc", post.description));
+        if (post.description) {
+            const pdDesc = el("div", "pd-desc");
+            appendTextWithMentions(pdDesc, post.description);
+            scroll.appendChild(pdDesc);
+        }
         scroll.appendChild(el("hr", "pd-divider"));
 
         const commentsHost = el("div");
