@@ -229,15 +229,20 @@ function render() {
 function renderFriendButton() {
     const btn = $("friendButton");
     const declineBtn = $("declineFriendButton");
+    const wrap = $("friendActions");
 
     if (profile.isSelf) {
+        wrap.hidden = true;
         btn.hidden = true;
         declineBtn.hidden = true;
         return;
     }
+    wrap.hidden = false;
     btn.hidden = false;
     btn.disabled = false;
     declineBtn.hidden = true; // only shown for pending_incoming, below
+
+    // ...rest unchanged
 
     const status = profile.friendStatus;
 
