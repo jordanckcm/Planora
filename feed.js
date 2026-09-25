@@ -13,10 +13,9 @@
    Notifications: a link like homepage.html?post=ID&comment=ID opens that
    post's modal straight away, scrolls to the comment and flashes it.
 
-   POST-LEVEL ACTIONS: a small ⋮ sits at the top-LEFT of each post (and of
-   the post-detail modal) holding "Copy link" and, for someone else's
-   post you haven't added yet, "Add to calendar". The existing top-RIGHT
-   ⋮ is unchanged — it's still just Edit, and only shows on your own posts.
+   POST-LEVEL ACTIONS: a single ⋮ sits at the top-RIGHT of each post (and
+   of the post-detail modal). If you own the post, it holds "Edit". If
+   you don't, it holds just "Copy link".
 
    REACTIONS: a star button + count (server-side, one per person per
    post, toggled via POST /api/events/<id>/star) sits next to a
@@ -179,7 +178,7 @@
         }
     }
 
-    // "Copy link" — shared by the post card's left menu and the modal's.
+    // "Copy link" — used by the post menu, on both the card and the modal.
     function copyPostLink(p) {
         const url = `${location.origin}${location.pathname}?post=${p.id}`;
         if (!navigator.clipboard || !navigator.clipboard.writeText) {
@@ -191,32 +190,16 @@
             .catch(() => toast("Couldn't copy the link.", "error"));
     }
 
-    // Builds the top-left ⋮ menu: Copy link always, Add to calendar when
-    // it's someone else's post you haven't added yet. Returns null only
-    // if buildDotsMenu would (it never does here, since Copy link is
-    // always offered) — kept as a function so both the card and the
-    // modal can build their own independent instance.
-    function buildLeftMenu(p, onAdded) {
-        const items = [{ label: "Copy link", run: () => copyPostLink(p) }];
-
-        if (!p.isMine && !p.addedByMe) {
-            items.push({
-                label: "Add to calendar",
-                run: async () => {
-                    try {
-                        await PlanoraData.addToMyCalendar(p.id);
-                        p.addedByMe = true;
-                        toast(`Added "${p.title}" to your calendar.`, "success");
-                        if (onAdded) onAdded();
-                    } catch (err) {
-                        toast(err.message, "error");
-                    }
-                }
-            });
-        }
+    // Single top-right ⋮ menu for a post. Owners get "Edit"; everyone
+    // else gets just "Copy link". buttonClass lets the card and the
+    // modal each use their own styling hook.
+    function buildPostMenu(p, onEdit, buttonClass = "post-menu") {
+        const items = p.isMine
+            ? [{ label: "Edit", run: onEdit }]
+            : [{ label: "Copy link", run: () => copyPostLink(p) }];
 
         return buildDotsMenu(items, {
-            buttonClass: "post-menu-left",
+            buttonClass,
             dropdownClass: "event-dropdown",
             ariaLabel: "Post options"
         });
@@ -254,13 +237,9 @@
         const post = el("article", "post");
         post.dataset.postId = p.id;
 
-        // header — left ⋮ menu first (top-left of the post), then the
-        // usual avatar/name/tag/time, then the existing right-side edit
-        // menu for your own posts
+        // header — avatar/name/tag/time, then the single top-right ⋮ menu
+        // (Edit for your own posts, Copy link for everyone else's)
         const head = el("div", "post-head");
-
-        const leftMenu = buildLeftMenu(p);
-        if (leftMenu) head.appendChild(leftMenu);
 
         const avatar = el("a", "post-avatar");
         avatar.href = profileUrl(p.owner);
@@ -280,13 +259,12 @@
         head.append(avatar, names, el("span", "post-tag", p.visibility === "global" ? "Global" : "Public"),
                     el("span", "post-time", formatRelativeShort(p.created_at)));
         if (wasEdited(p)) head.appendChild(el("span", "post-time", "Edited"));
-        if (p.isMine) {
-            const menu = buildDotsMenu(
-                [{ label: "Edit", run: () => { if (typeof openEventFormRef === "function") openEventFormRef(p); } }],
-                { buttonClass: "post-menu", dropdownClass: "event-dropdown", ariaLabel: "Post options" }
-            );
-            if (menu) head.appendChild(menu);
-        }
+
+        const menu = buildPostMenu(p, () => {
+            if (typeof openEventFormRef === "function") openEventFormRef(p);
+        });
+        if (menu) head.appendChild(menu);
+
         post.appendChild(head);
 
         // title + description sit right under the profile row
@@ -315,7 +293,8 @@
         post.appendChild(media);
 
         // actions — star + going count, then Comments. "Add to calendar"
-        // now lives in the left ⋮ menu above instead of a standalone button.
+        // is not offered from the post card; use the calendar/global view
+        // to add someone else's post if needed.
         const actions = el("div", "post-actions");
 
         actions.appendChild(buildStarButton(p));
@@ -532,168 +511,4 @@
         composerContainer.appendChild(form);
     }
 
-    /* ---------- Post detail modal (Instagram-style lightbox) ---------- */
-    function openPostDetail(post, focusId) {
-        const overlay = el("div", "pd-overlay");
-        const box = el("div", "pd-box");
-        overlay.appendChild(box);
-
-        // media, with the left ⋮ menu (copy link / add to calendar) and
-        // close + (if mine) edit menu overlaid top-right
-        const media = el("div", "pd-media");
-        if (post.image) {
-            const pos = post.image_position || { x: 50, y: 50 };
-            media.style.backgroundImage = `url("${post.image}")`;
-            media.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
-        } else {
-            media.style.background = `linear-gradient(135deg, ${post.color || EVENT_COLORS[0]}, #1b1b1b)`;
-            media.textContent = post.icon || EVENT_ICONS[0];
-        }
-
-        const leftMenu = buildLeftMenu(post);
-        if (leftMenu) {
-            const wrapLeft = el("div", "pd-menu-wrap pd-menu-wrap-left");
-            wrapLeft.appendChild(leftMenu);
-            media.appendChild(wrapLeft);
-        }
-
-        if (post.isMine) {
-            const menu = buildDotsMenu(
-                [{ label: "Edit", run: () => { closeModal(); if (typeof openEventFormRef === "function") openEventFormRef(post); } }],
-                { buttonClass: "pd-icon-btn", dropdownClass: "event-dropdown", ariaLabel: "Post options" }
-            );
-            if (menu) {
-                const wrap = el("div", "pd-menu-wrap");
-                wrap.appendChild(menu);
-                media.appendChild(wrap);
-            }
-        }
-        const close = el("button", "pd-icon-btn pd-close", "×");
-        close.type = "button";
-        close.setAttribute("aria-label", "Close");
-        close.addEventListener("click", () => closeModal());
-        media.appendChild(close);
-        box.appendChild(media);
-
-        // scrolling body: owner + title/description, then every comment
-        const scroll = el("div", "pd-scroll");
-        const head = el("div", "pd-head");
-        const avatar = el("a", "post-avatar");
-        avatar.href = profileUrl(post.owner);
-        avatar.dataset.profileHover = post.owner;
-        if (post.ownerAvatarImage) {
-            const pos = post.ownerAvatarPosition || { x: 50, y: 50 };
-            avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${post.ownerAvatarImage}")`;
-        } else {
-            avatar.style.background = `linear-gradient(135deg, ${post.ownerAvatarColor}, #1b1b1b)`;
-            avatar.textContent = (post.ownerDisplayName || post.owner).charAt(0).toUpperCase();
-        }
-        const names = el("div", "post-names");
-        const who = el("a", "post-who", post.ownerDisplayName || post.owner);
-        who.href = profileUrl(post.owner);
-        who.dataset.profileHover = post.owner;
-        const dateText = formatFullTimestamp(post.created_at) + (wasEdited(post) ? " · Edited" : "");
-        names.append(who, el("span", "pd-date", dateText));
-        head.append(avatar, names);
-        scroll.appendChild(head);
-        scroll.appendChild(el("div", "pd-title", post.title));
-        if (post.description) {
-            const pdDesc = el("div", "pd-desc");
-            appendTextWithMentions(pdDesc, post.description, post.mentions);
-            scroll.appendChild(pdDesc);
-        }
-
-        // star + going count, same as the card
-        const pdActions = el("div", "post-actions pd-actions");
-        pdActions.appendChild(buildStarButton(post));
-        if (post.goingCount > 0) {
-            pdActions.appendChild(el("span", "post-going-count", `${post.goingCount} going`));
-        }
-        scroll.appendChild(pdActions);
-
-        scroll.appendChild(el("hr", "pd-divider"));
-
-        const commentsHost = el("div");
-        scroll.appendChild(commentsHost);
-        box.appendChild(scroll);
-
-        // composer stays pinned at the bottom of the modal
-        const composer = el("div", "pd-composer");
-        box.appendChild(composer);
-        hooks.modal = { id: post.id, composer, reload: () => renderComments(post, { full: true, focusId: null, listEl: commentsHost, formEl: composer, countBtn: null }) };
-
-        document.body.appendChild(overlay);
-        document.body.classList.add("pd-lock");
-        requestAnimationFrame(() => overlay.classList.add("show"));
-
-        function closeModal() {
-            overlay.classList.remove("show");
-            document.body.classList.remove("pd-lock");
-            hooks.modal = null;
-            if (hooks.onModalClose) hooks.onModalClose();
-            document.removeEventListener("keydown", onKey);
-            setTimeout(() => overlay.remove(), 200);
-        }
-        function onKey(e) { if (e.key === "Escape") closeModal(); }
-        document.addEventListener("keydown", onKey);
-        overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
-
-        renderComments(post, { full: true, focusId, listEl: commentsHost, formEl: composer, countBtn: null })
-            .then(() => {
-                if (!focusId) return;
-                const target = commentsHost.querySelector(`[data-comment-id="${focusId}"]`);
-                if (!target) return;
-                target.scrollIntoView({ block: "center" });
-                target.classList.add("cm-flash");
-                setTimeout(() => target.classList.remove("cm-flash"), 1800);
-            });
-    }
-})();
-
-
-/* Create/edit event form -> slide-in drawer, same structure as the profile editor:
-   header (title + close), scrolling body, pinned footer. Nodes are moved, not
-   rebuilt, so every id and listener homepage.js set up keeps working. */
-(function () {
-    function mk(tag, cls, text) {
-        const n = document.createElement(tag);
-        if (cls) n.className = cls;
-        if (text !== undefined) n.textContent = text;
-        return n;
-    }
-
-    function drawerize() {
-        const form = document.querySelector(".event-form");
-        const box = form && form.querySelector(".event-form-box");
-        if (!box) return false;
-        if (box.dataset.drawer) return true;
-        box.dataset.drawer = "1";
-
-        const title = box.querySelector(".form-title");
-        const buttons = box.querySelector(".form-buttons");
-        const head = mk("div", "ef-head");
-        const scroll = mk("div", "ef-scroll");
-        Array.from(box.children).forEach((c) => { if (c !== title && c !== buttons) scroll.appendChild(c); });
-
-        const close = mk("button", "ef-close", "×");
-        close.type = "button";
-        close.setAttribute("aria-label", "Close");
-        const cancel = () => document.getElementById("cancelEvent").click();
-        close.addEventListener("click", cancel);
-
-        head.append(title, close);
-        box.append(head, scroll, buttons);
-
-        form.addEventListener("click", (e) => { if (e.target === form) cancel(); }); // click the dark area
-        document.addEventListener("keydown", (e) => {
-            if (e.key === "Escape" && form.classList.contains("show")) cancel();
-        });
-        return true;
-    }
-
-    if (!drawerize()) {
-        // the form is built after login check, so wait for it to appear
-        const obs = new MutationObserver(() => { if (drawerize()) obs.disconnect(); });
-        obs.observe(document.body, { childList: true });
-    }
-})();
+    /* ----------
