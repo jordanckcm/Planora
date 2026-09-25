@@ -44,6 +44,50 @@
     feed.id = "feedContainer";
     document.body.insertBefore(feed, document.getElementById("toastStack"));
 
+    // === FEATURED STORIES ROW ===
+    // A horizontal strip of avatar bubbles for currently-Featured posts,
+    // Instagram/Facebook-story style. Tapping a bubble opens that post in
+    // the same full-screen modal a normal post's media tap opens.
+    const storiesRow = document.createElement("div");
+    storiesRow.className = "stories-row";
+    storiesRow.hidden = true; // shown once loadStories() finds something
+    document.body.insertBefore(storiesRow, feed);
+
+    async function loadStories() {
+        let items = [];
+        try {
+            items = await apiRequest("/api/featured");
+        } catch (err) {
+            // stories are a nice-to-have, not core functionality — fail quietly
+            return;
+        }
+        storiesRow.textContent = "";
+        storiesRow.hidden = items.length === 0;
+        items.forEach((p) => storiesRow.appendChild(buildStoryBubble(p)));
+    }
+
+    function buildStoryBubble(p) {
+        const bubble = el("button", "story-bubble");
+        bubble.type = "button";
+        bubble.setAttribute("aria-label", `Featured post by ${p.ownerDisplayName || p.owner}`);
+
+        const ring = el("div", "story-ring");
+        if (p.ownerAvatarImage) {
+            const pos = p.ownerAvatarPosition || { x: 50, y: 50 };
+            ring.style.setProperty("--story-avatar", `url("${p.ownerAvatarImage}")`);
+            ring.style.setProperty("--story-pos", `${pos.x}% ${pos.y}%`);
+            ring.classList.add("has-image");
+        } else {
+            ring.style.background = `linear-gradient(135deg, ${p.ownerAvatarColor}, #1b1b1b)`;
+            ring.textContent = (p.ownerDisplayName || p.owner).charAt(0).toUpperCase();
+        }
+
+        const label = el("span", "story-label", p.isMine ? "You" : (p.ownerDisplayName || p.owner));
+        bubble.append(ring, label);
+        bubble.addEventListener("click", () => openPostDetail(p));
+        return bubble;
+    }
+
     // === FEED SEARCH ===
     // Filters the posts already fetched for this load of the feed — same
     // idea as the calendar's search, just scoped to titles/descriptions/
@@ -78,8 +122,9 @@
     window.render = async function () {
         document.body.classList.toggle("feed-on", feedActive);
         feedSearchBar.style.display = feedActive ? "flex" : "none";
+        storiesRow.style.display = feedActive ? "" : "none";
         if (window.PlanoraNav) PlanoraNav.setActive(feedActive ? "home" : mode);
-        if (feedActive) { await loadFeed(); openPendingPost(); return; }
+        if (feedActive) { await Promise.all([loadFeed(), loadStories()]); openPendingPost(); return; }
         return baseRender();
     };
 
@@ -190,19 +235,48 @@
             .catch(() => toast("Couldn't copy the link.", "error"));
     }
 
-    // Single top-right ⋮ menu for a post. Owners get "Edit" + "Copy link";
-    // everyone else gets just "Copy link". buttonClass lets the card and the
-    // modal each use their own styling hook.
+    // Single top-right ⋮ menu for a post.
+    //   Owner:        Edit, Copy link, (+ Feature/Unfeature if admin)
+    //   Non-owner:    Copy link, (+ Feature/Unfeature if admin)
+    // buttonClass lets the card and the modal each use their own styling hook.
     function buildPostMenu(p, onEdit, buttonClass = "post-menu") {
-        const items = p.isMine
-            ? [{ label: "Edit", run: onEdit }, { label: "Copy link", run: () => copyPostLink(p) }]
-            : [{ label: "Copy link", run: () => copyPostLink(p) }];
-   
+        const items = [];
+        if (p.isMine) items.push({ label: "Edit", run: onEdit });
+        items.push({ label: "Copy link", run: () => copyPostLink(p) });
+
+        if (currentUser.role === "admin") {
+            items.push({
+                label: p.featured ? "Unfeature" : "Feature this post",
+                run: () => toggleFeatured(p)
+            });
+        }
+
         return buildDotsMenu(items, {
             buttonClass,
             dropdownClass: "event-dropdown",
             ariaLabel: "Post options"
         });
+    }
+
+    // Featuring/unfeaturing from the ⋮ menu. Fixed at 24 hours for now —
+    // simple, predictable, no extra UI needed. Updates the in-memory post
+    // object so the card/modal badge and menu label flip immediately, and
+    // refreshes the stories row so a newly-featured post shows up there
+    // without waiting for the next poll.
+    async function toggleFeatured(p) {
+        const wasFeatured = Boolean(p.featured);
+        try {
+            const result = await apiRequest(`/api/admin/events/${p.id}/feature`, {
+                method: "PUT",
+                body: wasFeatured ? { hours: null } : { hours: 24 }
+            });
+            p.featured = result.featured;
+            toast(p.featured ? "Featured for 24 hours." : "Unfeatured.", "success");
+            loadStories();
+            renderFeedList(); // repaint so the badge appears/disappears immediately
+        } catch (err) {
+            toast(err.message, "error");
+        }
     }
 
     // Star button + live count, shared shape between the card and the modal.
@@ -258,6 +332,7 @@
         names.append(who, el("span", "post-handle", "@" + p.owner));
         head.append(avatar, names, el("span", "post-tag", p.visibility === "global" ? "Global" : "Public"),
                     el("span", "post-time", formatRelativeShort(p.created_at)));
+        if (p.featured) head.appendChild(el("span", "post-tag post-featured", "★ Featured"));
         if (wasEdited(p)) head.appendChild(el("span", "post-time", "Edited"));
 
         const menu = buildPostMenu(p, () => {
@@ -567,6 +642,7 @@
         const dateText = formatFullTimestamp(post.created_at) + (wasEdited(post) ? " · Edited" : "");
         names.append(who, el("span", "pd-date", dateText));
         head.append(avatar, names);
+        if (post.featured) head.appendChild(el("span", "post-tag post-featured pd-featured", "★ Featured"));
         scroll.appendChild(head);
         scroll.appendChild(el("div", "pd-title", post.title));
         if (post.description) {
