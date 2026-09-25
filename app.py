@@ -2883,23 +2883,6 @@ def admin_delete_event(current_user, event_id):
     cascade_delete_event(event)
     return jsonify({"ok": True})
 
-@app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
-@require_role("admin")
-def admin_delete_event(current_user, event_id):
-    """
-    Lets an admin remove ANY event, not just their own - e.g. to take
-    down something inappropriate someone posted to Global. Also cascades:
-    see cascade_delete_event.
-    """
-    event = find_event(event_id)
-    if not event:
-        return jsonify({"error": "Event not found."}), 404
-
-    events.remove(event)
-    cascade_delete_event(event)
-    return jsonify({"ok": True})
-
-
 @app.route("/api/admin/events/<int:event_id>/feature", methods=["PUT"])
 @require_role("admin")
 def admin_feature_event(current_user, event_id):
