@@ -511,4 +511,161 @@
         composerContainer.appendChild(form);
     }
 
-    /* ----------
+    /* ---------- Post detail modal (Instagram-style lightbox) ---------- */
+    function openPostDetail(post, focusId) {
+        const overlay = el("div", "pd-overlay");
+        const box = el("div", "pd-box");
+        overlay.appendChild(box);
+
+        // media, with close + the single ⋮ menu (Edit if it's yours,
+        // Copy link otherwise) overlaid top-right
+        const media = el("div", "pd-media");
+        if (post.image) {
+            const pos = post.image_position || { x: 50, y: 50 };
+            media.style.backgroundImage = `url("${post.image}")`;
+            media.style.backgroundPosition = `${pos.x}% ${pos.y}%`;
+        } else {
+            media.style.background = `linear-gradient(135deg, ${post.color || EVENT_COLORS[0]}, #1b1b1b)`;
+            media.textContent = post.icon || EVENT_ICONS[0];
+        }
+
+        const menu = buildPostMenu(
+            post,
+            () => { closeModal(); if (typeof openEventFormRef === "function") openEventFormRef(post); },
+            "pd-icon-btn"
+        );
+        if (menu) {
+            const wrap = el("div", "pd-menu-wrap");
+            wrap.appendChild(menu);
+            media.appendChild(wrap);
+        }
+
+        const close = el("button", "pd-icon-btn pd-close", "×");
+        close.type = "button";
+        close.setAttribute("aria-label", "Close");
+        close.addEventListener("click", () => closeModal());
+        media.appendChild(close);
+        box.appendChild(media);
+
+        // scrolling body: owner + title/description, then every comment
+        const scroll = el("div", "pd-scroll");
+        const head = el("div", "pd-head");
+        const avatar = el("a", "post-avatar");
+        avatar.href = profileUrl(post.owner);
+        avatar.dataset.profileHover = post.owner;
+        if (post.ownerAvatarImage) {
+            const pos = post.ownerAvatarPosition || { x: 50, y: 50 };
+            avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${post.ownerAvatarImage}")`;
+        } else {
+            avatar.style.background = `linear-gradient(135deg, ${post.ownerAvatarColor}, #1b1b1b)`;
+            avatar.textContent = (post.ownerDisplayName || post.owner).charAt(0).toUpperCase();
+        }
+        const names = el("div", "post-names");
+        const who = el("a", "post-who", post.ownerDisplayName || post.owner);
+        who.href = profileUrl(post.owner);
+        who.dataset.profileHover = post.owner;
+        const dateText = formatFullTimestamp(post.created_at) + (wasEdited(post) ? " · Edited" : "");
+        names.append(who, el("span", "pd-date", dateText));
+        head.append(avatar, names);
+        scroll.appendChild(head);
+        scroll.appendChild(el("div", "pd-title", post.title));
+        if (post.description) {
+            const pdDesc = el("div", "pd-desc");
+            appendTextWithMentions(pdDesc, post.description, post.mentions);
+            scroll.appendChild(pdDesc);
+        }
+
+        // star + going count, same as the card
+        const pdActions = el("div", "post-actions pd-actions");
+        pdActions.appendChild(buildStarButton(post));
+        if (post.goingCount > 0) {
+            pdActions.appendChild(el("span", "post-going-count", `${post.goingCount} going`));
+        }
+        scroll.appendChild(pdActions);
+
+        scroll.appendChild(el("hr", "pd-divider"));
+
+        const commentsHost = el("div");
+        scroll.appendChild(commentsHost);
+        box.appendChild(scroll);
+
+        // composer stays pinned at the bottom of the modal
+        const composer = el("div", "pd-composer");
+        box.appendChild(composer);
+        hooks.modal = { id: post.id, composer, reload: () => renderComments(post, { full: true, focusId: null, listEl: commentsHost, formEl: composer, countBtn: null }) };
+
+        document.body.appendChild(overlay);
+        document.body.classList.add("pd-lock");
+        requestAnimationFrame(() => overlay.classList.add("show"));
+
+        function closeModal() {
+            overlay.classList.remove("show");
+            document.body.classList.remove("pd-lock");
+            hooks.modal = null;
+            if (hooks.onModalClose) hooks.onModalClose();
+            document.removeEventListener("keydown", onKey);
+            setTimeout(() => overlay.remove(), 200);
+        }
+        function onKey(e) { if (e.key === "Escape") closeModal(); }
+        document.addEventListener("keydown", onKey);
+        overlay.addEventListener("click", (e) => { if (e.target === overlay) closeModal(); });
+
+        renderComments(post, { full: true, focusId, listEl: commentsHost, formEl: composer, countBtn: null })
+            .then(() => {
+                if (!focusId) return;
+                const target = commentsHost.querySelector(`[data-comment-id="${focusId}"]`);
+                if (!target) return;
+                target.scrollIntoView({ block: "center" });
+                target.classList.add("cm-flash");
+                setTimeout(() => target.classList.remove("cm-flash"), 1800);
+            });
+    }
+})();
+
+
+/* Create/edit event form -> slide-in drawer, same structure as the profile editor:
+   header (title + close), scrolling body, pinned footer. Nodes are moved, not
+   rebuilt, so every id and listener homepage.js set up keeps working. */
+(function () {
+    function mk(tag, cls, text) {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (text !== undefined) n.textContent = text;
+        return n;
+    }
+
+    function drawerize() {
+        const form = document.querySelector(".event-form");
+        const box = form && form.querySelector(".event-form-box");
+        if (!box) return false;
+        if (box.dataset.drawer) return true;
+        box.dataset.drawer = "1";
+
+        const title = box.querySelector(".form-title");
+        const buttons = box.querySelector(".form-buttons");
+        const head = mk("div", "ef-head");
+        const scroll = mk("div", "ef-scroll");
+        Array.from(box.children).forEach((c) => { if (c !== title && c !== buttons) scroll.appendChild(c); });
+
+        const close = mk("button", "ef-close", "×");
+        close.type = "button";
+        close.setAttribute("aria-label", "Close");
+        const cancel = () => document.getElementById("cancelEvent").click();
+        close.addEventListener("click", cancel);
+
+        head.append(title, close);
+        box.append(head, scroll, buttons);
+
+        form.addEventListener("click", (e) => { if (e.target === form) cancel(); }); // click the dark area
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && form.classList.contains("show")) cancel();
+        });
+        return true;
+    }
+
+    if (!drawerize()) {
+        // the form is built after login check, so wait for it to appear
+        const obs = new MutationObserver(() => { if (drawerize()) obs.disconnect(); });
+        obs.observe(document.body, { childList: true });
+    }
+})();
