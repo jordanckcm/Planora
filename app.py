@@ -1126,7 +1126,6 @@ def notification_view(n):
         "commentId": n["comment_id"],
         "text": n["text"],
         "createdAt": n["created_at"],
-        "featured": is_featured(event),
     }
 
 
@@ -1152,6 +1151,7 @@ def profile_event_view(event):
         "edited": bool(event.get("edited")),
         "edited_at": event.get("edited_at"),
         "created_at": event.get("created_at"),
+        "featured": is_featured(event),
     }
 
 
