@@ -11,7 +11,21 @@
    mirroring an Instagram-style post lightbox.
 
    Notifications: a link like homepage.html?post=ID&comment=ID opens that
-   post's modal straight away, scrolls to the comment and flashes it. */
+   post's modal straight away, scrolls to the comment and flashes it.
+
+   POST-LEVEL ACTIONS: a small ⋮ sits at the top-LEFT of each post (and of
+   the post-detail modal) holding "Copy link" and, for someone else's
+   post you haven't added yet, "Add to calendar". The existing top-RIGHT
+   ⋮ is unchanged — it's still just Edit, and only shows on your own posts.
+
+   REACTIONS: a star button + count (server-side, one per person per
+   post, toggled via POST /api/events/<id>/star) sits next to a
+   "N going" count (how many other people have the post on their
+   calendar) in the actions row.
+
+   SEARCH: a small search bar above the feed filters the already-loaded
+   posts by title/description/owner, client-side — matching the calendar
+   page's search but scoped to Home. */
 
 (function () {
     const hooks = window.PlanoraFeedHooks = { panels: new Map(), modal: null, onModalClose: null };
@@ -31,9 +45,40 @@
     feed.id = "feedContainer";
     document.body.insertBefore(feed, document.getElementById("toastStack"));
 
+    // === FEED SEARCH ===
+    // Filters the posts already fetched for this load of the feed — same
+    // idea as the calendar's search, just scoped to titles/descriptions/
+    // owners of Home posts instead of calendar events.
+    const feedSearchBar = document.createElement("div");
+    feedSearchBar.className = "search-bar feed-search-bar";
+    feedSearchBar.innerHTML = `
+        <input type="text" id="feedSearch" class="search-input" placeholder="Search posts…" autocomplete="off" maxlength="80">
+        <button type="button" id="feedClearSearch" class="clear-search" aria-label="Clear search" style="display:none;">×</button>
+    `;
+    document.body.insertBefore(feedSearchBar, feed);
+
+    const feedSearchInput = feedSearchBar.querySelector("#feedSearch");
+    const feedClearBtn = feedSearchBar.querySelector("#feedClearSearch");
+    let feedQuery = "";
+    let latestPosts = [];
+
+    feedSearchInput.addEventListener("input", () => {
+        feedQuery = feedSearchInput.value.trim().toLowerCase();
+        feedClearBtn.style.display = feedQuery ? "flex" : "none";
+        renderFeedList();
+    });
+    feedClearBtn.addEventListener("click", () => {
+        feedSearchInput.value = "";
+        feedQuery = "";
+        feedClearBtn.style.display = "none";
+        feedSearchInput.focus();
+        renderFeedList();
+    });
+
     const baseRender = window.render;
     window.render = async function () {
         document.body.classList.toggle("feed-on", feedActive);
+        feedSearchBar.style.display = feedActive ? "flex" : "none";
         if (window.PlanoraNav) PlanoraNav.setActive(feedActive ? "home" : mode);
         if (feedActive) { await loadFeed(); openPendingPost(); return; }
         return baseRender();
@@ -46,22 +91,43 @@
     };
 
     async function loadFeed() {
-        let posts;
         try {
-            posts = await apiRequest("/api/feed");
+            latestPosts = await apiRequest("/api/feed");
         } catch (err) {
             toast(err.message, "error");
             return;
         }
+        renderFeedList();
+    }
+
+    function renderFeedList() {
         hooks.panels.clear();
         feed.textContent = "";
-        if (!posts.length) {
+
+        const query = feedQuery;
+        const posts = query
+            ? latestPosts.filter(p =>
+                p.title.toLowerCase().includes(query) ||
+                (p.description && p.description.toLowerCase().includes(query)) ||
+                p.owner.toLowerCase().includes(query))
+            : latestPosts;
+
+        if (!latestPosts.length) {
             const empty = document.createElement("div");
             empty.className = "feed-empty";
             empty.textContent = "Nothing here yet. Tap + and post a Public or Global event.";
             feed.appendChild(empty);
             return;
         }
+
+        if (!posts.length) {
+            const empty = document.createElement("div");
+            empty.className = "feed-empty";
+            empty.textContent = "No posts match your search.";
+            feed.appendChild(empty);
+            return;
+        }
+
         posts.forEach((p) => feed.appendChild(buildPost(p)));
     }
 
@@ -113,12 +179,89 @@
         }
     }
 
+    // "Copy link" — shared by the post card's left menu and the modal's.
+    function copyPostLink(p) {
+        const url = `${location.origin}${location.pathname}?post=${p.id}`;
+        if (!navigator.clipboard || !navigator.clipboard.writeText) {
+            toast("Copying isn't supported in this browser.", "error");
+            return;
+        }
+        navigator.clipboard.writeText(url)
+            .then(() => toast("Link copied to clipboard.", "success"))
+            .catch(() => toast("Couldn't copy the link.", "error"));
+    }
+
+    // Builds the top-left ⋮ menu: Copy link always, Add to calendar when
+    // it's someone else's post you haven't added yet. Returns null only
+    // if buildDotsMenu would (it never does here, since Copy link is
+    // always offered) — kept as a function so both the card and the
+    // modal can build their own independent instance.
+    function buildLeftMenu(p, onAdded) {
+        const items = [{ label: "Copy link", run: () => copyPostLink(p) }];
+
+        if (!p.isMine && !p.addedByMe) {
+            items.push({
+                label: "Add to calendar",
+                run: async () => {
+                    try {
+                        await PlanoraData.addToMyCalendar(p.id);
+                        p.addedByMe = true;
+                        toast(`Added "${p.title}" to your calendar.`, "success");
+                        if (onAdded) onAdded();
+                    } catch (err) {
+                        toast(err.message, "error");
+                    }
+                }
+            });
+        }
+
+        return buildDotsMenu(items, {
+            buttonClass: "post-menu-left",
+            dropdownClass: "event-dropdown",
+            ariaLabel: "Post options"
+        });
+    }
+
+    // Star button + live count, shared shape between the card and the modal.
+    function buildStarButton(p) {
+        const starBtn = el("button", "post-btn post-star" + (p.starredByMe ? " starred" : ""));
+        starBtn.type = "button";
+
+        function paint() {
+            starBtn.textContent = (p.starredByMe ? "★" : "☆") + " " + (p.starCount || 0);
+            starBtn.classList.toggle("starred", Boolean(p.starredByMe));
+        }
+        paint();
+
+        starBtn.addEventListener("click", async () => {
+            starBtn.disabled = true;
+            try {
+                const result = await apiRequest(`/api/events/${p.id}/star`, { method: "POST" });
+                p.starredByMe = result.starred;
+                p.starCount = result.starCount;
+                paint();
+            } catch (err) {
+                toast(err.message, "error");
+            } finally {
+                starBtn.disabled = false;
+            }
+        });
+
+        return starBtn;
+    }
+
     function buildPost(p) {
         const post = el("article", "post");
         post.dataset.postId = p.id;
 
-        // header
+        // header — left ⋮ menu first (top-left of the post), then the
+        // usual avatar/name/tag/time, then the existing right-side edit
+        // menu for your own posts
         const head = el("div", "post-head");
+
+        const leftMenu = buildLeftMenu(p);
+        if (leftMenu) head.appendChild(leftMenu);
+
         const avatar = el("a", "post-avatar");
         avatar.href = profileUrl(p.owner);
         avatar.dataset.profileHover = p.owner;
@@ -171,26 +314,16 @@
         media.addEventListener("click", () => openPostDetail(p));
         post.appendChild(media);
 
-        // actions
+        // actions — star + going count, then Comments. "Add to calendar"
+        // now lives in the left ⋮ menu above instead of a standalone button.
         const actions = el("div", "post-actions");
-        if (!p.isMine) {
-            const add = el("button", "post-btn" + (p.addedByMe ? " done" : ""), p.addedByMe ? "On your calendar" : "Add to calendar");
-            add.type = "button";
-            add.disabled = p.addedByMe;
-            add.addEventListener("click", async () => {
-                add.disabled = true;
-                try {
-                    await PlanoraData.addToMyCalendar(p.id);
-                    add.textContent = "On your calendar";
-                    add.classList.add("done");
-                    toast(`Added "${p.title}" to your calendar.`, "success");
-                } catch (err) {
-                    toast(err.message, "error");
-                    add.disabled = false;
-                }
-            });
-            actions.appendChild(add);
+
+        actions.appendChild(buildStarButton(p));
+
+        if (p.goingCount > 0) {
+            actions.appendChild(el("span", "post-going-count", `${p.goingCount} going`));
         }
+
         const count = el("button", "post-btn", `Comments (${p.commentCount})`);
         count.type = "button";
         actions.appendChild(count);
@@ -405,7 +538,8 @@
         const box = el("div", "pd-box");
         overlay.appendChild(box);
 
-        // media, with close + (if mine) edit menu overlaid top-right
+        // media, with the left ⋮ menu (copy link / add to calendar) and
+        // close + (if mine) edit menu overlaid top-right
         const media = el("div", "pd-media");
         if (post.image) {
             const pos = post.image_position || { x: 50, y: 50 };
@@ -415,6 +549,14 @@
             media.style.background = `linear-gradient(135deg, ${post.color || EVENT_COLORS[0]}, #1b1b1b)`;
             media.textContent = post.icon || EVENT_ICONS[0];
         }
+
+        const leftMenu = buildLeftMenu(post);
+        if (leftMenu) {
+            const wrapLeft = el("div", "pd-menu-wrap pd-menu-wrap-left");
+            wrapLeft.appendChild(leftMenu);
+            media.appendChild(wrapLeft);
+        }
+
         if (post.isMine) {
             const menu = buildDotsMenu(
                 [{ label: "Edit", run: () => { closeModal(); if (typeof openEventFormRef === "function") openEventFormRef(post); } }],
@@ -460,6 +602,15 @@
             appendTextWithMentions(pdDesc, post.description, post.mentions);
             scroll.appendChild(pdDesc);
         }
+
+        // star + going count, same as the card
+        const pdActions = el("div", "post-actions pd-actions");
+        pdActions.appendChild(buildStarButton(post));
+        if (post.goingCount > 0) {
+            pdActions.appendChild(el("span", "post-going-count", `${post.goingCount} going`));
+        }
+        scroll.appendChild(pdActions);
+
         scroll.appendChild(el("hr", "pd-divider"));
 
         const commentsHost = el("div");
