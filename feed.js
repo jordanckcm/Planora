@@ -190,14 +190,14 @@
             .catch(() => toast("Couldn't copy the link.", "error"));
     }
 
-    // Single top-right ⋮ menu for a post. Owners get "Edit"; everyone
-    // else gets just "Copy link". buttonClass lets the card and the
+    // Single top-right ⋮ menu for a post. Owners get "Edit" + "Copy link";
+    // everyone else gets just "Copy link". buttonClass lets the card and the
     // modal each use their own styling hook.
     function buildPostMenu(p, onEdit, buttonClass = "post-menu") {
         const items = p.isMine
-            ? [{ label: "Edit", run: onEdit }]
+            ? [{ label: "Edit", run: onEdit }, { label: "Copy link", run: () => copyPostLink(p) }]
             : [{ label: "Copy link", run: () => copyPostLink(p) }];
-
+   
         return buildDotsMenu(items, {
             buttonClass,
             dropdownClass: "event-dropdown",
