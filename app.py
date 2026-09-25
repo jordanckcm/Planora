@@ -133,6 +133,17 @@ PREFERENCES
     reduce_motion (bool). These aren't used for anything server-side;
     they're just stored so a person's theme/motion choice follows them
     to a new device, the same way Discord's account-level settings do.
+
+STARS (reactions)
+    A lightweight "star" a person can put on any event they can see
+    (their own included) — the like-equivalent for Planora. Kept as its
+    own flat list, `stars`, of {event_id, username, created_at}. One
+    star per person per event; posting again just removes it (toggle).
+    star_count()/has_starred() read it; feed_item() and get_events() both
+    report starCount/starredByMe so the frontend can show a filled vs.
+    outlined star. Stars are cleaned up alongside an event (cascade_delete_event)
+    or a person's account (delete_me / admin_delete_user), same as
+    comments and notifications.
 """
 from pywebpush import webpush, WebPushException
 import json as json_lib
@@ -285,6 +296,7 @@ comments = []
 friendships = []  # [{"id", "requester", "recipient", "status", "created_at"}]
 next_friendship_id = 1
 notifications = []
+stars = []  # [{"event_id", "username", "created_at"}] - one per person per event
 push_subscriptions = []  # [{"username", "subscription": {endpoint, keys}, "created_at"}, ...]
 push_history = {}        # username (lowercase) -> [timestamps of recent pushes]
 push_lock = threading.Lock()
@@ -514,17 +526,38 @@ def can_see_event(user, event):
     return user["role"] == "admin" or event["owner"].lower() == user["username"].lower()
 
 
+def star_count(event_id):
+    return len([s for s in stars if s["event_id"] == event_id])
+
+
+def has_starred(event_id, username):
+    return any(
+        s["event_id"] == event_id and s["username"].lower() == username.lower()
+        for s in stars
+    )
+
+
+def going_count(event):
+    """How many OTHER people have this post on their calendar - i.e. how many
+    clones of it exist that aren't the poster's own auto-added copy."""
+    return len([
+        e for e in events
+        if e.get("cloned_from") == event["id"] and e["owner"].lower() != event["owner"].lower()
+    ])
+
+
 def cascade_delete_event(deleted_event):
     """
     Removes the fallout of an already-removed event: if it was a Global
     post, everyone's local copies of it go too, along with the comments
-    on the post and on those copies.
+    on the post and on those copies, and any stars on any of them.
     """
     removed_ids = {deleted_event["id"]}
     if deleted_event["visibility"] == "global":
         removed_ids |= {e["id"] for e in events if e.get("cloned_from") == deleted_event["id"]}
         events[:] = [e for e in events if e.get("cloned_from") != deleted_event["id"]]
     comments[:] = [c for c in comments if c["event_id"] not in removed_ids]
+    stars[:] = [s for s in stars if s["event_id"] not in removed_ids]
     prune_notifications()
     log_change("event", event_id=deleted_event["id"])
 
@@ -1125,6 +1158,9 @@ def feed_item(e, me):
         o["owner"].lower() == me and o.get("cloned_from") == e["id"] for o in events
     )
     item["commentCount"] = len([c for c in comments if c["event_id"] == e["id"]])
+    item["starCount"] = star_count(e["id"])
+    item["starredByMe"] = has_starred(e["id"], me)
+    item["goingCount"] = going_count(e)
     return item
 
 
@@ -1600,6 +1636,7 @@ def delete_me():
         cascade_delete_event(event)
 
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
+    stars[:] = [s for s in stars if s["username"].lower() != username.lower()]
     prune_orphan_replies()
     drop_user_push_data(username)
     drop_user_friendships(username)
@@ -1751,6 +1788,8 @@ def get_events():
         event_copy.setdefault("edited_at", None)
         event_copy["mentions"] = extract_mentions(event.get("description", ""))
         event_copy["isMine"] = event["owner"].lower() == username.lower()
+        event_copy["starCount"] = star_count(event["id"])
+        event_copy["starredByMe"] = has_starred(event["id"], username.lower())
 
         # so the card can show the host's face instead of a bare day
         # number - falls back to their assigned color if they have no photo
@@ -1802,6 +1841,40 @@ def get_event(event_id):
         return jsonify({"error": "Event not found."}), 404
 
     return jsonify(feed_item(event, user["username"].lower()))
+
+
+@app.route("/api/events/<int:event_id>/star", methods=["POST"])
+def toggle_star(event_id):
+    """
+    Toggles the signed-in person's star on this event: adds one if they
+    hadn't starred it, removes it if they had. Works on any event the
+    viewer can see (their own calendar events included), the same
+    visibility rule as commenting. Returns the new state so the frontend
+    doesn't need a follow-up fetch.
+    """
+    user = get_logged_in_user()
+    if not user:
+        return jsonify({"error": "Not signed in."}), 401
+
+    event = find_event(event_id)
+    if not event or not can_see_event(user, event):
+        return jsonify({"error": "Event not found."}), 404
+
+    username = user["username"]
+    existing = next(
+        (s for s in stars if s["event_id"] == event_id and s["username"].lower() == username.lower()),
+        None,
+    )
+
+    if existing:
+        stars.remove(existing)
+        starred = False
+    else:
+        stars.append({"event_id": event_id, "username": username, "created_at": now_in_ms()})
+        starred = True
+
+    log_change("event", event_id=event_id)
+    return jsonify({"starred": starred, "starCount": star_count(event_id)})
 
 
 @app.route("/api/events", methods=["POST"])
@@ -2640,6 +2713,7 @@ def admin_delete_user(current_user, username):
         cascade_delete_event(event)
 
     comments[:] = [c for c in comments if c["author"].lower() != username.lower()]
+    stars[:] = [s for s in stars if s["username"].lower() != username.lower()]
     prune_orphan_replies()
     drop_user_push_data(username)
     drop_user_friendships(username)
