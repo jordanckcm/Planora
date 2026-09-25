@@ -32,6 +32,7 @@
         const el = document.createElement("a");
         el.className = "fr-avatar";
         el.href = "profile.html?u=" + encodeURIComponent(person.username);
+        el.dataset.profileHover = person.username;
         const img = safeImage(person.avatarImage);
         if (img) {
             const pos = person.avatarPosition || { x: 50, y: 50 };
@@ -53,6 +54,7 @@
         const name = document.createElement("a");
         name.className = "fr-name";
         name.href = "profile.html?u=" + encodeURIComponent(person.username);
+        name.dataset.profileHover = person.username;
         name.textContent = person.displayName || person.username;
 
         const handle = document.createElement("div");
