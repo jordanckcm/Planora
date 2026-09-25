@@ -179,11 +179,18 @@ select {
     margin-top: -46px;
 }
 
+.hero-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px; /* matches .edit-button's own margin-bottom */
+}
+
 .friend-actions {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px; /* matches .edit-button's existing margin-bottom */
+    /* margin-bottom removed — now lives on .hero-actions */
 }
 
 .avatar-big {
