@@ -217,11 +217,11 @@ function render() {
     document.querySelectorAll(".events-tab").forEach((btn) => {
         btn.classList.toggle("active", btn.dataset.tab === currentEventsTab);
     });
-   
+
     $("tabNote").textContent = p.isSelf
         ? "Public and Global are visible to everyone. Private is visible only to you."
         : "";
-   
+
     renderEvents();
     renderFriendButton();
 }
@@ -408,9 +408,9 @@ function eventTile(event) {
         addedMark.title = "Already on your calendar";
         cover.appendChild(addedMark);
     }
-   
-   // separate, unconditional on isSelf — this is what actually needs to run
-   // for private events, which only ever show up when profile.isSelf is true
+
+    // separate, unconditional on isSelf — this is what actually needs to run
+    // for private events, which only ever show up when profile.isSelf is true
     if (event.visibility === "local") {
         const lock = document.createElement("span");
         lock.className = "tile-lock";
@@ -574,6 +574,7 @@ async function openPost(event) {
     paintAvatar($("postAvatar"), profile.avatarImage, profile.avatarColor, initialOf(profile.displayName, profile.username), profile.avatarPosition);
     $("postAuthor").textContent = profile.displayName;
     $("postAuthor").href = profileHref(profile.username);
+    $("postAuthor").dataset.profileHover = profile.username;
     $("postDate").textContent = formatEventDate(event);
     $("postTitle").textContent = event.title;
 
@@ -669,6 +670,7 @@ function postCommentRow(comment, isReply) {
     const avatar = document.createElement("a");
     avatar.className = "comment-avatar";
     avatar.href = profileHref(comment.author);
+    avatar.dataset.profileHover = comment.author;
     avatar.title = displayName;
     if (safeImage(comment.authorAvatarImage)) {
         avatar.style.background = `center / cover no-repeat url("${comment.authorAvatarImage}")`;
@@ -680,6 +682,7 @@ function postCommentRow(comment, isReply) {
     const author = document.createElement("a");
     author.className = "comment-author";
     author.href = profileHref(comment.author);
+    author.dataset.profileHover = comment.author;
     author.textContent = "@" + comment.author;
 
     const time = document.createElement("span");
@@ -694,6 +697,7 @@ function postCommentRow(comment, isReply) {
         const mention = document.createElement("a");
         mention.className = "comment-mention";
         mention.href = profileHref(comment.reply_to);
+        mention.dataset.profileHover = comment.reply_to;
         mention.textContent = "@" + comment.reply_to;
         text.appendChild(mention);
         text.appendChild(document.createTextNode(" "));
