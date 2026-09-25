@@ -121,6 +121,7 @@
         const head = el("div", "post-head");
         const avatar = el("a", "post-avatar");
         avatar.href = profileUrl(p.owner);
+        avatar.dataset.profileHover = p.owner;
         if (p.ownerAvatarImage) {
             const pos = p.ownerAvatarPosition || { x: 50, y: 50 };
             avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${p.ownerAvatarImage}")`;
@@ -131,6 +132,7 @@
         const names = el("div", "post-names");
         const who = el("a", "post-who", p.ownerDisplayName || p.owner);
         who.href = profileUrl(p.owner);
+        who.dataset.profileHover = p.owner;
         names.append(who, el("span", "post-handle", "@" + p.owner));
         head.append(avatar, names, el("span", "post-tag", p.visibility === "global" ? "Global" : "Public"),
                     el("span", "post-time", formatRelativeShort(p.created_at)));
@@ -270,15 +272,18 @@
 
             const av = el("a", "cm-avatar");
             av.href = profileUrl(c.author);
+            av.dataset.profileHover = c.author;
             paintAv(av, c.authorAvatarImage, c.authorAvatarColor, c.authorDisplayName || c.author, c.authorAvatarPosition);
 
             const line = el("div", "cm-line");
             const name = el("a", "cm-name", c.author);
             name.href = profileUrl(c.author);
+            name.dataset.profileHover = c.author;
             line.appendChild(name);
             if (c.reply_to) {
                 const m = el("a", "cm-mention", "@" + c.reply_to);
                 m.href = profileUrl(c.reply_to);
+                m.dataset.profileHover = c.reply_to;
                 line.appendChild(m);
             }
             appendTextWithMentions(line, c.text, c.mentions);
@@ -433,6 +438,7 @@
         const head = el("div", "pd-head");
         const avatar = el("a", "post-avatar");
         avatar.href = profileUrl(post.owner);
+        avatar.dataset.profileHover = post.owner;
         if (post.ownerAvatarImage) {
             const pos = post.ownerAvatarPosition || { x: 50, y: 50 };
             avatar.style.background = `${pos.x}% ${pos.y}% / cover no-repeat url("${post.ownerAvatarImage}")`;
@@ -443,6 +449,7 @@
         const names = el("div", "post-names");
         const who = el("a", "post-who", post.ownerDisplayName || post.owner);
         who.href = profileUrl(post.owner);
+        who.dataset.profileHover = post.owner;
         const dateText = formatFullTimestamp(post.created_at) + (wasEdited(post) ? " · Edited" : "");
         names.append(who, el("span", "pd-date", dateText));
         head.append(avatar, names);
