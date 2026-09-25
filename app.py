@@ -530,6 +530,15 @@ def star_count(event_id):
     return len([s for s in stars if s["event_id"] == event_id])
 
 
+def is_featured(event):
+    """True if this event is currently pinned as Featured. featured_until
+    is a millisecond timestamp (like created_at) - once it's in the past,
+    the event just quietly stops being featured. Nothing needs to actively
+    clear it."""
+    until = event.get("featured_until")
+    return bool(until and until > now_in_ms())
+
+
 def has_starred(event_id, username):
     return any(
         s["event_id"] == event_id and s["username"].lower() == username.lower()
@@ -1117,6 +1126,7 @@ def notification_view(n):
         "commentId": n["comment_id"],
         "text": n["text"],
         "createdAt": n["created_at"],
+        "featured": is_featured(event),
     }
 
 
@@ -1266,11 +1276,13 @@ def feed_score(event, viewer, ctx):
     """Higher = nearer the top. Returns (score, why) where why is a short
     label for the strongest reason, for the UI to show if it wants to."""
     age_hours = max(0.0, (now_in_ms() - event.get("created_at", 0)) / 3600000)
-    why = ""
+    why = "Featured" if is_featured(event) else ""
 
     # 1. freshness: full marks when just posted, half every 18 hours
     score = 100 * 0.5 ** (age_hours / 18)
-    if age_hours < 6:
+    if is_featured(event):
+        score += 500
+    if age_hours < 6 and not why:
         why = "New"
 
     # a post made this very moment always lands at the very top
@@ -1283,9 +1295,9 @@ def feed_score(event, viewer, ctx):
     if days is not None:
         if 0 <= days <= 14:
             score += 10 + 55 * (1 - days / 14)
-            if days == 0:
+            if days == 0 and not why:
                 why = "Happening today"
-            elif days <= 3 and why != "Just posted":
+            elif days <= 3 and not why:
                 why = "Coming up soon"
         elif days > 14:
             score += 3
@@ -1378,6 +1390,25 @@ def get_feed():
         item["why"] = why
         result.append(item)
     return jsonify(result)
+
+@app.route("/api/featured", methods=["GET"])
+def get_featured():
+    """Every currently-active Featured post, for the stories row at the
+    top of the Home feed. No pagination - there should only ever be a
+    handful of these at once, by nature of how featuring works."""
+    viewer = get_logged_in_user()
+    if not viewer:
+        return jsonify({"error": "Not signed in."}), 401
+
+    me = viewer["username"].lower()
+    active = [
+        e for e in events
+        if e["visibility"] in ("global", "public") and is_featured(e)
+    ]
+    # most recently featured first
+    active.sort(key=lambda e: e.get("featured_until", 0), reverse=True)
+
+    return jsonify([feed_item(e, me) for e in active])
 
 @app.route("/")
 def serve_home_page():
@@ -1790,6 +1821,7 @@ def get_events():
         event_copy["isMine"] = event["owner"].lower() == username.lower()
         event_copy["starCount"] = star_count(event["id"])
         event_copy["starredByMe"] = has_starred(event["id"], username.lower())
+        event_copy["featured"] = is_featured(event)
 
         # so the card can show the host's face instead of a bare day
         # number - falls back to their assigned color if they have no photo
@@ -1969,6 +2001,7 @@ def add_event():
         "image": image,
         "image_position": image_position,
         "cloned_from": None,
+        "featured_until": None,
         "created_at": now_in_ms(),
         "edited": False,
         "edited_at": None,
@@ -2849,6 +2882,51 @@ def admin_delete_event(current_user, event_id):
     events.remove(event)
     cascade_delete_event(event)
     return jsonify({"ok": True})
+
+@app.route("/api/admin/events/<int:event_id>", methods=["DELETE"])
+@require_role("admin")
+def admin_delete_event(current_user, event_id):
+    """
+    Lets an admin remove ANY event, not just their own - e.g. to take
+    down something inappropriate someone posted to Global. Also cascades:
+    see cascade_delete_event.
+    """
+    event = find_event(event_id)
+    if not event:
+        return jsonify({"error": "Event not found."}), 404
+
+    events.remove(event)
+    cascade_delete_event(event)
+    return jsonify({"ok": True})
+
+
+@app.route("/api/admin/events/<int:event_id>/feature", methods=["PUT"])
+@require_role("admin")
+def admin_feature_event(current_user, event_id):
+    """
+    Pins (or unpins) an event as Featured. Send {"hours": 24} to feature
+    it for 24 hours from now, or {"hours": null} (or omit "hours"
+    entirely) to unfeature it immediately. Only Public/Global events make
+    sense to feature - a Private event has no feed presence to boost -
+    but this doesn't hard-block Private just in case an admin wants to
+    feature something right after flipping its visibility; the frontend
+    is expected to only ever offer this on Public/Global posts.
+    """
+    event = find_event(event_id)
+    if not event:
+        return jsonify({"error": "Event not found."}), 404
+
+    hours = body().get("hours")
+
+    if hours is None:
+        event["featured_until"] = None
+    else:
+        if not isinstance(hours, (int, float)) or isinstance(hours, bool) or hours <= 0 or hours > 720:
+            return jsonify({"error": "Pick a number of hours between 1 and 720 (30 days)."}), 400
+        event["featured_until"] = now_in_ms() + int(hours * 3600000)
+
+    log_change("event", event_id=event["id"])
+    return jsonify({"ok": True, "featured": is_featured(event), "featuredUntil": event["featured_until"]})
 
 
 # starts the "event starts soon" reminder checker (also when run by gunicorn)
