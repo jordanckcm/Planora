@@ -71,8 +71,6 @@ async function apiRequest(url, options = {}) {
         throw offlineError;
     }
 
-   
-
     // Read the body as text first instead of calling response.json()
     // directly. Most responses are valid JSON, but if the server ever
     // sends back something that isn't — an unhandled error slipping
@@ -124,7 +122,7 @@ const Planora = (() => {
             if (!names.has(name.toLowerCase())) name = raw.replace(/\.+$/, "");
             if (!names.has(name.toLowerCase())) return whole;
             const trailing = raw.slice(name.length);
-            return `${lead}<a class="mention" href="profile.html?u=${encodeURIComponent(name)}">@${name}</a>${trailing}`;
+            return `${lead}<a class="mention" href="profile.html?u=${encodeURIComponent(name)}" data-profile-hover="${name}">@${name}</a>${trailing}`;
         });
     }
 
@@ -147,6 +145,7 @@ const Planora = (() => {
             const a = document.createElement("a");
             a.className = className;
             a.href = "profile.html?u=" + encodeURIComponent(name);
+            a.dataset.profileHover = name;
             a.textContent = "@" + name;
             container.appendChild(a);
             last = at + 1 + name.length;
