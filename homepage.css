@@ -870,3 +870,132 @@ body {
         transform: none;
     }
 }
+
+/* =========================================================
+   FEATURED STORIES ROW — "Capture Frame" style
+   A camcorder-viewfinder bracket frame instead of an
+   Instagram gradient ring, echoing the VHS aesthetic the
+   rest of the app already uses.
+========================================================= */
+
+.stories-row {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding: 16px 16px 12px;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.stories-row::-webkit-scrollbar {
+    display: none;
+}
+
+.story-bubble {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    flex-shrink: 0;
+
+    width: 64px;
+
+    border: none;
+    background: none;
+    cursor: pointer;
+}
+
+.story-ring {
+    position: relative;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 58px;
+    height: 58px;
+
+    border-radius: 10px;
+    background: color-mix(in srgb, #f5c542 10%, transparent);
+
+    font-size: 18px;
+    font-weight: 600;
+    color: #f5c542;
+
+    transition: transform 0.15s ease;
+}
+
+.story-bubble:hover .story-ring {
+    transform: scale(1.05);
+}
+
+/* corner brackets — the viewfinder/focus-frame look */
+.story-ring::before {
+    content: "";
+    position: absolute;
+    inset: -4px;
+    border-radius: 12px;
+    pointer-events: none;
+
+    background:
+        linear-gradient(#f5c542, #f5c542) top left / 12px 2px no-repeat,
+        linear-gradient(#f5c542, #f5c542) top left / 2px 12px no-repeat,
+        linear-gradient(#f5c542, #f5c542) top right / 12px 2px no-repeat,
+        linear-gradient(#f5c542, #f5c542) top right / 2px 12px no-repeat,
+        linear-gradient(#f5c542, #f5c542) bottom left / 12px 2px no-repeat,
+        linear-gradient(#f5c542, #f5c542) bottom left / 2px 12px no-repeat,
+        linear-gradient(#f5c542, #f5c542) bottom right / 12px 2px no-repeat,
+        linear-gradient(#f5c542, #f5c542) bottom right / 2px 12px no-repeat;
+}
+
+/* small pulsing "recording" dot, top-right corner */
+.story-ring::after {
+    content: "";
+    position: absolute;
+    top: -6px;
+    right: -6px;
+
+    width: 9px;
+    height: 9px;
+
+    border-radius: 50%;
+    background: #e0473e;
+    box-shadow: 0 0 0 2px var(--panel, #131313);
+
+    animation: storyPulse 1.8s ease-in-out infinite;
+}
+
+@keyframes storyPulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+.story-ring.has-image {
+    color: transparent; /* hide any stray initial text if it leaks through */
+    background-image: var(--story-avatar);
+    background-position: var(--story-pos, 50% 50%);
+    background-size: cover;
+    background-repeat: no-repeat;
+}
+
+.story-label {
+    max-width: 64px;
+
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    font-size: 10px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-dim, #ccc);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .story-bubble:hover .story-ring {
+        transform: none;
+    }
+    .story-ring::after {
+        animation: none;
+    }
+}
